@@ -13,7 +13,7 @@ Phase 0 is complete only when:
 - [x] Unit tests and coverage gate pass.
 - [x] Ruff formatting and linting pass.
 - [x] Strict mypy passes.
-- [ ] GitHub Actions passes on the pull request.
+- [x] GitHub Actions passes on the integration commit (Python 3.11 and 3.12).
 - [x] `CURRENT_STATUS.md` and `HANDOFF.md` reflect the merged state.
 
 No simulator, LLM integration, cloud resource, or production database is required in Phase 0.

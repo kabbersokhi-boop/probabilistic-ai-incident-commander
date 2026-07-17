@@ -32,7 +32,7 @@ Phase 0 - Product thesis and evaluation contract
 
 - Repository: `kabbersokhi-boop/probabilistic-ai-incident-commander`.
 - Branch: `main`, by explicit integration instruction. This supersedes the original feature-branch and draft-PR delivery flow.
-- GitHub Actions: pending first push of the Phase 0 integration commit.
+- GitHub Actions: passed on Python 3.11 and 3.12 for run 29565614702 (`phase-0-contracts`).
 
 ## Next phase
 

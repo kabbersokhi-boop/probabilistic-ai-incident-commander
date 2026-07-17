@@ -3,7 +3,10 @@ include README.md
 include CONTRIBUTING.md
 include Makefile
 include .env.example
+recursive-include configs *.yaml
+recursive-include data *.md
 recursive-include docs *.md
+recursive-include examples *.py
 recursive-include schemas *.json
 recursive-include specs *.yaml
 recursive-include tests *.py

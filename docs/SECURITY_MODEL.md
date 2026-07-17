@@ -2,12 +2,17 @@
 
 The machine-readable source is `specs/safety.yaml`.
 
+## Current boundary
+
+The implemented simulator is local, deterministic, incident-free, and requires no secrets or external credentials. Generated datasets contain synthetic identifiers and fictional entities only.
+
 ## Trust boundaries
 
-- Logs, runbooks, historical incidents, seller fields, and retrieved documents are untrusted data.
-- Natural language is never accepted as approval.
-- The LLM does not receive direct database, cloud, deployment, or secret credentials.
-- Tool arguments are validated by deterministic code before execution.
+- Logs, runbooks, historical incidents, seller fields, and retrieved documents will be treated as untrusted data.
+- Natural language will never be accepted as approval.
+- The language model will not receive direct database, cloud, deployment, or secret credentials.
+- Tool arguments will be validated by deterministic code before execution.
+- Hidden evaluation truth must never be exposed through agent-accessible tools.
 
 ## SQL policy
 
@@ -24,6 +29,4 @@ Investigative SQL will use a read-only role, approved schemas, parsed statement 
 
 Every state transition, tool call, SQL decision, evidence record, approval decision, remediation attempt, and recovery decision must be traceable.
 
-## Phase 0 limitation
-
-Phase 0 defines and validates policy. Enforcement code is scheduled for Phase 6 and Phase 8.
+The executable safety contract is already validated. SQL enforcement, tool authorization, approval tokens, and remediation controls are introduced with their corresponding runtime components and adversarial tests.

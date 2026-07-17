@@ -8,6 +8,11 @@
           "title": "Baseline Id",
           "type": "string"
         },
+        "introduced_in_version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Introduced In Version",
+          "type": "string"
+        },
         "name": {
           "minLength": 1,
           "title": "Name",
@@ -17,18 +22,13 @@
           "minLength": 1,
           "title": "Purpose",
           "type": "string"
-        },
-        "required_from_phase": {
-          "minimum": 0,
-          "title": "Required From Phase",
-          "type": "integer"
         }
       },
       "required": [
         "baseline_id",
         "name",
         "purpose",
-        "required_from_phase"
+        "introduced_in_version"
       ],
       "title": "BaselineSpec",
       "type": "object"
@@ -151,6 +151,11 @@
           "default": null,
           "title": "Hard Gate Operator"
         },
+        "introduced_in_version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Introduced In Version",
+          "type": "string"
+        },
         "metric_id": {
           "pattern": "^[a-z][a-z0-9_]*$",
           "title": "Metric Id",
@@ -169,11 +174,6 @@
           "default": null,
           "title": "Notes"
         },
-        "required_from_phase": {
-          "minimum": 0,
-          "title": "Required From Phase",
-          "type": "integer"
-        },
         "unit": {
           "minLength": 1,
           "title": "Unit",
@@ -187,7 +187,7 @@
         "direction",
         "unit",
         "formula",
-        "required_from_phase"
+        "introduced_in_version"
       ],
       "title": "EvaluationMetric",
       "type": "object"

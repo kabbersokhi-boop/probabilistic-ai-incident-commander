@@ -12,7 +12,7 @@ def test_validate_command_succeeds(spec_dir: Path, capsys: pytest.CaptureFixture
     exit_code = main(["validate", "--spec-dir", str(spec_dir)])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "Phase 0 contracts are valid" in captured.out
+    assert "Project contracts are valid" in captured.out
 
 
 def test_validate_json_output_is_machine_readable(
@@ -36,7 +36,7 @@ def test_summary_command_lists_incident_families(
     assert "payment_configuration" in payload["incident_families"]
 
 
-def test_export_schemas_writes_four_documents(
+def test_export_schemas_writes_six_documents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     output_dir = tmp_path / "schemas"
@@ -48,6 +48,8 @@ def test_export_schemas_writes_four_documents(
         "evaluation.schema.json",
         "safety.schema.json",
         "incident.schema.json",
+        "simulation-config.schema.json",
+        "dataset-manifest.schema.json",
     }
 
 

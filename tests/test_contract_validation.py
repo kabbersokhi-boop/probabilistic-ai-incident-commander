@@ -6,7 +6,7 @@ from paic.contracts.loader import ContractBundle
 from paic.contracts.validator import validate_contract_bundle
 
 
-def test_phase_zero_contracts_have_no_validation_issues(bundle: ContractBundle) -> None:
+def test_project_contracts_have_no_validation_issues(bundle: ContractBundle) -> None:
     assert validate_contract_bundle(bundle) == []
 
 
@@ -64,10 +64,7 @@ def test_cross_contract_validator_reports_all_policy_drift(bundle: ContractBundl
     from dataclasses import replace
 
     project = bundle.project.model_copy(
-        update={
-            "project": bundle.project.project.model_copy(update={"current_phase": 1}),
-            "workflow": list(reversed(bundle.project.workflow)),
-        }
+        update={"workflow": list(reversed(bundle.project.workflow))}
     )
     benchmark = bundle.evaluation.benchmark.model_copy(
         update={
@@ -137,9 +134,8 @@ def test_cross_contract_validator_reports_all_policy_drift(bundle: ContractBundl
     )
     codes = {issue.code for issue in validate_contract_bundle(invalid)}
     assert {
-        "project.phase",
         "workflow.order",
-        "incidents.phase0.minimum",
+        "incidents.minimum_seed_set",
         "benchmark.minimum_below_seed_count",
         "incidents.duplicate_id",
         "incidents.duplicate_seed",

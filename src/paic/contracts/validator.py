@@ -1,4 +1,4 @@
-"""Cross-contract validation for Phase 0."""
+"""Cross-contract validation for the project specification."""
 
 from __future__ import annotations
 
@@ -53,16 +53,6 @@ def validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
 
     issues: list[ValidationIssue] = []
 
-    if bundle.project.project.current_phase != 0:
-        issues.append(
-            ValidationIssue(
-                "error",
-                "project.phase",
-                "project.yaml:project.current_phase",
-                "Phase 0 package must declare current_phase: 0.",
-            )
-        )
-
     if bundle.project.workflow != _REQUIRED_WORKFLOW:
         issues.append(
             ValidationIssue(
@@ -78,9 +68,9 @@ def validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
         issues.append(
             ValidationIssue(
                 "error",
-                "incidents.phase0.minimum",
+                "incidents.minimum_seed_set",
                 "specs/incidents",
-                "Phase 0 must define at least five seed incidents.",
+                "The benchmark foundation must define at least five seed incidents.",
             )
         )
     if benchmark.minimum_total_incidents < len(bundle.incidents):

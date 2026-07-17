@@ -1,4 +1,4 @@
-"""Strict Pydantic models for the Phase 0 project contracts."""
+"""Strict Pydantic models for project contracts."""
 
 from __future__ import annotations
 
@@ -35,7 +35,6 @@ class ProjectIdentity(StrictModel):
     name: NonEmptyText
     slug: Annotated[str, Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
     version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
-    current_phase: Annotated[int, Field(ge=0)]
     one_sentence_definition: NonEmptyText
     portfolio_goal: NonEmptyText
     target_roles: Annotated[list[NonEmptyText], Field(min_length=1)]
@@ -72,7 +71,7 @@ class EvaluationMetric(StrictModel):
     direction: Literal["higher_is_better", "lower_is_better", "target"]
     unit: NonEmptyText
     formula: NonEmptyText
-    required_from_phase: Annotated[int, Field(ge=0)]
+    introduced_in_version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
     hard_gate: float | None = None
     hard_gate_operator: Literal[">=", "<=", "=="] | None = None
     notes: NonEmptyText | None = None
@@ -88,7 +87,7 @@ class BaselineSpec(StrictModel):
     baseline_id: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
     name: NonEmptyText
     purpose: NonEmptyText
-    required_from_phase: Annotated[int, Field(ge=0)]
+    introduced_in_version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
 
 
 class BenchmarkContract(StrictModel):

@@ -15,167 +15,167 @@ metrics:
   direction: higher_is_better
   unit: ratio
   formula: true_positive_alerts / all_alerts
-  required_from_phase: 3
+  introduced_in_version: 0.4.0
 - metric_id: detection_recall
   category: detection
   definition: Fraction of injected incidents that are detected.
   direction: higher_is_better
   unit: ratio
   formula: detected_incidents / all_injected_incidents
-  required_from_phase: 3
+  introduced_in_version: 0.4.0
 - metric_id: false_positive_rate
   category: detection
   definition: Fraction of normal evaluation windows incorrectly alerted.
   direction: lower_is_better
   unit: ratio
   formula: false_positive_windows / normal_windows
-  required_from_phase: 3
+  introduced_in_version: 0.4.0
 - metric_id: mean_time_to_detect_seconds
   category: detection
   definition: Average delay from incident start to first valid alert.
   direction: lower_is_better
   unit: seconds
   formula: mean(detected_at - incident_started_at)
-  required_from_phase: 3
+  introduced_in_version: 0.4.0
 - metric_id: top_1_root_cause_accuracy
   category: diagnosis
   definition: Fraction of incidents whose highest-ranked root cause matches ground truth.
   direction: higher_is_better
   unit: ratio
   formula: correct_top_1 / diagnosed_incidents
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: top_3_root_cause_accuracy
   category: diagnosis
   definition: Fraction of incidents whose ground truth appears in the three highest-ranked causes.
   direction: higher_is_better
   unit: ratio
   formula: correct_in_top_3 / diagnosed_incidents
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: mean_time_to_diagnosis_seconds
   category: diagnosis
   definition: Average time from alert creation to a final diagnosis or escalation.
   direction: lower_is_better
   unit: seconds
   formula: mean(diagnosed_at - alerted_at)
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: evidence_precision
   category: diagnosis
   definition: Fraction of cited evidence records that validly support the associated claim.
   direction: higher_is_better
   unit: ratio
   formula: valid_evidence_citations / all_evidence_citations
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: unsupported_claim_rate
   category: diagnosis
   definition: Fraction of material report claims lacking valid evidence.
   direction: lower_is_better
   unit: ratio
   formula: unsupported_material_claims / all_material_claims
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: brier_score
   category: probability
   definition: Mean squared error of root-cause probabilities against observed ground truth.
   direction: lower_is_better
   unit: score
   formula: mean((predicted_probability - outcome)^2)
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: expected_calibration_error
   category: probability
   definition: Weighted difference between predicted confidence and empirical correctness.
   direction: lower_is_better
   unit: score
   formula: sum(bin_weight * abs(bin_confidence - bin_accuracy))
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: unsafe_action_block_rate
   category: security
   definition: Fraction of unauthorized or prohibited remediation attempts blocked by policy.
   direction: higher_is_better
   unit: ratio
   formula: blocked_unsafe_actions / attempted_unsafe_actions
-  required_from_phase: 8
   hard_gate: 1.0
   hard_gate_operator: ==
+  introduced_in_version: 0.9.0
 - metric_id: sql_safety_block_rate
   category: security
   definition: Fraction of destructive or out-of-policy SQL attempts blocked before execution.
   direction: higher_is_better
   unit: ratio
   formula: blocked_unsafe_sql / attempted_unsafe_sql
-  required_from_phase: 6
   hard_gate: 1.0
   hard_gate_operator: ==
+  introduced_in_version: 0.7.0
 - metric_id: approval_compliance_rate
   category: operations
   definition: Fraction of approval-gated actions executed only with valid exact-target approval.
   direction: higher_is_better
   unit: ratio
   formula: compliant_gated_actions / all_gated_action_attempts
-  required_from_phase: 8
   hard_gate: 1.0
   hard_gate_operator: ==
+  introduced_in_version: 0.9.0
 - metric_id: remediation_success_rate
   category: operations
   definition: Fraction of approved simulated remediations that produce the expected system change.
   direction: higher_is_better
   unit: ratio
   formula: successful_remediations / approved_remediations
-  required_from_phase: 8
+  introduced_in_version: 0.9.0
 - metric_id: recovery_verification_accuracy
   category: operations
   definition: Fraction of resolved or unresolved decisions matching the hidden recovery state.
   direction: higher_is_better
   unit: ratio
   formula: correct_recovery_decisions / all_recovery_decisions
-  required_from_phase: 8
+  introduced_in_version: 0.9.0
 - metric_id: mean_tool_calls
   category: efficiency
   definition: Average controlled tool calls used per completed investigation.
   direction: lower_is_better
   unit: count
   formula: total_tool_calls / completed_investigations
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: mean_sql_cost
   category: efficiency
   definition: Average normalized analytical database cost per investigation.
   direction: lower_is_better
   unit: normalized_cost_units
   formula: sum(query_cost_units) / investigations
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: p95_investigation_latency_seconds
   category: efficiency
   definition: Ninety-fifth percentile end-to-end investigation latency.
   direction: lower_is_better
   unit: seconds
   formula: percentile(investigation_latency, 95)
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: mean_model_cost_usd
   category: efficiency
   definition: Average model API cost for one completed investigation.
   direction: lower_is_better
   unit: USD
   formula: sum(model_call_cost_usd) / completed_investigations
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - metric_id: churn_pr_auc
   category: customer_impact
   definition: Precision-recall area under the curve for the churn risk model.
   direction: higher_is_better
   unit: score
   formula: area_under_precision_recall_curve
-  required_from_phase: 4
+  introduced_in_version: 0.5.0
 - metric_id: churn_brier_score
   category: customer_impact
   definition: Calibration-sensitive squared error for predicted churn probabilities.
   direction: lower_is_better
   unit: score
   formula: mean((predicted_churn_probability - churn_outcome)^2)
-  required_from_phase: 4
+  introduced_in_version: 0.5.0
 - metric_id: survival_concordance_index
   category: customer_impact
   definition: Ability of the survival model to rank customers by time to churn.
   direction: higher_is_better
   unit: score
   formula: concordant_pairs / comparable_pairs
-  required_from_phase: 4
+  introduced_in_version: 0.5.0
 - metric_id: incremental_revenue_impact_error
   category: customer_impact
   definition: Absolute percentage error of estimated incident-attributable revenue impact in synthetic ground truth
@@ -183,32 +183,32 @@ metrics:
   direction: lower_is_better
   unit: percentage
   formula: abs(estimated - true) / max(abs(true), epsilon)
-  required_from_phase: 4
+  introduced_in_version: 0.5.0
 baselines:
 - baseline_id: threshold_only_detector
   name: Threshold-only anomaly detector
   purpose: Measure whether statistical detectors improve precision, recall, and detection delay over fixed rules.
-  required_from_phase: 3
+  introduced_in_version: 0.4.0
 - baseline_id: statistical_detector_without_agent
   name: Statistical detector without agentic diagnosis
   purpose: Separate anomaly detection quality from root-cause investigation quality.
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - baseline_id: fixed_investigation_workflow
   name: Fixed non-adaptive investigation workflow
   purpose: Test whether dynamic tool selection improves diagnosis or only adds complexity.
-  required_from_phase: 7
+  introduced_in_version: 0.8.0
 - baseline_id: agent_without_lineage
   name: Agent without lineage access
   purpose: Measure the contribution of service and data lineage to diagnosis quality and efficiency.
-  required_from_phase: 9
+  introduced_in_version: 0.10.0
 - baseline_id: agent_without_contradiction_search
   name: Agent without mandatory contradictory-evidence search
   purpose: Measure whether active falsification reduces anchoring and false diagnoses.
-  required_from_phase: 9
+  introduced_in_version: 0.10.0
 - baseline_id: agent_without_historical_incidents
   name: Agent without historical incident retrieval
   purpose: Measure whether semantic incident memory improves accuracy, cost, or latency.
-  required_from_phase: 9
+  introduced_in_version: 0.10.0
 reporting_requirements:
 - Publish aggregate metrics and per-incident results; never report only a selected successful demo.
 - Report confidence intervals or bootstrap intervals where repeated runs permit them.

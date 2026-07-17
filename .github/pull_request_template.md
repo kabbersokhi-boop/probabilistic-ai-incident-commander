@@ -1,12 +1,14 @@
 ## Summary
 
+## User-visible behaviour
+
 ## Scope
 
 ## Commands executed and exact results
 
-## Contract or architecture changes
+## Contract, architecture, or schema changes
 
-## Security implications
+## Security and data implications
 
 ## Known limitations
 
@@ -14,7 +16,7 @@
 
 - [ ] Tests added or updated
 - [ ] `make check` passes
+- [ ] Smoke dataset generation and validation pass when applicable
 - [ ] Generated schemas are current
-- [ ] `docs/CURRENT_STATUS.md` updated
-- [ ] `docs/HANDOFF.md` updated
-- [ ] No secrets or generated datasets committed
+- [ ] Public documentation reflects shipped behaviour
+- [ ] No secrets, generated datasets, caches, or build artifacts are committed

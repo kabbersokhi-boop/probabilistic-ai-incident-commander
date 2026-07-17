@@ -1,39 +1,32 @@
 # Current Status
 
-## Phase
+## Available now
 
-Phase 0 - Product thesis and evaluation contract
+### Executable contracts
 
-## Implemented
+- Product, evaluation, safety, and incident YAML specifications
+- Five seed incidents covering checkout, payments, inventory, analytics pipelines, and fulfilment
+- Hidden ground truth, decoy changes, competing hypotheses, evidence expectations, remediation, and recovery criteria
+- Strict Pydantic models, cross-file validation, CLI summaries, and generated JSON Schemas
 
-- Project, evaluation, safety, and incident YAML contracts
-- Five seed incidents across checkout, payments, inventory, analytics pipelines, and fulfilment
-- Strict Pydantic models with cross-field invariants
-- Cross-contract validation
-- CLI validation, summary, and JSON Schema export
-- Unit tests and CI configuration
-- Project architecture, roadmap, decisions, security, and evaluation documentation
+### Synthetic commerce environment
 
-## Verified locally during GitHub integration
+- Deterministic configuration-driven generation with fixed seeds
+- Seventeen relational commerce and operational tables
+- Customers, catalogue, promotions, campaign attribution, checkout funnels, payments, orders, inventory, fulfilment scans, returns, refunds, seller feeds, pipelines, and deployments
+- Time-of-day, day-of-week, regional, device, channel, customer-type, customer-preference, and product-demand variation
+- Canonical schemas, primary and foreign keys, UTC timestamps, and reproducible identifiers
+- Parquet export with resolved configuration, manifest, row counts, schemas, relationships, timestamps, and SHA-256 hashes
+- Validation for schema integrity, keys, temporal order, financial reconciliation, inventory balance, healthy baseline metrics, configuration drift, and file corruption
+- CLI generation, validation, and dataset summaries
 
-- Python: 3.11.15.
-- Editable package installation completed successfully in a clean virtual environment.
-- Compilation passed: `python -m compileall -q src tests`.
-- Contract validation passed for 5 incidents and 24 evaluation metrics, including JSON output with no issues.
-- Ruff formatting check passed: 13 files already formatted.
-- Ruff lint passed: all checks passed.
-- Strict mypy passed for `src` and `tests`: no issues in 13 source files.
-- Pytest passed: 25 passed, with 98.90 percent total coverage.
-- Four JSON Schemas regenerated without a diff.
-- Source and wheel distributions built successfully.
-- The wheel installed in a second clean Python 3.11.15 virtual environment; installed `paic-contract validate` and `paic-contract summary` both passed.
+## Explicit limitations
 
-## GitHub integration
+- The simulator produces healthy baseline data only; incident injection is not yet implemented.
+- The analytical metric layer and statistical anomaly detectors are not yet implemented.
+- No language model, agent framework, database service, frontend, Docker service, or cloud resource is required yet.
+- Generated datasets are intended for development and benchmarking, not production forecasting.
 
-- Repository: `kabbersokhi-boop/probabilistic-ai-incident-commander`.
-- Branch: `main`, by explicit integration instruction. This supersedes the original feature-branch and draft-PR delivery flow.
-- GitHub Actions: passed on Python 3.11 and 3.12 for run 29565614702 (`phase-0-contracts`).
+## Next capability
 
-## Next phase
-
-Phase 1 - Synthetic Commerce Environment. It must consume these contracts rather than redefine them informally.
+The next implementation adds a semantic analytical layer for business metrics, checkout funnels, cohorts, contribution analysis, and data-quality status on top of the generated Parquet datasets.

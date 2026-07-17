@@ -2,8 +2,7 @@ schema_version: '1.0'
 project:
   name: Probabilistic AI Incident Commander
   slug: probabilistic-ai-incident-commander
-  version: 0.1.0
-  current_phase: 0
+  version: 0.2.0
   one_sentence_definition: An evidence-grounded agentic system that detects commerce anomalies, investigates them
     across business and operational data, ranks root causes probabilistically, recommends governed remediation,
     and verifies recovery.

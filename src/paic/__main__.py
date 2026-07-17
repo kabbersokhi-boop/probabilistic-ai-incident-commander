@@ -1,4 +1,4 @@
-"""Allow ``python -m paic`` to run the contract CLI."""
+"""Allow ``python -m paic`` to run the project toolkit."""
 
 from paic.cli import main
 

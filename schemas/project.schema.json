@@ -3,11 +3,6 @@
     "ProjectIdentity": {
       "additionalProperties": false,
       "properties": {
-        "current_phase": {
-          "minimum": 0,
-          "title": "Current Phase",
-          "type": "integer"
-        },
         "name": {
           "minLength": 1,
           "title": "Name",
@@ -56,7 +51,6 @@
         "name",
         "slug",
         "version",
-        "current_phase",
         "one_sentence_definition",
         "portfolio_goal",
         "target_roles",

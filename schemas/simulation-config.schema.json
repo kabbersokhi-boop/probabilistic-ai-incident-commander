@@ -1,0 +1,429 @@
+{
+  "$defs": {
+    "BehaviorConfig": {
+      "additionalProperties": false,
+      "description": "Normal operating probabilities used by the baseline simulator.",
+      "properties": {
+        "address_attempt_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Address Attempt Rate",
+          "type": "number"
+        },
+        "address_success_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Address Success Rate",
+          "type": "number"
+        },
+        "average_items_per_order": {
+          "maximum": 5.0,
+          "minimum": 1.0,
+          "title": "Average Items Per Order",
+          "type": "number"
+        },
+        "base_late_delivery_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Base Late Delivery Rate",
+          "type": "number"
+        },
+        "base_payment_approval_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Base Payment Approval Rate",
+          "type": "number"
+        },
+        "base_return_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Base Return Rate",
+          "type": "number"
+        },
+        "inventory_success_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Inventory Success Rate",
+          "type": "number"
+        },
+        "payment_attempt_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Payment Attempt Rate",
+          "type": "number"
+        },
+        "preferred_device_adherence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Preferred Device Adherence",
+          "type": "number"
+        },
+        "preferred_payment_adherence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Preferred Payment Adherence",
+          "type": "number"
+        },
+        "promotion_session_share": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Promotion Session Share",
+          "type": "number"
+        },
+        "refund_completion_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Refund Completion Rate",
+          "type": "number"
+        },
+        "returning_customer_share": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Returning Customer Share",
+          "type": "number"
+        }
+      },
+      "required": [
+        "address_attempt_rate",
+        "address_success_rate",
+        "inventory_success_rate",
+        "payment_attempt_rate",
+        "base_payment_approval_rate",
+        "base_return_rate",
+        "base_late_delivery_rate",
+        "refund_completion_rate",
+        "promotion_session_share",
+        "returning_customer_share",
+        "preferred_device_adherence",
+        "preferred_payment_adherence",
+        "average_items_per_order"
+      ],
+      "title": "BehaviorConfig",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "description": "Parquet export settings.",
+      "properties": {
+        "compression": {
+          "default": "zstd",
+          "enum": [
+            "zstd",
+            "snappy",
+            "gzip",
+            "lz4",
+            "uncompressed"
+          ],
+          "title": "Compression",
+          "type": "string"
+        },
+        "compression_level": {
+          "anyOf": [
+            {
+              "maximum": 22,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 6,
+          "title": "Compression Level"
+        },
+        "include_statistics": {
+          "default": true,
+          "title": "Include Statistics",
+          "type": "boolean"
+        },
+        "row_group_size": {
+          "default": 50000,
+          "minimum": 1000,
+          "title": "Row Group Size",
+          "type": "integer"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    },
+    "RegionConfig": {
+      "additionalProperties": false,
+      "description": "Regional demand, tax, and fulfilment characteristics.",
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z]{2}(?:-[A-Z0-9]+)?$",
+          "title": "Code",
+          "type": "string"
+        },
+        "conversion_multiplier": {
+          "exclusiveMaximum": 2.0,
+          "exclusiveMinimum": 0.25,
+          "title": "Conversion Multiplier",
+          "type": "number"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "delivery_days": {
+          "maximum": 14,
+          "minimum": 1,
+          "title": "Delivery Days",
+          "type": "integer"
+        },
+        "market": {
+          "minLength": 1,
+          "title": "Market",
+          "type": "string"
+        },
+        "payment_approval_multiplier": {
+          "exclusiveMaximum": 2.0,
+          "exclusiveMinimum": 0.25,
+          "title": "Payment Approval Multiplier",
+          "type": "number"
+        },
+        "tax_rate": {
+          "maximum": 0.5,
+          "minimum": 0.0,
+          "title": "Tax Rate",
+          "type": "number"
+        },
+        "weight": {
+          "exclusiveMinimum": 0.0,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "code",
+        "market",
+        "weight",
+        "currency",
+        "tax_rate",
+        "conversion_multiplier",
+        "payment_approval_multiplier",
+        "delivery_days"
+      ],
+      "title": "RegionConfig",
+      "type": "object"
+    },
+    "ScaleConfig": {
+      "additionalProperties": false,
+      "description": "Entity counts and baseline traffic volume.",
+      "properties": {
+        "base_sessions_per_hour": {
+          "exclusiveMinimum": 0.0,
+          "title": "Base Sessions Per Hour",
+          "type": "number"
+        },
+        "customers": {
+          "minimum": 100,
+          "title": "Customers",
+          "type": "integer"
+        },
+        "products": {
+          "minimum": 50,
+          "title": "Products",
+          "type": "integer"
+        },
+        "promotions": {
+          "minimum": 0,
+          "title": "Promotions",
+          "type": "integer"
+        },
+        "sellers": {
+          "minimum": 5,
+          "title": "Sellers",
+          "type": "integer"
+        },
+        "warehouses": {
+          "minimum": 2,
+          "title": "Warehouses",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "customers",
+        "sellers",
+        "products",
+        "warehouses",
+        "promotions",
+        "base_sessions_per_hour"
+      ],
+      "title": "ScaleConfig",
+      "type": "object"
+    },
+    "WeightedValue": {
+      "additionalProperties": false,
+      "description": "A categorical value and its relative sampling weight.",
+      "properties": {
+        "value": {
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "weight": {
+          "exclusiveMinimum": 0.0,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "weight"
+      ],
+      "title": "WeightedValue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete deterministic commerce simulation configuration.",
+  "properties": {
+    "acquisition_channels": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Acquisition Channels",
+      "type": "array"
+    },
+    "behavior": {
+      "$ref": "#/$defs/BehaviorConfig"
+    },
+    "carriers": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Carriers",
+      "type": "array"
+    },
+    "categories": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 3,
+      "title": "Categories",
+      "type": "array"
+    },
+    "channels": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Channels",
+      "type": "array"
+    },
+    "devices": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Devices",
+      "type": "array"
+    },
+    "duration_days": {
+      "maximum": 365,
+      "minimum": 1,
+      "title": "Duration Days",
+      "type": "integer"
+    },
+    "issuers": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Issuers",
+      "type": "array"
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "payment_methods": {
+      "items": {
+        "$ref": "#/$defs/WeightedValue"
+      },
+      "minItems": 2,
+      "title": "Payment Methods",
+      "type": "array"
+    },
+    "pipelines": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Pipelines",
+      "type": "array"
+    },
+    "regions": {
+      "items": {
+        "$ref": "#/$defs/RegionConfig"
+      },
+      "minItems": 2,
+      "title": "Regions",
+      "type": "array"
+    },
+    "scale": {
+      "$ref": "#/$defs/ScaleConfig"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "maximum": 9223372036854775807,
+      "minimum": 1,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "services": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 3,
+      "title": "Services",
+      "type": "array"
+    },
+    "simulation_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Simulation Id",
+      "type": "string"
+    },
+    "start_at": {
+      "format": "date-time",
+      "title": "Start At",
+      "type": "string"
+    },
+    "timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "simulation_id",
+    "seed",
+    "start_at",
+    "duration_days",
+    "scale",
+    "behavior",
+    "regions",
+    "devices",
+    "channels",
+    "payment_methods",
+    "issuers",
+    "categories",
+    "carriers",
+    "acquisition_channels",
+    "services",
+    "pipelines"
+  ],
+  "title": "SimulationConfig",
+  "type": "object"
+}

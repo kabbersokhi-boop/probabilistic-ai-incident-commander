@@ -1,4 +1,4 @@
-name: phase-0-contracts
+name: quality
 
 on:
   pull_request:
@@ -11,6 +11,12 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      POLARS_MAX_THREADS: "4"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -33,9 +39,28 @@ jobs:
       - name: Type check
         run: python -m mypy src tests
       - name: Test with coverage
-        run: python -m pytest --cov=paic --cov-report=term-missing
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -p pytest_cov.plugin --cov=paic --cov-report=term-missing
       - name: Verify generated schemas
         run: |
           rm -rf schemas-generated
           python -m paic export-schemas --output-dir schemas-generated
           diff -ru schemas schemas-generated
+      - name: Generate and validate smoke dataset
+        run: |
+          python -m paic simulate \
+            --config configs/simulation/smoke.yaml \
+            --output-dir .artifacts/smoke
+          python -m paic dataset validate --dataset-dir .artifacts/smoke
+          python -m paic dataset summary --dataset-dir .artifacts/smoke > .artifacts/smoke-summary.json
+      - name: Generate and validate standard dataset
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m paic simulate \
+            --config configs/simulation/standard.yaml \
+            --output-dir .artifacts/standard
+          python -m paic dataset validate --dataset-dir .artifacts/standard
+      - name: Build package
+        if: matrix.python-version == '3.11'
+        run: python -m build

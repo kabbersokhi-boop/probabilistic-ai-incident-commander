@@ -4,13 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "probabilistic-ai-incident-commander"
-version = "0.1.0"
-description = "Machine-readable contracts and implementation for a probabilistic AI incident commander."
+version = "0.2.0"
+description = "Evidence-grounded agentic AI for probabilistic commerce incident investigation."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Probabilistic AI Incident Commander contributors" }]
 dependencies = [
+  "Faker>=25,<40",
+  "numpy>=2.0,<3",
+  "polars>=1.20,<2",
+  "pyarrow>=17,<23",
   "pydantic>=2.8,<3",
   "PyYAML>=6.0,<7",
 ]
@@ -26,6 +30,7 @@ dev = [
 ]
 
 [project.scripts]
+paic = "paic.cli:main"
 paic-contract = "paic.cli:main"
 
 [tool.setuptools]
@@ -61,8 +66,13 @@ ignore = ["E501"]
 known-first-party = ["paic"]
 
 [tool.mypy]
-python_version = "3.11"
 strict = true
 warn_unused_configs = true
-plugins = ["pydantic.mypy"]
+follow_imports = "skip"
+ignore_missing_imports = true
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["pydantic", "pydantic.*"]
+follow_imports = "normal"
+ignore_missing_imports = false

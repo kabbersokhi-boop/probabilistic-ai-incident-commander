@@ -1,10 +1,12 @@
 # Probabilistic AI Incident Commander
 
+[![CI](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml)
+
 **Evidence-grounded, governed agentic AI for diagnosing commerce incidents under uncertainty.**
 
 Probabilistic AI Incident Commander is an open reference implementation of an autonomous operations system that combines statistical anomaly detection, analytical investigation, probabilistic root-cause ranking, controlled remediation, and recovery verification.
 
-The system is designed to answer more than *“What changed?”* It aims to determine:
+It is designed to answer more than *“What changed?”* The completed system will determine:
 
 - where the impact is concentrated,
 - which explanations are supported or contradicted by evidence,
@@ -20,13 +22,14 @@ Detect -> Scope -> Investigate -> Test hypotheses -> Rank causes
 
 ## Why this project exists
 
-Most AI operations demos stop at alert summarization or chart explanation. This project is being built to demonstrate a more rigorous pattern:
+Many AI operations demos stop at alert summarization or chart explanation. This project follows a stricter design:
 
-- **Statistics detect anomalies.** The language model does not guess from a chart.
+- **Statistics detect anomalies.** A language model does not guess from a chart.
 - **The agent investigates.** It selects controlled tools, gathers evidence, and adapts its plan.
 - **Probability expresses uncertainty.** Root-cause confidence is calculated and evaluated, not invented in prose.
-- **Policies govern actions.** SQL access, permissions, approvals, and remediation boundaries are enforced by normal software.
-- **Recovery is measured.** An incident is not resolved merely because an action completed successfully.
+- **Policies govern actions.** SQL access, permissions, approvals, and remediation boundaries are enforced by ordinary software.
+- **Recovery is measured.** An incident is not resolved merely because an action completed.
+- **Evaluation uses hidden ground truth.** The system is judged across reproducible incidents, not one selected success.
 
 ## Who it is for
 
@@ -40,12 +43,123 @@ The project is intended for engineers and technical teams interested in:
 - commerce, payments, fulfilment, and marketplace operations,
 - safe human-in-the-loop automation.
 
-It is also designed as a reproducible technical case study for evaluating how probabilistic models and language-model agents can cooperate inside a controlled software system.
+It is also a reproducible technical case study for evaluating how probabilistic models and language-model agents can cooperate inside a controlled software system.
 
-## Target system
+## Current capabilities
+
+The repository currently provides two working foundations.
+
+### Executable product and evaluation contracts
+
+- Machine-readable product, evaluation, safety, and incident specifications
+- Five seed incidents with hidden root causes, decoy changes, competing hypotheses, expected evidence, remediation, and recovery criteria
+- Strict Pydantic models and cross-contract validation
+- JSON Schema export for external tooling
+- Evaluation definitions covering detection, diagnosis, probability calibration, security, efficiency, and customer impact
+
+### Deterministic synthetic commerce environment
+
+- Reproducible generation from a fixed seed and validated YAML configuration
+- Seventeen connected commerce and operational tables
+- Realistic hourly traffic, weekday effects, regional differences, customer preferences, promotion and campaign attribution, checkout funnels, payment outcomes, inventory, fulfilment scans, returns, refunds, seller feeds, data pipelines, and deployments
+- Canonical Polars schemas with primary-key and foreign-key definitions
+- Compressed Parquet export with a resolved configuration, row counts, timestamps, runtime dependency versions, SHA-256 hashes, and a machine-readable manifest
+- Deterministic validation for schemas, relationships, temporal ordering, financial reconciliation, inventory balance, healthy baseline rates, and simulation boundaries
+- Dataset summaries for conversion, payment approval, gross order value, delivery, returns, new-versus-returning customers, acquisition channels, and warehouse scan latency
+
+The simulator intentionally generates a **healthy, incident-free baseline**. Incident injection and anomaly detection are added as separate, testable capabilities so the benchmark can distinguish normal behaviour from failures.
+
+## Quick start
+
+### Requirements
+
+- Python 3.11 or newer
+- `make` is optional; every command is also available through Python
+
+### Install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+### Generate a smoke dataset
+
+```bash
+paic simulate \
+  --config configs/simulation/smoke.yaml \
+  --output-dir data/generated/smoke
+```
+
+The command creates:
 
 ```text
-Synthetic commerce activity
+data/generated/smoke/
+├── _SUCCESS
+├── config.resolved.json
+├── manifest.json
+└── tables/
+    ├── customers.parquet
+    ├── checkout_sessions.parquet
+    ├── payment_attempts.parquet
+    ├── orders.parquet
+    └── ... 13 more tables
+```
+
+### Validate and inspect the dataset
+
+```bash
+paic dataset validate --dataset-dir data/generated/smoke
+paic dataset summary --dataset-dir data/generated/smoke
+```
+
+### Generate the larger baseline
+
+```bash
+paic simulate \
+  --config configs/simulation/standard.yaml \
+  --output-dir data/generated/standard
+```
+
+### Validate the project contracts
+
+```bash
+paic validate --spec-dir specs
+paic summary --spec-dir specs
+```
+
+### Run the quality suite
+
+```bash
+make check
+```
+
+Equivalent commands:
+
+```bash
+python -m ruff format --check .
+python -m ruff check .
+python -m mypy src tests
+python -m pytest --cov=paic --cov-report=term-missing
+```
+
+## Generated data model
+
+| Area | Tables |
+|---|---|
+| Customers and catalogue | `customers`, `sellers`, `warehouses`, `products`, `promotions` |
+| Commerce funnel | `checkout_sessions`, `payment_attempts`, `orders`, `order_items` |
+| Inventory and fulfilment | `inventory_snapshots`, `shipments`, `warehouse_scan_events`, `returns`, `refunds` |
+| Operational context | `seller_feed_runs`, `pipeline_runs`, `deployments` |
+
+See [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) for table-level details and [`docs/SYNTHETIC_COMMERCE_ENVIRONMENT.md`](docs/SYNTHETIC_COMMERCE_ENVIRONMENT.md) for modelling assumptions.
+
+## Target architecture
+
+```text
+Synthetic commerce environment
           |
           v
 Metric and cohort calculations
@@ -79,7 +193,7 @@ Simulated remediation
 Statistical recovery verification
           |
           v
-Evidence-backed incident report
+Evidence-backed incident report and evaluator
 ```
 
 ## Example investigation
@@ -102,95 +216,23 @@ The completed system will:
 12. verify sustained recovery across primary and guardrail metrics,
 13. generate an evidence-linked incident report.
 
-## What is implemented today
-
-The repository currently provides the executable foundation that future components must satisfy:
-
-- machine-readable product, evaluation, safety, and incident contracts,
-- five deterministic seed incidents with hidden ground truth,
-- realistic decoy changes and competing hypotheses,
-- expected supporting and contradictory evidence,
-- remediation and recovery criteria,
-- strict Pydantic models and cross-file validation,
-- JSON Schema generation for external tooling,
-- command-line validation and contract summaries,
-- automated tests and continuous integration,
-- architecture, security, evaluation, and development decision records.
-
-The next capabilities being added are the synthetic commerce environment, analytical metric layer, and statistical anomaly-detection engine.
-
-## Quick start
-
-### Requirements
-
-- Python 3.11 or newer
-- `make` is optional; all checks can also be run with Python commands
-
-### Install
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-### Validate the repository contracts
-
-```bash
-paic-contract validate --spec-dir specs
-paic-contract summary --spec-dir specs
-```
-
-### Run the full quality suite
-
-```bash
-make check
-```
-
-Equivalent individual commands:
-
-```bash
-python -m ruff format --check .
-python -m ruff check .
-python -m mypy src tests
-python -m pytest --cov=paic --cov-report=term-missing
-```
-
-### Export JSON Schemas
-
-```bash
-paic-contract export-schemas --output-dir schemas
-```
-
-## Repository map
-
-```text
-specs/                  Product, evaluation, safety, and incident contracts
-src/paic/contracts/     Pydantic models, loaders, and cross-contract validation
-schemas/                Generated JSON Schemas
-tests/                  Contract, CLI, validation, and invariant tests
-docs/                   Architecture, evaluation, security, and decision records
-.github/                 Continuous integration and contribution templates
-```
-
 ## Core design principles
 
 ### Deterministic detection
 
-Anomaly detection, metric calculation, statistical testing, permissions, approval enforcement, and recovery verification are implemented in ordinary code. Language models are used for planning, hypothesis generation, tool selection, interpretation, and report generation.
+Metric calculation, anomaly detection, statistical testing, permissions, approval enforcement, and recovery verification belong in ordinary code. Language models are reserved for planning, hypothesis generation, tool selection, interpretation, and report drafting.
 
 ### Evidence before conclusions
 
-Every root-cause hypothesis must define expected observations, planned tests, supporting evidence, contradictory evidence, and a reason to accept, reject, or retain the hypothesis.
+Every root-cause hypothesis must define expected observations, planned tests, supporting evidence, contradictory evidence, and a reason to accept, reject, or retain it.
 
 ### Explicit uncertainty
 
-The system will rank explanations probabilistically and measure calibration against hidden ground-truth incidents. A confidence value is useful only when its reliability is evaluated.
+Root-cause probabilities will be calculated outside the language model and evaluated for calibration against hidden ground truth. A confidence value is useful only when its reliability is measured.
 
 ### Bounded autonomy
 
-The agent may investigate autonomously through approved tools. It may recommend sensitive actions, but policy code decides whether an action is allowed, requires human approval, or is permanently blocked.
+The agent may investigate autonomously through approved tools. It may recommend sensitive actions, but policy code decides whether an action is automatic, requires exact human approval, or is blocked.
 
 ### Measured recovery
 
@@ -198,45 +240,67 @@ Successful execution is not the same as successful remediation. Recovery require
 
 ## Safety model
 
-This project operates entirely on synthetic systems and simulated remediations.
+The project operates entirely on synthetic systems and simulated remediations. Its intended boundaries include:
 
-The intended safety boundaries include:
-
-- no unrestricted database credentials for the language model,
+- no unrestricted credentials for the language model,
 - read-only investigative SQL,
 - parsed and policy-checked queries,
-- approved schemas, row limits, timeouts, and audit logs,
+- approved schemas, row limits, timeouts, and audit records,
 - exact human approval for reversible sensitive actions,
 - blocked high-risk actions,
 - untrusted treatment of logs, runbooks, and retrieved text,
 - explicit protection against prompt injection and fabricated evidence.
 
+See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
+
 ## Evaluation
 
-The project is evaluation-first. Each synthetic incident has hidden ground truth so that system performance can be measured objectively.
+Each benchmark incident has hidden ground truth so system behaviour can be measured objectively. Planned measurements include:
 
-Planned measurements include:
-
-- anomaly-detection precision, recall, and detection delay,
+- anomaly-detection precision, recall, false-positive rate, and detection delay,
 - root-cause Top-1 and Top-3 accuracy,
-- probability calibration,
+- Brier score and probability calibration,
 - evidence quality and unsupported-claim rate,
-- tool-call count, latency, and model cost,
+- tool-call count, latency, SQL cost, and model cost,
 - SQL safety and unauthorized-action block rates,
 - remediation success and recovery-verification accuracy,
 - churn, survival, and customer-impact model quality,
 - ablations with lineage, history, contradiction search, and other components removed.
 
-## Development status
+No README or résumé result should be published until a reproducible benchmark command produces it.
 
-This repository is under active development. Shipped capabilities are documented separately from planned capabilities, and the README will evolve as runnable simulation, statistical, agentic, and interface components are added.
+## Repository map
 
-The goal is a reproducible end-to-end demonstration that can be started locally, inject a hidden incident, show the investigation in real time, request approval, simulate remediation, verify recovery, and publish measured evaluation results.
+```text
+configs/                Reproducible simulation configurations
+specs/                  Product, evaluation, safety, and incident contracts
+src/paic/contracts/     Contract models, loaders, and cross-contract validation
+src/paic/simulator/     Synthetic commerce generation, schemas, export, and validation
+schemas/                Generated JSON Schemas
+examples/               Small programmatic usage examples
+tests/                  Unit, invariant, CLI, generation, and integrity tests
+docs/                   Architecture, data, evaluation, security, and decision records
+.github/                 Continuous integration and contribution templates
+```
+
+## Development roadmap
+
+The next major capabilities are:
+
+1. analytical metrics, funnels, cohorts, and contribution analysis,
+2. robust seasonal and cohort-aware anomaly detection,
+3. customer churn, survival, causal impact, and revenue-at-risk modelling,
+4. operational evidence, lineage, and safe tool access,
+5. probabilistic agentic investigation,
+6. governed remediation and recovery verification,
+7. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
+
+Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before proposing changes. New functionality should preserve deterministic tests, explicit contracts, documented assumptions, and measurable acceptance criteria.
+Issues and pull requests are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before proposing changes. New functionality should preserve deterministic tests, explicit contracts, documented assumptions, and measurable acceptance criteria.
 
 ## License
 
-See [`LICENSE`](LICENSE) for licensing information.
+This project is available under the [MIT License](LICENSE).

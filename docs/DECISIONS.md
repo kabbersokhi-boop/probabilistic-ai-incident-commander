@@ -1,37 +1,49 @@
 # Architecture Decisions
 
-## ADR-0001: Statistical detection is outside the LLM
+## ADR-0001: Statistical detection is outside the language model
 
-**Decision:** Deterministic statistical or machine-learning code detects anomalies.  
-**Reason:** Detection must be reproducible, measurable, and benchmarkable.  
+**Decision:** Deterministic statistical or machine-learning code detects anomalies.
+**Reason:** Detection must be reproducible, measurable, and benchmarkable.
 **Status:** Accepted.
 
 ## ADR-0002: One principal agent before multi-agent expansion
 
-**Decision:** Begin with one Incident Commander and add a critic only if evaluation proves a benefit.  
-**Reason:** Fewer coordination failures, lower cost, easier tracing, and clearer ablations.  
+**Decision:** Begin with one Incident Commander and add a critic only if evaluation proves a benefit.
+**Reason:** Fewer coordination failures, lower cost, easier tracing, and clearer ablations.
 **Status:** Accepted.
 
 ## ADR-0003: Root-cause probabilities are calculated externally
 
-**Decision:** The LLM may propose evidence and hypotheses but cannot manufacture numeric confidence.  
-**Reason:** Probabilities need explicit assumptions and calibration.  
+**Decision:** The language model may propose evidence and hypotheses but cannot manufacture numeric confidence.
+**Reason:** Probabilities need explicit assumptions and calibration.
 **Status:** Accepted.
 
 ## ADR-0004: Churn is part of incident impact
 
-**Decision:** Churn and survival analysis estimate the downstream effect of incident exposure.  
-**Reason:** This keeps customer modelling connected to the operational product rather than becoming a separate notebook.  
+**Decision:** Churn and survival analysis estimate the downstream effect of incident exposure.
+**Reason:** This keeps customer modelling connected to the operational product rather than becoming a separate notebook.
 **Status:** Accepted.
 
 ## ADR-0005: Repository contracts are authoritative
 
-**Decision:** Machine-readable specs and versioned docs are the source of truth across ChatGPT, Codex, and GitHub.  
-**Reason:** Tool sessions do not share perfect memory.  
+**Decision:** Machine-readable specifications and versioned documentation are the source of truth across development tools.
+**Reason:** Tool sessions do not share perfect memory, while the repository is reviewable and reproducible.
 **Status:** Accepted.
 
-## ADR-0006: Develop phase by phase
+## ADR-0006: Deliver capability milestones through focused changes
 
-**Decision:** Each phase receives its own branch, pull request, tests, and review; releases group completed phases.  
-**Reason:** Smaller integration risk and clearer public engineering history.  
+**Decision:** Each substantial capability receives a focused branch, tests, documentation, and review; public releases group compatible capabilities.
+**Reason:** Smaller integration risk, clearer history, and easier regression diagnosis.
+**Status:** Accepted.
+
+## ADR-0007: Keep baseline generation separate from incident injection
+
+**Decision:** The commerce simulator first produces a healthy incident-free baseline. Failure injection is implemented as a separate transformation with hidden truth.
+**Reason:** This enables reliable detector false-positive testing, clean reproducibility, and strict separation between agent-visible data and evaluator-only truth.
+**Status:** Accepted.
+
+## ADR-0008: Export self-validating columnar datasets
+
+**Decision:** Generated tables are written as Parquet alongside a resolved configuration and cryptographic manifest.
+**Reason:** Columnar files support analytical workloads, while hashes and schema metadata make artifacts portable and auditable.
 **Status:** Accepted.

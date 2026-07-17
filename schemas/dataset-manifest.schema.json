@@ -1,0 +1,258 @@
+{
+  "$defs": {
+    "ColumnManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "dtype",
+        "nullable"
+      ],
+      "title": "ColumnManifest",
+      "type": "object"
+    },
+    "ForeignKeyManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        },
+        "target_column": {
+          "minLength": 1,
+          "title": "Target Column",
+          "type": "string"
+        },
+        "target_table": {
+          "minLength": 1,
+          "title": "Target Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "column",
+        "target_table",
+        "target_column",
+        "nullable"
+      ],
+      "title": "ForeignKeyManifest",
+      "type": "object"
+    },
+    "RuntimeManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Packages",
+          "type": "object"
+        },
+        "platform": {
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_implementation": {
+          "minLength": 1,
+          "title": "Python Implementation",
+          "type": "string"
+        },
+        "python_version": {
+          "minLength": 1,
+          "title": "Python Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "python_version",
+        "python_implementation",
+        "platform",
+        "packages"
+      ],
+      "title": "RuntimeManifest",
+      "type": "object"
+    },
+    "TableManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnManifest"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "foreign_keys": {
+          "items": {
+            "$ref": "#/$defs/ForeignKeyManifest"
+          },
+          "title": "Foreign Keys",
+          "type": "array"
+        },
+        "maximum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Timestamp"
+        },
+        "minimum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Timestamp"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_key": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Primary Key",
+          "type": "array"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "relative_path",
+        "row_count",
+        "byte_size",
+        "sha256",
+        "primary_key",
+        "foreign_keys",
+        "columns"
+      ],
+      "title": "TableManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "incident_injections": {
+      "minimum": 0,
+      "title": "Incident Injections",
+      "type": "integer"
+    },
+    "logical_end_at": {
+      "format": "date-time",
+      "title": "Logical End At",
+      "type": "string"
+    },
+    "logical_start_at": {
+      "format": "date-time",
+      "title": "Logical Start At",
+      "type": "string"
+    },
+    "runtime": {
+      "$ref": "#/$defs/RuntimeManifest"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minimum": 1,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "simulation_id": {
+      "minLength": 1,
+      "title": "Simulation Id",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/TableManifest"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "simulation_id",
+    "generator_version",
+    "runtime",
+    "seed",
+    "config_sha256",
+    "logical_start_at",
+    "logical_end_at",
+    "incident_injections",
+    "tables"
+  ],
+  "title": "DatasetManifest",
+  "type": "object"
+}

@@ -9,7 +9,7 @@ from paic.contracts.loader import ContractBundle, ContractLoadError, load_contra
 
 def test_loads_complete_bundle(bundle: ContractBundle) -> None:
     assert bundle.project.project.name == "Probabilistic AI Incident Commander"
-    assert bundle.project.project.current_phase == 0
+    assert bundle.project.project.version == "0.2.0"
     assert len(bundle.incidents) == 5
     assert len(bundle.evaluation.metrics) >= 20
     assert bundle.safety.default_deny is True

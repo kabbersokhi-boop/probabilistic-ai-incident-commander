@@ -51,7 +51,7 @@ def _load_model(path: Path, model_type: type[ModelT]) -> ModelT:
 
 
 def load_contract_bundle(spec_dir: str | Path) -> ContractBundle:
-    """Load all Phase 0 contracts from ``spec_dir``."""
+    """Load all project contracts from ``spec_dir``."""
 
     root = Path(spec_dir).resolve()
     required_files = {

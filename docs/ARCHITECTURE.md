@@ -78,13 +78,32 @@ The generator emits an incident-free baseline. Incident injection remains a sepa
 
 Metric observations retain the value, numerator, denominator, sample size, and quality status. This allows anomaly detectors and investigation tools to reason from auditable statistics instead of hidden aggregation logic.
 
+### Statistical detection layer
+
+`src/paic/detection/` consumes validated metric observations and produces:
+
+- no-lookahead rolling and seasonal median/MAD baselines,
+- empirical beta-binomial predictive tests for proportions,
+- Poisson or negative-binomial tests for counts,
+- robust log-Student-t tests for currency and duration metrics,
+- Benjamini-Hochberg q-values across concurrently monitored series,
+- two-sided CUSUM change detection,
+- sequential likelihood scores,
+- deterministic alert eligibility, effect-size, support, and severity rules,
+- anomaly and change-point events,
+- ten-scenario benchmark evidence,
+- self-validating Parquet artifacts tied to source-analytics lineage.
+
+Benchmark perturbations are evaluator-only copies of metric observations. They do not modify the source dataset or analytical artifact.
+
 ### Command-line interface
 
 `src/paic/cli.py` exposes:
 
 - contract validation and schema export,
 - dataset generation, validation, and summaries,
-- analytical build, validation, and summaries.
+- analytical build, validation, and summaries,
+- detector build, validation, benchmark, and summaries.
 
 The simulator and analytical layer are usable without a language model, database service, or web interface.
 
@@ -115,9 +134,12 @@ Every exported analytical artifact contains:
 
 Both artifact types reject unsafe relative paths and can detect configuration, manifest, metadata, or table drift.
 
+### Detection artifact
+
+Every exported detection artifact contains scored observations, anomaly and change-point events, benchmark truth and results, detector-quality evidence, the resolved detector configuration, source-analytics hashes, runtime metadata, table schemas, row counts, timestamp bounds, file hashes, and a manifest-bound success marker.
+
 ## Planned component boundaries
 
-- `detection`: seasonal, robust, sequential, and change-point methods
 - `customer_impact`: churn, survival, causal studies, revenue impact
 - `evidence`: logs, deployments, configuration, lineage, retrieval
 - `tools`: scoped interfaces and SQL gateway

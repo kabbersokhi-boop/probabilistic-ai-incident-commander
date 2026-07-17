@@ -1,0 +1,327 @@
+{
+  "$defs": {
+    "DetectionColumnManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "dtype",
+        "nullable"
+      ],
+      "title": "DetectionColumnManifest",
+      "type": "object"
+    },
+    "DetectionRuntimeManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Packages",
+          "type": "object"
+        },
+        "platform": {
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_implementation": {
+          "minLength": 1,
+          "title": "Python Implementation",
+          "type": "string"
+        },
+        "python_version": {
+          "minLength": 1,
+          "title": "Python Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "python_version",
+        "python_implementation",
+        "platform",
+        "packages"
+      ],
+      "title": "DetectionRuntimeManifest",
+      "type": "object"
+    },
+    "DetectionTableManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/DetectionColumnManifest"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "maximum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Timestamp"
+        },
+        "minimum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Timestamp"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_key": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Primary Key",
+          "type": "array"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "relative_path",
+        "row_count",
+        "byte_size",
+        "sha256",
+        "primary_key",
+        "columns"
+      ],
+      "title": "DetectionTableManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "anomaly_event_count": {
+      "minimum": 0,
+      "title": "Anomaly Event Count",
+      "type": "integer"
+    },
+    "anomaly_observation_count": {
+      "minimum": 0,
+      "title": "Anomaly Observation Count",
+      "type": "integer"
+    },
+    "benchmark_false_positive_rate": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark False Positive Rate"
+    },
+    "benchmark_mean_delay_periods": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark Mean Delay Periods"
+    },
+    "benchmark_precision": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark Precision"
+    },
+    "benchmark_scenario_count": {
+      "minimum": 0,
+      "title": "Benchmark Scenario Count",
+      "type": "integer"
+    },
+    "benchmark_scenario_recall": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark Scenario Recall"
+    },
+    "change_point_count": {
+      "minimum": 0,
+      "title": "Change Point Count",
+      "type": "integer"
+    },
+    "detection_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Detection Config Sha256",
+      "type": "string"
+    },
+    "detection_id": {
+      "minLength": 1,
+      "title": "Detection Id",
+      "type": "string"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "logical_end_at": {
+      "format": "date-time",
+      "title": "Logical End At",
+      "type": "string"
+    },
+    "logical_start_at": {
+      "format": "date-time",
+      "title": "Logical Start At",
+      "type": "string"
+    },
+    "observation_count": {
+      "minimum": 0,
+      "title": "Observation Count",
+      "type": "integer"
+    },
+    "quality_error_count": {
+      "minimum": 0,
+      "title": "Quality Error Count",
+      "type": "integer"
+    },
+    "runtime": {
+      "$ref": "#/$defs/DetectionRuntimeManifest"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_metric_count": {
+      "minimum": 1,
+      "title": "Selected Metric Count",
+      "type": "integer"
+    },
+    "selected_series_count": {
+      "minimum": 1,
+      "title": "Selected Series Count",
+      "type": "integer"
+    },
+    "source_analytics_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Analytics Config Sha256",
+      "type": "string"
+    },
+    "source_analytics_id": {
+      "minLength": 1,
+      "title": "Source Analytics Id",
+      "type": "string"
+    },
+    "source_analytics_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Analytics Manifest Sha256",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/DetectionTableManifest"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "detection_id",
+    "generator_version",
+    "runtime",
+    "source_analytics_id",
+    "source_analytics_manifest_sha256",
+    "source_analytics_config_sha256",
+    "detection_config_sha256",
+    "logical_start_at",
+    "logical_end_at",
+    "selected_metric_count",
+    "selected_series_count",
+    "observation_count",
+    "anomaly_observation_count",
+    "anomaly_event_count",
+    "change_point_count",
+    "benchmark_scenario_count",
+    "quality_error_count",
+    "tables"
+  ],
+  "title": "DetectionManifest",
+  "type": "object"
+}

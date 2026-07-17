@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides three working foundations.
+The repository currently provides four working foundations.
 
 ### Executable product and evaluation contracts
 
@@ -78,7 +78,19 @@ The repository currently provides three working foundations.
 - Self-validating Parquet artifacts with resolved configuration, metric catalog, table hashes, runtime metadata, and tamper-evident success markers
 - No language-model dependency: every published analytical value is calculated by deterministic Polars code
 
-The simulator intentionally generates a **healthy, incident-free baseline**. Incident injection and anomaly detection remain separate, testable capabilities so the benchmark can distinguish normal behaviour from failures.
+### Statistical anomaly-detection engine
+
+- Rolling and seasonal median/MAD baselines that use only prior observations
+- Distribution-aware predictive tests: empirical beta-binomial for proportions, Poisson or negative binomial for counts, and robust log-Student-t tests for positive skewed values
+- Benjamini-Hochberg false-discovery control across simultaneously monitored series
+- Two-sided CUSUM change detection and sequential likelihood scoring
+- Cohort-specific eligibility, sample-size, effect-size, and detector-support policies
+- Auditable outputs containing expected ranges, residuals, p-values, q-values, change scores, detector support, severity, and event boundaries
+- Ten deterministic ground-truth perturbations spanning checkout, payments, orders, revenue, inventory, fulfilment, pipelines, and seller feeds
+- A reference standard run with 100% scenario recall, 81.25% precision, a 0.24% false-positive rate, and 1.2-period mean detection delay
+- Self-validating Parquet artifacts bound to the exact source analytics manifest and detector configuration
+
+The simulator intentionally generates a **healthy, incident-free baseline**. Detector evaluation applies evaluator-only perturbations to selected metric observations, leaving the source dataset unchanged and preserving a clean false-positive benchmark.
 
 ## Quick start
 
@@ -157,7 +169,25 @@ data/generated/analytics-smoke/
     └── data_quality_results.parquet
 ```
 
-### Generate and analyse the larger baseline
+### Build and validate the statistical detector
+
+```bash
+paic detection build \
+  --analytics-dir data/generated/analytics-smoke \
+  --config configs/detection/smoke.yaml \
+  --output-dir data/generated/detection-smoke
+
+paic detection validate \
+  --detection-dir data/generated/detection-smoke \
+  --analytics-dir data/generated/analytics-smoke
+
+paic detection summary \
+  --detection-dir data/generated/detection-smoke
+```
+
+The detection artifact contains scored observations, anomaly events, change-point events, benchmark truth and results, detector quality evidence, the resolved detector configuration, cryptographic hashes, and source-analytics lineage.
+
+### Generate, analyse, and benchmark the larger baseline
 
 ```bash
 paic simulate \
@@ -168,6 +198,15 @@ paic analytics build \
   --dataset-dir data/generated/standard \
   --config configs/analytics/standard.yaml \
   --output-dir data/generated/analytics-standard
+
+paic detection build \
+  --analytics-dir data/generated/analytics-standard \
+  --config configs/detection/standard.yaml \
+  --output-dir data/generated/detection-standard
+
+paic detection validate \
+  --detection-dir data/generated/detection-standard \
+  --analytics-dir data/generated/analytics-standard
 ```
 
 ### Validate the project contracts
@@ -302,9 +341,19 @@ See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
 
 ## Evaluation
 
-Each benchmark incident has hidden ground truth so system behaviour can be measured objectively. Planned measurements include:
+Each benchmark incident has hidden ground truth so system behaviour can be measured objectively. The statistical detector already reports scenario recall, observation precision, false-positive rate, point recall, and detection delay. The standard deterministic benchmark currently produces:
 
-- anomaly-detection precision, recall, false-positive rate, and detection delay,
+| Measure | Result |
+|---|---:|
+| Injected scenarios | 10 |
+| Scenario recall | 100% |
+| Observation precision | 81.25% |
+| False-positive rate | 0.24% |
+| Mean detection delay | 1.2 periods |
+
+The wider product evaluation will also measure:
+
+- anomaly-detection precision, recall, false-positive rate, and detection delay across raw-event incident families,
 - root-cause Top-1 and Top-3 accuracy,
 - Brier score and probability calibration,
 - evidence quality and unsupported-claim rate,
@@ -319,15 +368,16 @@ No README or résumé result should be published until a reproducible benchmark 
 ## Repository map
 
 ```text
-configs/                Reproducible simulation and analytics configurations
+configs/                Reproducible simulation, analytics, and detection configurations
 specs/                  Product, evaluation, safety, and incident contracts
 src/paic/contracts/     Contract models, loaders, and cross-contract validation
 src/paic/simulator/     Synthetic commerce generation, schemas, export, and validation
 src/paic/analytics/     Semantic metrics, cohorts, funnels, contributions, and quality checks
+src/paic/detection/     Statistical baselines, predictive tests, FDR, change detection, and benchmarks
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
 tests/                  Unit, invariant, CLI, reconciliation, and integrity tests
-docs/                   Architecture, data, analytics, evaluation, security, and decisions
+docs/                   Architecture, data, analytics, detection, evaluation, security, and decisions
 .github/                 Continuous integration and contribution templates
 ```
 
@@ -335,12 +385,11 @@ docs/                   Architecture, data, analytics, evaluation, security, and
 
 The next major capabilities are:
 
-1. robust seasonal and cohort-aware anomaly detection,
-2. customer churn, survival, causal impact, and revenue-at-risk modelling,
-3. operational evidence, lineage, and safe tool access,
-4. probabilistic agentic investigation,
-5. governed remediation and recovery verification,
-6. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
+1. customer churn, survival, causal impact, and revenue-at-risk modelling,
+2. operational evidence, lineage, and safe tool access,
+3. probabilistic agentic investigation,
+4. governed remediation and recovery verification,
+5. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

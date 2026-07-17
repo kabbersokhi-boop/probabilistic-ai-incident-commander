@@ -17,6 +17,10 @@ from paic.analytics.engine import build_analytics
 from paic.analytics.io import export_analytics
 from paic.analytics.types import AnalyticsBuildResult
 from paic.contracts.loader import ContractBundle, load_contract_bundle
+from paic.detection.config import DetectionConfig, load_detection_config
+from paic.detection.engine import build_detection
+from paic.detection.io import export_detection
+from paic.detection.types import DetectionBuildResult
 from paic.simulator.config import SimulationConfig, load_simulation_config
 from paic.simulator.engine import simulate
 from paic.simulator.io import export_dataset
@@ -97,3 +101,82 @@ def analytics_smoke_dir(
     output = cast(Path, tmp_path_factory.mktemp("analytics-artifact")) / "analytics"
     export_analytics(analytics_smoke_result, output)
     return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def detection_smoke_config(repo_root: Path) -> DetectionConfig:
+    return load_detection_config(repo_root / "configs" / "detection" / "smoke.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def detection_smoke_result(
+    analytics_smoke_dir: Path,
+    detection_smoke_config: DetectionConfig,
+) -> DetectionBuildResult:
+    return build_detection(analytics_smoke_dir, detection_smoke_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def detection_smoke_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    detection_smoke_result: DetectionBuildResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("detection-artifact")) / "detection"
+    export_detection(detection_smoke_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def standard_config(repo_root: Path) -> SimulationConfig:
+    return load_simulation_config(repo_root / "configs" / "simulation" / "standard.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def standard_result(standard_config: SimulationConfig) -> SimulationResult:
+    return simulate(standard_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def standard_dataset_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    standard_result: SimulationResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("detection-standard-source")) / "dataset"
+    export_dataset(standard_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_standard_config(repo_root: Path) -> AnalyticsConfig:
+    return load_analytics_config(repo_root / "configs" / "analytics" / "standard.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_standard_result(
+    standard_dataset_dir: Path,
+    analytics_standard_config: AnalyticsConfig,
+) -> AnalyticsBuildResult:
+    return build_analytics(standard_dataset_dir, analytics_standard_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_standard_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    analytics_standard_result: AnalyticsBuildResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("detection-standard-analytics")) / "analytics"
+    export_analytics(analytics_standard_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def detection_standard_config(repo_root: Path) -> DetectionConfig:
+    return load_detection_config(repo_root / "configs" / "detection" / "standard.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def detection_standard_result(
+    analytics_standard_dir: Path,
+    detection_standard_config: DetectionConfig,
+) -> DetectionBuildResult:
+    return build_detection(analytics_standard_dir, detection_standard_config)

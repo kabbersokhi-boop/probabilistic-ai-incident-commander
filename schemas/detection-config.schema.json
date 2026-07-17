@@ -1,0 +1,488 @@
+{
+  "$defs": {
+    "AlertPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "fdr_alpha": {
+          "default": 0.05,
+          "exclusiveMaximum": 0.5,
+          "exclusiveMinimum": 0.0,
+          "title": "Fdr Alpha",
+          "type": "number"
+        },
+        "minimum_absolute_effect": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Minimum Absolute Effect",
+          "type": "number"
+        },
+        "minimum_detector_support": {
+          "default": 2,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Minimum Detector Support",
+          "type": "integer"
+        },
+        "minimum_relative_effect": {
+          "default": 0.08,
+          "minimum": 0.0,
+          "title": "Minimum Relative Effect",
+          "type": "number"
+        },
+        "minimum_sample_size": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Minimum Sample Size",
+          "type": "integer"
+        },
+        "robust_z_threshold": {
+          "default": 3.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Robust Z Threshold",
+          "type": "number"
+        }
+      },
+      "title": "AlertPolicy",
+      "type": "object"
+    },
+    "BaselineConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "$ref": "#/$defs/BaselineWindow"
+        },
+        "hour": {
+          "$ref": "#/$defs/BaselineWindow"
+        }
+      },
+      "required": [
+        "hour",
+        "day"
+      ],
+      "title": "BaselineConfig",
+      "type": "object"
+    },
+    "BaselineWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "lookback_periods": {
+          "minimum": 4,
+          "title": "Lookback Periods",
+          "type": "integer"
+        },
+        "minimum_history": {
+          "minimum": 3,
+          "title": "Minimum History",
+          "type": "integer"
+        },
+        "minimum_scale": {
+          "default": 1e-06,
+          "exclusiveMinimum": 0.0,
+          "title": "Minimum Scale",
+          "type": "number"
+        },
+        "minimum_seasonal_history": {
+          "minimum": 2,
+          "title": "Minimum Seasonal History",
+          "type": "integer"
+        },
+        "relative_scale_floor": {
+          "default": 0.01,
+          "minimum": 0.0,
+          "title": "Relative Scale Floor",
+          "type": "number"
+        },
+        "seasonal_periods": {
+          "minimum": 1,
+          "title": "Seasonal Periods",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lookback_periods",
+        "minimum_history",
+        "seasonal_periods",
+        "minimum_seasonal_history"
+      ],
+      "title": "BaselineWindow",
+      "type": "object"
+    },
+    "BenchmarkScenario": {
+      "additionalProperties": false,
+      "description": "A deterministic metric-level perturbation used only for detector evaluation.",
+      "properties": {
+        "cohort": {
+          "minLength": 1,
+          "title": "Cohort",
+          "type": "string"
+        },
+        "dimension_values": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "region",
+              "device",
+              "channel",
+              "customer_type",
+              "app_version",
+              "issuer",
+              "payment_method",
+              "processor",
+              "customer_segment",
+              "loyalty_tier",
+              "product_category",
+              "seller_id",
+              "warehouse_id",
+              "pipeline_name",
+              "service",
+              "deployment_scope"
+            ]
+          },
+          "title": "Dimension Values",
+          "type": "object"
+        },
+        "duration_periods": {
+          "minimum": 1,
+          "title": "Duration Periods",
+          "type": "integer"
+        },
+        "expected_direction": {
+          "enum": [
+            "increase",
+            "decrease"
+          ],
+          "title": "Expected Direction",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "level_shift",
+            "drift",
+            "spike"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "magnitude": {
+          "title": "Magnitude",
+          "type": "number"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "scenario_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "start_at": {
+          "format": "date-time",
+          "title": "Start At",
+          "type": "string"
+        },
+        "time_grain": {
+          "enum": [
+            "hour",
+            "day"
+          ],
+          "title": "Time Grain",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenario_id",
+        "metric",
+        "time_grain",
+        "cohort",
+        "start_at",
+        "duration_periods",
+        "kind",
+        "magnitude",
+        "expected_direction"
+      ],
+      "title": "BenchmarkScenario",
+      "type": "object"
+    },
+    "CusumConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "drift": {
+          "default": 0.5,
+          "exclusiveMinimum": 0.0,
+          "title": "Drift",
+          "type": "number"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "threshold": {
+          "default": 5.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "title": "CusumConfig",
+      "type": "object"
+    },
+    "DetectionOutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "compression": {
+          "default": "zstd",
+          "enum": [
+            "zstd",
+            "snappy",
+            "gzip",
+            "lz4",
+            "uncompressed"
+          ],
+          "title": "Compression",
+          "type": "string"
+        },
+        "compression_level": {
+          "anyOf": [
+            {
+              "maximum": 22,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 6,
+          "title": "Compression Level"
+        },
+        "include_statistics": {
+          "default": true,
+          "title": "Include Statistics",
+          "type": "boolean"
+        },
+        "row_group_size": {
+          "default": 50000,
+          "minimum": 1000,
+          "title": "Row Group Size",
+          "type": "integer"
+        }
+      },
+      "title": "DetectionOutputConfig",
+      "type": "object"
+    },
+    "MetricPolicyOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "minimum_absolute_effect": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Absolute Effect"
+        },
+        "minimum_detector_support": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Detector Support"
+        },
+        "minimum_relative_effect": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Relative Effect"
+        },
+        "minimum_sample_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Sample Size"
+        },
+        "robust_z_threshold": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Robust Z Threshold"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "title": "MetricPolicyOverride",
+      "type": "object"
+    },
+    "SequentialConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "alpha": {
+          "default": 0.01,
+          "exclusiveMaximum": 0.5,
+          "exclusiveMinimum": 0.0,
+          "title": "Alpha",
+          "type": "number"
+        },
+        "alternative_standardized_shift": {
+          "default": 1.5,
+          "exclusiveMinimum": 0.0,
+          "title": "Alternative Standardized Shift",
+          "type": "number"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "SequentialConfig",
+      "type": "object"
+    },
+    "SeriesSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "cohorts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Cohorts",
+          "type": "array"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "time_grains": {
+          "items": {
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Time Grains",
+          "type": "array"
+        }
+      },
+      "required": [
+        "metric",
+        "time_grains",
+        "cohorts"
+      ],
+      "title": "SeriesSelector",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "alert_policy": {
+      "$ref": "#/$defs/AlertPolicy"
+    },
+    "baseline": {
+      "$ref": "#/$defs/BaselineConfig"
+    },
+    "benchmark_scenarios": {
+      "items": {
+        "$ref": "#/$defs/BenchmarkScenario"
+      },
+      "title": "Benchmark Scenarios",
+      "type": "array"
+    },
+    "cusum": {
+      "$ref": "#/$defs/CusumConfig"
+    },
+    "detection_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Detection Id",
+      "type": "string"
+    },
+    "metric_overrides": {
+      "items": {
+        "$ref": "#/$defs/MetricPolicyOverride"
+      },
+      "title": "Metric Overrides",
+      "type": "array"
+    },
+    "output": {
+      "$ref": "#/$defs/DetectionOutputConfig"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selectors": {
+      "items": {
+        "$ref": "#/$defs/SeriesSelector"
+      },
+      "minItems": 1,
+      "title": "Selectors",
+      "type": "array"
+    },
+    "sequential": {
+      "$ref": "#/$defs/SequentialConfig"
+    },
+    "timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "detection_id",
+    "selectors",
+    "baseline"
+  ],
+  "title": "DetectionConfig",
+  "type": "object"
+}

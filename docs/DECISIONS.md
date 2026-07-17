@@ -65,3 +65,27 @@
 **Decision:** Analytical outputs are exported as Parquet with the resolved configuration, metric catalog, source identity, runtime metadata, cryptographic hashes, and a manifest-bound success marker.
 **Reason:** Evaluation and anomaly detection require portable artifacts whose lineage and integrity can be independently verified.
 **Status:** Accepted.
+
+## ADR-0012: Detection baselines exclude the current observation
+
+**Decision:** Every expected value and uncertainty estimate is calculated only from earlier periods in the same series.
+**Reason:** Lookahead would leak the anomaly into its own baseline and make evaluation misleading.
+**Status:** Accepted.
+
+## ADR-0013: Predictive tests follow metric distributions
+
+**Decision:** Proportions use an empirical beta-binomial model, counts use Poisson or negative-binomial models, and positive skewed metrics use a robust log-Student-t model.
+**Reason:** A single Gaussian z-test is not defensible across bounded rates, overdispersed counts, and long-tailed monetary values.
+**Status:** Accepted.
+
+## ADR-0014: Alert policy requires FDR control and multiple evidence channels
+
+**Decision:** Alerts require a Benjamini-Hochberg q-value below policy, a material effect size, sufficient sample and history, and support from a configurable number of deviation, CUSUM, or sequential signals.
+**Reason:** Monitoring many cohorts without multiple-testing correction or support requirements creates excessive false positives.
+**Status:** Accepted.
+
+## ADR-0015: Detector benchmarks perturb metric copies, not source data
+
+**Decision:** Ground-truth detector scenarios are applied to selected metric observations after analytics export. The source dataset and analytical artifact remain immutable.
+**Reason:** This isolates detector evaluation, preserves a clean false-positive baseline, and prevents evaluator labels from leaking into operational data.
+**Status:** Accepted.

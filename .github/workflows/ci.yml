@@ -47,7 +47,7 @@ jobs:
           rm -rf schemas-generated
           python -m paic export-schemas --output-dir schemas-generated
           diff -ru schemas schemas-generated
-      - name: Generate, analyse, and validate smoke dataset
+      - name: Generate, analyse, detect, and validate smoke dataset
         run: |
           python -m paic simulate \
             --config configs/simulation/smoke.yaml \
@@ -63,7 +63,17 @@ jobs:
           python -m paic analytics summary \
             --analytics-dir .artifacts/analytics-smoke \
             > .artifacts/analytics-smoke-summary.json
-      - name: Generate, analyse, and validate standard dataset
+          python -m paic detection build \
+            --analytics-dir .artifacts/analytics-smoke \
+            --config configs/detection/smoke.yaml \
+            --output-dir .artifacts/detection-smoke
+          python -m paic detection validate \
+            --detection-dir .artifacts/detection-smoke \
+            --analytics-dir .artifacts/analytics-smoke
+          python -m paic detection summary \
+            --detection-dir .artifacts/detection-smoke \
+            > .artifacts/detection-smoke-summary.json
+      - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |
           python -m paic simulate \
@@ -77,6 +87,16 @@ jobs:
           python -m paic analytics validate \
             --analytics-dir .artifacts/analytics-standard \
             --dataset-dir .artifacts/standard
+          python -m paic detection build \
+            --analytics-dir .artifacts/analytics-standard \
+            --config configs/detection/standard.yaml \
+            --output-dir .artifacts/detection-standard
+          python -m paic detection validate \
+            --detection-dir .artifacts/detection-standard \
+            --analytics-dir .artifacts/analytics-standard
+          python -m paic detection summary \
+            --detection-dir .artifacts/detection-standard \
+            > .artifacts/detection-standard-summary.json
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build

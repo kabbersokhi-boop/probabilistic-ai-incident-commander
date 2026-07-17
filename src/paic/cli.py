@@ -1,4 +1,4 @@
-"""Command-line interface for contracts, synthetic data, and analytics."""
+"""Command-line interface for contracts, synthetic data, analytics, and detection."""
 
 from __future__ import annotations
 
@@ -35,6 +35,19 @@ from paic.contracts.models import (
     SafetyContract,
 )
 from paic.contracts.validator import validate_contract_bundle
+from paic.detection.config import (
+    DetectionConfig,
+    DetectionConfigError,
+    load_detection_config,
+)
+from paic.detection.engine import DetectionBuildError, build_detection
+from paic.detection.io import DetectionIOError, export_detection, load_detection
+from paic.detection.manifest import DetectionManifest
+from paic.detection.summary import build_detection_summary
+from paic.detection.validation import (
+    detection_report_to_json,
+    validate_detection_directory,
+)
 from paic.simulator.config import (
     SimulationConfig,
     SimulatorConfigError,
@@ -128,6 +141,8 @@ def _export_schemas(output_dir: Path) -> int:
         "dataset-manifest.schema.json": DatasetManifest,
         "analytics-config.schema.json": AnalyticsConfig,
         "analytics-manifest.schema.json": AnalyticsManifest,
+        "detection-config.schema.json": DetectionConfig,
+        "detection-manifest.schema.json": DetectionManifest,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -284,6 +299,81 @@ def _analytics_summary(analytics_dir: Path) -> int:
     return 0
 
 
+def _build_detection(
+    analytics_dir: Path,
+    config_path: Path,
+    output_dir: Path,
+    overwrite: bool,
+    output_format: str,
+) -> int:
+    try:
+        config = load_detection_config(config_path)
+        result = build_detection(analytics_dir, config)
+        manifest = export_detection(result, output_dir, overwrite=overwrite)
+        loaded = load_detection(output_dir)
+        summary = build_detection_summary(loaded)
+    except (
+        DetectionConfigError,
+        DetectionBuildError,
+        DetectionIOError,
+        AnalyticsIOError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        else:
+            print(f"DETECTION ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    payload = {
+        "success": True,
+        "detection_id": config.detection_id,
+        "output_dir": str(output_dir.resolve()),
+        "manifest": manifest.model_dump(mode="json"),
+        "summary": summary,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    else:
+        print(f"Built {config.detection_id} in {output_dir.resolve()}")
+        print(f"Scored observations: {manifest.observation_count:,}")
+        print(f"Anomaly observations: {manifest.anomaly_observation_count:,}")
+        print(f"Anomaly events: {manifest.anomaly_event_count:,}")
+        if manifest.benchmark_scenario_count:
+            print(
+                "Benchmark: "
+                f"precision={manifest.benchmark_precision:.3f}, "
+                f"scenario_recall={manifest.benchmark_scenario_recall:.3f}, "
+                f"false_positive_rate={manifest.benchmark_false_positive_rate:.4f}"
+            )
+        print("Detection quality: passed")
+    return 0
+
+
+def _validate_detection(detection_dir: Path, analytics_dir: Path | None, output_format: str) -> int:
+    report = validate_detection_directory(detection_dir, analytics_dir=analytics_dir)
+    if output_format == "json":
+        print(detection_report_to_json(report))
+    else:
+        for issue in report.issues:
+            print(f"{issue.severity.upper():7} {issue.code:34} {issue.message}")
+        print("Detection validation: " + ("passed" if report.valid else "failed"))
+        if report.summary:
+            print(json.dumps(report.summary, indent=2, sort_keys=True))
+    return 0 if report.valid else 1
+
+
+def _detection_summary(detection_dir: Path) -> int:
+    try:
+        loaded = load_detection(detection_dir)
+    except DetectionIOError as exc:
+        print(f"DETECTION ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(build_detection_summary(loaded), indent=2, sort_keys=True, default=str))
+    return 0
+
+
 def _print_dataset_report(report: DatasetValidationReport) -> None:
     for issue in report.issues:
         print(f"{issue.severity.upper():7} {issue.code:36} {issue.table or '-'}: {issue.message}")
@@ -353,6 +443,29 @@ def build_parser() -> argparse.ArgumentParser:
         "summary", help="Print analytical manifest, quality, latest metrics, and funnel."
     )
     analytics_summary.add_argument("--analytics-dir", type=Path, required=True)
+
+    detection_parser = subparsers.add_parser(
+        "detection", help="Build and inspect deterministic anomaly-detection artifacts."
+    )
+    detection_subparsers = detection_parser.add_subparsers(dest="detection_command", required=True)
+    detection_build = detection_subparsers.add_parser(
+        "build", help="Build robust baselines, detector scores, events, and benchmarks."
+    )
+    detection_build.add_argument("--analytics-dir", type=Path, required=True)
+    detection_build.add_argument("--config", type=Path, required=True)
+    detection_build.add_argument("--output-dir", type=Path, required=True)
+    detection_build.add_argument("--overwrite", action="store_true")
+    detection_build.add_argument("--format", choices=("text", "json"), default="text")
+    detection_validate = detection_subparsers.add_parser(
+        "validate", help="Validate an exported anomaly-detection artifact."
+    )
+    detection_validate.add_argument("--detection-dir", type=Path, required=True)
+    detection_validate.add_argument("--analytics-dir", type=Path)
+    detection_validate.add_argument("--format", choices=("text", "json"), default="text")
+    detection_summary = detection_subparsers.add_parser(
+        "summary", help="Print detection manifest, benchmark, quality, and latest events."
+    )
+    detection_summary.add_argument("--detection-dir", type=Path, required=True)
     return parser
 
 
@@ -382,6 +495,18 @@ def main(argv: list[str] | None = None) -> int:
         return _validate_analytics(args.analytics_dir, args.dataset_dir, args.format)
     if args.command == "analytics" and args.analytics_command == "summary":
         return _analytics_summary(args.analytics_dir)
+    if args.command == "detection" and args.detection_command == "build":
+        return _build_detection(
+            args.analytics_dir,
+            args.config,
+            args.output_dir,
+            args.overwrite,
+            args.format,
+        )
+    if args.command == "detection" and args.detection_command == "validate":
+        return _validate_detection(args.detection_dir, args.analytics_dir, args.format)
+    if args.command == "detection" and args.detection_command == "summary":
+        return _detection_summary(args.detection_dir)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

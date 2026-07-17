@@ -23,8 +23,8 @@ Contributions should keep the project reproducible, measurable, and safe.
 
 ```bash
 make check
-make simulate-smoke
-make validate-smoke
+make analytics-smoke
+make validate-analytics-smoke
 ```
 
 See `docs/QUALITY_GATES.md` for the complete acceptance criteria.

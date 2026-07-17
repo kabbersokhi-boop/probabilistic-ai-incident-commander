@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 os.environ.setdefault("POLARS_MAX_THREADS", "4")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -11,9 +12,14 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 import pytest
 
+from paic.analytics.config import AnalyticsConfig, load_analytics_config
+from paic.analytics.engine import build_analytics
+from paic.analytics.io import export_analytics
+from paic.analytics.types import AnalyticsBuildResult
 from paic.contracts.loader import ContractBundle, load_contract_bundle
 from paic.simulator.config import SimulationConfig, load_simulation_config
 from paic.simulator.engine import simulate
+from paic.simulator.io import export_dataset
 from paic.simulator.types import SimulationResult
 
 
@@ -58,3 +64,36 @@ def rich_result(smoke_config: SimulationConfig) -> SimulationResult:
         }
     )
     return simulate(config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_smoke_config(repo_root: Path) -> AnalyticsConfig:
+    return load_analytics_config(repo_root / "configs" / "analytics" / "smoke.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def smoke_dataset_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    smoke_result: SimulationResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("analytics-source")) / "dataset"
+    export_dataset(smoke_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_smoke_result(
+    smoke_dataset_dir: Path,
+    analytics_smoke_config: AnalyticsConfig,
+) -> AnalyticsBuildResult:
+    return build_analytics(smoke_dataset_dir, analytics_smoke_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def analytics_smoke_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    analytics_smoke_result: AnalyticsBuildResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("analytics-artifact")) / "analytics"
+    export_analytics(analytics_smoke_result, output)
+    return output

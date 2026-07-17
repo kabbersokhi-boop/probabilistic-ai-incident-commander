@@ -23,8 +23,8 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -47,20 +47,36 @@ jobs:
           rm -rf schemas-generated
           python -m paic export-schemas --output-dir schemas-generated
           diff -ru schemas schemas-generated
-      - name: Generate and validate smoke dataset
+      - name: Generate, analyse, and validate smoke dataset
         run: |
           python -m paic simulate \
             --config configs/simulation/smoke.yaml \
             --output-dir .artifacts/smoke
           python -m paic dataset validate --dataset-dir .artifacts/smoke
-          python -m paic dataset summary --dataset-dir .artifacts/smoke > .artifacts/smoke-summary.json
-      - name: Generate and validate standard dataset
+          python -m paic analytics build \
+            --dataset-dir .artifacts/smoke \
+            --config configs/analytics/smoke.yaml \
+            --output-dir .artifacts/analytics-smoke
+          python -m paic analytics validate \
+            --analytics-dir .artifacts/analytics-smoke \
+            --dataset-dir .artifacts/smoke
+          python -m paic analytics summary \
+            --analytics-dir .artifacts/analytics-smoke \
+            > .artifacts/analytics-smoke-summary.json
+      - name: Generate, analyse, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |
           python -m paic simulate \
             --config configs/simulation/standard.yaml \
             --output-dir .artifacts/standard
           python -m paic dataset validate --dataset-dir .artifacts/standard
+          python -m paic analytics build \
+            --dataset-dir .artifacts/standard \
+            --config configs/analytics/standard.yaml \
+            --output-dir .artifacts/analytics-standard
+          python -m paic analytics validate \
+            --analytics-dir .artifacts/analytics-standard \
+            --dataset-dir .artifacts/standard
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build

@@ -65,6 +65,16 @@ class SequentialState:
 
 
 _SEVERITY_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+_REASON_CODE_ORDER = (
+    "history_gate_passed",
+    "sample_size_gate_passed",
+    "effect_size_gate_passed",
+    "support_robust_deviation",
+    "support_fdr_significance",
+    "support_cusum",
+    "support_sequential",
+    "alert_raised",
+)
 
 
 def _safe_float(value: object) -> float | None:
@@ -481,7 +491,15 @@ def _score_series(metrics: pl.DataFrame, config: DetectionConfig) -> pl.DataFram
                     "estimated_change_start": estimated_change_start,
                     "sequential_log_likelihood": sequential_score,
                     "sequential_alert": sequential_alert,
+                    "support_robust_deviation": False,
+                    "support_fdr_significance": False,
+                    "support_cusum": False,
+                    "support_sequential": False,
                     "detector_support_count": 0,
+                    "sample_size_gate_passed": sample_size >= minimum_sample,
+                    "effect_size_gate_passed": False,
+                    "history_gate_passed": len(finite_history) >= baseline_config.minimum_history,
+                    "alert_reason_codes": "[]",
                     "is_eligible": eligible,
                     "is_anomaly": False,
                     "direction": _direction(residual),
@@ -559,6 +577,16 @@ def _finalize_alerts(observations: pl.DataFrame, config: DetectionConfig) -> pl.
             and magnitude
             and support_count >= minimum_support
         )
+        reason_flags = {
+            "history_gate_passed": bool(row["history_gate_passed"]),
+            "sample_size_gate_passed": bool(row["sample_size_gate_passed"]),
+            "effect_size_gate_passed": magnitude,
+            "support_robust_deviation": supports[0],
+            "support_fdr_significance": supports[1],
+            "support_cusum": supports[2],
+            "support_sequential": supports[3],
+            "alert_raised": anomaly,
+        }
         score = evidence_score(
             robust_z=robust_z,
             q_value=q_value,
@@ -570,6 +598,14 @@ def _finalize_alerts(observations: pl.DataFrame, config: DetectionConfig) -> pl.
             minimum_relative_effect=minimum_relative,
         )
         row["detector_support_count"] = support_count
+        row["support_robust_deviation"] = supports[0]
+        row["support_fdr_significance"] = supports[1]
+        row["support_cusum"] = supports[2]
+        row["support_sequential"] = supports[3]
+        row["effect_size_gate_passed"] = magnitude
+        row["alert_reason_codes"] = json.dumps(
+            [code for code in _REASON_CODE_ORDER if reason_flags[code]], separators=(",", ":")
+        )
         row["is_anomaly"] = anomaly
         row["evidence_score"] = score
         row["severity"] = severity_from_score(score, support_count) if anomaly else "none"

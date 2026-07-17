@@ -68,6 +68,8 @@ A point becomes an alert only when it is eligible, statistically significant aft
 
 Eligibility and thresholds can be overridden per metric. This is important because an hourly conversion proportion, a daily pipeline retention rate, and gross order value have different variance and decision costs.
 
+Each detector observation publishes the four support flags, explicit history, sample-size, and effect-size gate results, and an ordered JSON `alert_reason_codes` array. These fields are derived from the existing policy only; they do not add a voter or alter an alert decision.
+
 ## Event formation
 
 Contiguous anomalous points for the same series are grouped into an event. Each event records:
@@ -154,3 +156,4 @@ paic detection summary \
 - Correlated detector signals are treated as support channels, not as independent probabilities.
 - Thresholds are benchmark policies, not universal production defaults.
 - Seasonal models are deliberately interpretable. More complex forecasting methods should be added only when out-of-sample evaluation demonstrates a material benefit.
+- Additional business-threshold voters and hierarchical cohort traversal remain future evaluated enhancements; neither is part of the current alert policy.

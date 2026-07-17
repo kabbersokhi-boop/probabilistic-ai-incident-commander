@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import polars as pl
+import pytest
 
 from paic.detection.io import export_detection, load_manifest
 from paic.detection.types import DetectionBuildResult
@@ -146,3 +147,37 @@ def test_validation_reports_missing_source_analytics(
         detection_smoke_dir, analytics_dir=tmp_path / "missing-analytics"
     )
     assert "source.analytics" in {item.code for item in report.issues}
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "expected_code"),
+    [
+        ("support_robust_deviation", True, "alerts.support_explanation"),
+        ("detector_support_count", 99, "alerts.support_explanation"),
+        ("alert_reason_codes", '["alert_raised"]', "alerts.reason_codes"),
+    ],
+)  # type: ignore[untyped-decorator]
+def test_validation_rejects_tampered_alert_explanations(
+    tmp_path: Path,
+    detection_smoke_dir: Path,
+    column: str,
+    value: bool | int | str,
+    expected_code: str,
+) -> None:
+    copied = tmp_path / column
+    shutil.copytree(detection_smoke_dir, copied)
+    manifest = load_manifest(copied)
+    table = next(item for item in manifest.tables if item.name == "detector_observations")
+    path = copied / table.relative_path
+    frame = pl.read_parquet(path).with_columns(pl.lit(value).alias(column))
+    frame.write_parquet(path, compression="zstd", compression_level=6)
+
+    def transform(raw: dict[str, Any]) -> None:
+        tables = cast(list[dict[str, Any]], raw["tables"])
+        item = next(value for value in tables if value["name"] == "detector_observations")
+        item["byte_size"] = path.stat().st_size
+        item["sha256"] = file_sha256(path)
+
+    _rewrite_manifest(copied, transform)
+    report = validate_detection_directory(copied)
+    assert expected_code in {item.code for item in report.issues}

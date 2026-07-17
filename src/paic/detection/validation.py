@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,17 @@ from paic.detection.engine import detection_quality_error_count
 from paic.detection.io import DetectionIOError, load_detection
 from paic.detection.schema import DETECTION_TABLE_ORDER, DETECTION_TABLE_SPECS
 from paic.simulator.io import file_sha256
+
+_REASON_CODE_ORDER = (
+    "history_gate_passed",
+    "sample_size_gate_passed",
+    "effect_size_gate_passed",
+    "support_robust_deviation",
+    "support_fdr_significance",
+    "support_cusum",
+    "support_sequential",
+    "alert_raised",
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +45,103 @@ class DetectionValidationReport:
 
 def _issue(issues: list[DetectionValidationIssue], code: str, message: str) -> None:
     issues.append(DetectionValidationIssue(code=code, message=message))
+
+
+def _validate_alert_explanations(
+    observations: pl.DataFrame, config: DetectionConfig, issues: list[DetectionValidationIssue]
+) -> None:
+    """Verify that persisted explanation fields reconstruct detector policy decisions."""
+
+    sequential_threshold = math.log((1.0 - config.sequential.alpha) / config.sequential.alpha)
+    invalid_support = 0
+    invalid_policy = 0
+    invalid_reasons = 0
+    for row in observations.to_dicts():
+        override = config.override_map.get(str(row["metric_name"]))
+        z_threshold = (
+            override.robust_z_threshold
+            if override is not None and override.robust_z_threshold is not None
+            else config.alert_policy.robust_z_threshold
+        )
+        minimum_support = (
+            override.minimum_detector_support
+            if override is not None and override.minimum_detector_support is not None
+            else config.alert_policy.minimum_detector_support
+        )
+        minimum_relative = (
+            override.minimum_relative_effect
+            if override is not None and override.minimum_relative_effect is not None
+            else config.alert_policy.minimum_relative_effect
+        )
+        minimum_absolute = (
+            override.minimum_absolute_effect
+            if override is not None and override.minimum_absolute_effect is not None
+            else config.alert_policy.minimum_absolute_effect
+        )
+        robust_z = row["robust_z"]
+        q_value = row["q_value"]
+        supports = (
+            robust_z is not None and abs(float(robust_z)) >= z_threshold,
+            q_value is not None and float(q_value) <= config.alert_policy.fdr_alpha,
+            float(row["cusum_score"]) >= config.cusum.threshold,
+            float(row["sequential_log_likelihood"]) >= sequential_threshold,
+        )
+        stored_supports = tuple(
+            bool(row[name])
+            for name in (
+                "support_robust_deviation",
+                "support_fdr_significance",
+                "support_cusum",
+                "support_sequential",
+            )
+        )
+        if stored_supports != supports or int(row["detector_support_count"]) != sum(supports):
+            invalid_support += 1
+        relative = row["relative_change"]
+        absolute = row["absolute_change"]
+        effect = (relative is not None and abs(float(relative)) >= minimum_relative) or (
+            minimum_absolute > 0
+            and absolute is not None
+            and abs(float(absolute)) >= minimum_absolute
+        )
+        if bool(row["effect_size_gate_passed"]) != effect:
+            invalid_policy += 1
+        expected_anomaly = (
+            bool(row["is_eligible"])
+            and bool(row["history_gate_passed"])
+            and bool(row["sample_size_gate_passed"])
+            and effect
+            and supports[1]
+            and sum(supports) >= minimum_support
+        )
+        if bool(row["is_anomaly"]) != expected_anomaly:
+            invalid_policy += 1
+        try:
+            reasons = json.loads(str(row["alert_reason_codes"]))
+        except json.JSONDecodeError:
+            invalid_reasons += 1
+            continue
+        flags = {
+            "history_gate_passed": bool(row["history_gate_passed"]),
+            "sample_size_gate_passed": bool(row["sample_size_gate_passed"]),
+            "effect_size_gate_passed": bool(row["effect_size_gate_passed"]),
+            "support_robust_deviation": stored_supports[0],
+            "support_fdr_significance": stored_supports[1],
+            "support_cusum": stored_supports[2],
+            "support_sequential": stored_supports[3],
+            "alert_raised": bool(row["is_anomaly"]),
+        }
+        expected_reasons = [code for code in _REASON_CODE_ORDER if flags[code]]
+        if not isinstance(reasons, list) or reasons != expected_reasons:
+            invalid_reasons += 1
+    if invalid_support:
+        _issue(
+            issues, "alerts.support_explanation", f"{invalid_support} invalid support explanations"
+        )
+    if invalid_policy:
+        _issue(issues, "alerts.policy_explanation", f"{invalid_policy} invalid policy explanations")
+    if invalid_reasons:
+        _issue(issues, "alerts.reason_codes", f"{invalid_reasons} invalid alert reason codes")
 
 
 def validate_detection_directory(
@@ -138,6 +247,8 @@ def validate_detection_directory(
         _issue(issues, "manifest.quality_count", "quality error count differs from manifest")
     if quality_errors:
         _issue(issues, "detection.quality", f"artifact contains {quality_errors} quality errors")
+    if config is not None and not observations.is_empty():
+        _validate_alert_explanations(observations, config, issues)
 
     benchmark = loaded.tables.get("benchmark_summary", pl.DataFrame())
     if benchmark.is_empty():

@@ -1,0 +1,229 @@
+{
+  "$defs": {
+    "AnalyticsOutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "compression": {
+          "default": "zstd",
+          "enum": [
+            "zstd",
+            "snappy",
+            "gzip",
+            "lz4",
+            "uncompressed"
+          ],
+          "title": "Compression",
+          "type": "string"
+        },
+        "compression_level": {
+          "anyOf": [
+            {
+              "maximum": 22,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 6,
+          "title": "Compression Level"
+        },
+        "include_statistics": {
+          "default": true,
+          "title": "Include Statistics",
+          "type": "boolean"
+        },
+        "row_group_size": {
+          "default": 50000,
+          "minimum": 1000,
+          "title": "Row Group Size",
+          "type": "integer"
+        }
+      },
+      "title": "AnalyticsOutputConfig",
+      "type": "object"
+    },
+    "CohortSpec": {
+      "additionalProperties": false,
+      "description": "Named zero-, one-, or two-dimensional cohort.",
+      "properties": {
+        "dimensions": {
+          "items": {
+            "enum": [
+              "region",
+              "device",
+              "channel",
+              "customer_type",
+              "app_version",
+              "issuer",
+              "payment_method",
+              "processor",
+              "customer_segment",
+              "loyalty_tier",
+              "product_category",
+              "seller_id",
+              "warehouse_id",
+              "pipeline_name",
+              "service",
+              "deployment_scope"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "title": "Dimensions",
+          "type": "array"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "dimensions"
+      ],
+      "title": "CohortSpec",
+      "type": "object"
+    },
+    "ContributionSpec": {
+      "additionalProperties": false,
+      "description": "Adjacent-period contribution analysis for a ratio metric.",
+      "properties": {
+        "dimension": {
+          "enum": [
+            "region",
+            "device",
+            "channel",
+            "customer_type",
+            "app_version",
+            "issuer",
+            "payment_method",
+            "processor",
+            "customer_segment",
+            "loyalty_tier",
+            "product_category",
+            "seller_id",
+            "warehouse_id",
+            "pipeline_name",
+            "service",
+            "deployment_scope"
+          ],
+          "title": "Dimension",
+          "type": "string"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "time_grain": {
+          "enum": [
+            "hour",
+            "day"
+          ],
+          "title": "Time Grain",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "metric",
+        "dimension",
+        "time_grain"
+      ],
+      "title": "ContributionSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete deterministic semantic-layer configuration.",
+  "properties": {
+    "analytics_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Analytics Id",
+      "type": "string"
+    },
+    "cohorts": {
+      "items": {
+        "$ref": "#/$defs/CohortSpec"
+      },
+      "minItems": 1,
+      "title": "Cohorts",
+      "type": "array"
+    },
+    "contributions": {
+      "items": {
+        "$ref": "#/$defs/ContributionSpec"
+      },
+      "title": "Contributions",
+      "type": "array"
+    },
+    "funnel_cohorts": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Funnel Cohorts",
+      "type": "array"
+    },
+    "metrics": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Metrics",
+      "type": "array"
+    },
+    "minimum_denominator": {
+      "default": 25,
+      "minimum": 1,
+      "title": "Minimum Denominator",
+      "type": "integer"
+    },
+    "output": {
+      "$ref": "#/$defs/AnalyticsOutputConfig"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "time_grains": {
+      "items": {
+        "enum": [
+          "hour",
+          "day"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Time Grains",
+      "type": "array"
+    },
+    "timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "analytics_id",
+    "time_grains",
+    "metrics",
+    "cohorts",
+    "funnel_cohorts"
+  ],
+  "title": "AnalyticsConfig",
+  "type": "object"
+}

@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides two working foundations.
+The repository currently provides three working foundations.
 
 ### Executable product and evaluation contracts
 
@@ -67,7 +67,18 @@ The repository currently provides two working foundations.
 - Deterministic validation for schemas, relationships, temporal ordering, financial reconciliation, inventory balance, healthy baseline rates, and simulation boundaries
 - Dataset summaries for conversion, payment approval, gross order value, delivery, returns, new-versus-returning customers, acquisition channels, and warehouse scan latency
 
-The simulator intentionally generates a **healthy, incident-free baseline**. Incident injection and anomaly detection are added as separate, testable capabilities so the benchmark can distinguish normal behaviour from failures.
+### Deterministic analytics and metric layer
+
+- Forty-three versioned metrics across checkout, payments, orders, inventory, fulfilment, returns, seller feeds, pipelines, and deployments
+- Hourly and daily observations with explicit values, numerators, denominators, sample sizes, and data-quality status
+- Overall, one-dimensional, and two-dimensional cohorts, including region-by-device analysis
+- A five-stage checkout funnel with stepwise conversion and drop-off calculations
+- Exact adjacent-period contribution decomposition that separates within-cohort rate effects from population-mix effects
+- Reconciliation checks that independently rebuild overall totals from cohort observations
+- Self-validating Parquet artifacts with resolved configuration, metric catalog, table hashes, runtime metadata, and tamper-evident success markers
+- No language-model dependency: every published analytical value is calculated by deterministic Polars code
+
+The simulator intentionally generates a **healthy, incident-free baseline**. Incident injection and anomaly detection remain separate, testable capabilities so the benchmark can distinguish normal behaviour from failures.
 
 ## Quick start
 
@@ -115,12 +126,48 @@ paic dataset validate --dataset-dir data/generated/smoke
 paic dataset summary --dataset-dir data/generated/smoke
 ```
 
-### Generate the larger baseline
+### Build and validate the analytical artifact
+
+```bash
+paic analytics build \
+  --dataset-dir data/generated/smoke \
+  --config configs/analytics/smoke.yaml \
+  --output-dir data/generated/analytics-smoke
+
+paic analytics validate \
+  --analytics-dir data/generated/analytics-smoke \
+  --dataset-dir data/generated/smoke
+
+paic analytics summary \
+  --analytics-dir data/generated/analytics-smoke
+```
+
+The analytical build writes:
+
+```text
+data/generated/analytics-smoke/
+├── _SUCCESS
+├── analytics.config.resolved.json
+├── manifest.json
+├── metric_catalog.json
+└── tables/
+    ├── metric_observations.parquet
+    ├── funnel_observations.parquet
+    ├── contribution_observations.parquet
+    └── data_quality_results.parquet
+```
+
+### Generate and analyse the larger baseline
 
 ```bash
 paic simulate \
   --config configs/simulation/standard.yaml \
   --output-dir data/generated/standard
+
+paic analytics build \
+  --dataset-dir data/generated/standard \
+  --config configs/analytics/standard.yaml \
+  --output-dir data/generated/analytics-standard
 ```
 
 ### Validate the project contracts
@@ -272,14 +319,15 @@ No README or résumé result should be published until a reproducible benchmark 
 ## Repository map
 
 ```text
-configs/                Reproducible simulation configurations
+configs/                Reproducible simulation and analytics configurations
 specs/                  Product, evaluation, safety, and incident contracts
 src/paic/contracts/     Contract models, loaders, and cross-contract validation
 src/paic/simulator/     Synthetic commerce generation, schemas, export, and validation
+src/paic/analytics/     Semantic metrics, cohorts, funnels, contributions, and quality checks
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
-tests/                  Unit, invariant, CLI, generation, and integrity tests
-docs/                   Architecture, data, evaluation, security, and decision records
+tests/                  Unit, invariant, CLI, reconciliation, and integrity tests
+docs/                   Architecture, data, analytics, evaluation, security, and decisions
 .github/                 Continuous integration and contribution templates
 ```
 
@@ -287,13 +335,12 @@ docs/                   Architecture, data, evaluation, security, and decision r
 
 The next major capabilities are:
 
-1. analytical metrics, funnels, cohorts, and contribution analysis,
-2. robust seasonal and cohort-aware anomaly detection,
-3. customer churn, survival, causal impact, and revenue-at-risk modelling,
-4. operational evidence, lineage, and safe tool access,
-5. probabilistic agentic investigation,
-6. governed remediation and recovery verification,
-7. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
+1. robust seasonal and cohort-aware anomaly detection,
+2. customer churn, survival, causal impact, and revenue-at-risk modelling,
+3. operational evidence, lineage, and safe tool access,
+4. probabilistic agentic investigation,
+5. governed remediation and recovery verification,
+6. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

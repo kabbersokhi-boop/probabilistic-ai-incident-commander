@@ -47,3 +47,21 @@
 **Decision:** Generated tables are written as Parquet alongside a resolved configuration and cryptographic manifest.
 **Reason:** Columnar files support analytical workloads, while hashes and schema metadata make artifacts portable and auditable.
 **Status:** Accepted.
+
+## ADR-0009: Metrics preserve sufficient statistics
+
+**Decision:** Ratio and mean observations retain their numerator and denominator; all observations retain sample size and quality status.
+**Reason:** Downstream detection, reconciliation, uncertainty estimation, and audit must not depend on rounded dashboard values or hidden aggregation logic.
+**Status:** Accepted.
+
+## ADR-0010: Cohort contribution uses exact symmetric decomposition
+
+**Decision:** Adjacent-period changes in selected ratio metrics are decomposed into symmetric within-cohort rate effects and population-mix effects.
+**Reason:** The decomposition is order-independent, interpretable, and exactly reconstructs the overall rate change, making contribution claims testable.
+**Status:** Accepted.
+
+## ADR-0011: Analytical artifacts are self-validating
+
+**Decision:** Analytical outputs are exported as Parquet with the resolved configuration, metric catalog, source identity, runtime metadata, cryptographic hashes, and a manifest-bound success marker.
+**Reason:** Evaluation and anomaly detection require portable artifacts whose lineage and integrity can be independently verified.
+**Status:** Accepted.

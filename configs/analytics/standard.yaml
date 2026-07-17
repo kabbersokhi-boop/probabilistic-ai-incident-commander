@@ -1,0 +1,76 @@
+schema_version: "1.0"
+analytics_id: commerce-analytics-standard
+timezone: UTC
+time_grains:
+  - hour
+  - day
+minimum_denominator: 25
+metrics:
+  - "*"
+cohorts:
+  - name: overall
+    dimensions: []
+  - name: region
+    dimensions: [region]
+  - name: device
+    dimensions: [device]
+  - name: channel
+    dimensions: [channel]
+  - name: customer-type
+    dimensions: [customer_type]
+  - name: app-version
+    dimensions: [app_version]
+  - name: issuer
+    dimensions: [issuer]
+  - name: payment-method
+    dimensions: [payment_method]
+  - name: processor
+    dimensions: [processor]
+  - name: customer-segment
+    dimensions: [customer_segment]
+  - name: loyalty-tier
+    dimensions: [loyalty_tier]
+  - name: product-category
+    dimensions: [product_category]
+  - name: seller
+    dimensions: [seller_id]
+  - name: warehouse
+    dimensions: [warehouse_id]
+  - name: pipeline-name
+    dimensions: [pipeline_name]
+  - name: service
+    dimensions: [service]
+  - name: deployment-scope
+    dimensions: [deployment_scope]
+  - name: region-device
+    dimensions: [region, device]
+funnel_cohorts:
+  - overall
+  - region
+  - device
+  - channel
+  - customer-type
+  - app-version
+  - region-device
+contributions:
+  - name: checkout-conversion-by-region
+    metric: checkout_conversion_rate
+    dimension: region
+    time_grain: day
+  - name: payment-approval-by-issuer
+    metric: payment_approval_rate
+    dimension: issuer
+    time_grain: day
+  - name: on-time-delivery-by-region
+    metric: on_time_delivery_rate
+    dimension: region
+    time_grain: day
+  - name: inventory-accuracy-by-seller
+    metric: inventory_exact_match_rate
+    dimension: seller_id
+    time_grain: day
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 50000
+  include_statistics: true

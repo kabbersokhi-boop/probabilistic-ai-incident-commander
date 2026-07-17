@@ -1,0 +1,254 @@
+{
+  "$defs": {
+    "AnalyticsColumnManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "dtype",
+        "nullable"
+      ],
+      "title": "AnalyticsColumnManifest",
+      "type": "object"
+    },
+    "AnalyticsRuntimeManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Packages",
+          "type": "object"
+        },
+        "platform": {
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_implementation": {
+          "minLength": 1,
+          "title": "Python Implementation",
+          "type": "string"
+        },
+        "python_version": {
+          "minLength": 1,
+          "title": "Python Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "python_version",
+        "python_implementation",
+        "platform",
+        "packages"
+      ],
+      "title": "AnalyticsRuntimeManifest",
+      "type": "object"
+    },
+    "AnalyticsTableManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/AnalyticsColumnManifest"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "maximum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Timestamp"
+        },
+        "minimum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Timestamp"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_key": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Primary Key",
+          "type": "array"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "relative_path",
+        "row_count",
+        "byte_size",
+        "sha256",
+        "primary_key",
+        "columns"
+      ],
+      "title": "AnalyticsTableManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analytics_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Analytics Config Sha256",
+      "type": "string"
+    },
+    "analytics_id": {
+      "minLength": 1,
+      "title": "Analytics Id",
+      "type": "string"
+    },
+    "cohort_count": {
+      "minimum": 1,
+      "title": "Cohort Count",
+      "type": "integer"
+    },
+    "contribution_analysis_count": {
+      "minimum": 0,
+      "title": "Contribution Analysis Count",
+      "type": "integer"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "logical_end_at": {
+      "format": "date-time",
+      "title": "Logical End At",
+      "type": "string"
+    },
+    "logical_start_at": {
+      "format": "date-time",
+      "title": "Logical Start At",
+      "type": "string"
+    },
+    "metric_catalog_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Metric Catalog Sha256",
+      "type": "string"
+    },
+    "metric_count": {
+      "minimum": 1,
+      "title": "Metric Count",
+      "type": "integer"
+    },
+    "quality_error_count": {
+      "minimum": 0,
+      "title": "Quality Error Count",
+      "type": "integer"
+    },
+    "runtime": {
+      "$ref": "#/$defs/AnalyticsRuntimeManifest"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Config Sha256",
+      "type": "string"
+    },
+    "source_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Manifest Sha256",
+      "type": "string"
+    },
+    "source_simulation_id": {
+      "minLength": 1,
+      "title": "Source Simulation Id",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/AnalyticsTableManifest"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "analytics_id",
+    "generator_version",
+    "runtime",
+    "source_simulation_id",
+    "source_config_sha256",
+    "source_manifest_sha256",
+    "analytics_config_sha256",
+    "metric_catalog_sha256",
+    "logical_start_at",
+    "logical_end_at",
+    "metric_count",
+    "cohort_count",
+    "contribution_analysis_count",
+    "quality_error_count",
+    "tables"
+  ],
+  "title": "AnalyticsManifest",
+  "type": "object"
+}

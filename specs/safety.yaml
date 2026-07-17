@@ -1,0 +1,77 @@
+schema_version: '1.0'
+default_deny: true
+llm_has_direct_credentials: false
+sql:
+  default_role: read_only
+  approved_schemas:
+  - analytics
+  - commerce_read
+  - operations_read
+  forbidden_statement_types:
+  - INSERT
+  - UPDATE
+  - DELETE
+  - MERGE
+  - CREATE
+  - ALTER
+  - DROP
+  - TRUNCATE
+  - GRANT
+  - REVOKE
+  - COPY
+  - CALL
+  - EXECUTE
+  row_limit: 1000
+  timeout_seconds: 15
+  result_size_bytes: 2000000
+  require_parameterized_values: true
+  require_audit_log: true
+  require_query_plan_check: true
+action_classes:
+- risk_level: 0
+  name: Read-only investigation
+  examples:
+  - Read a metric
+  - Inspect lineage
+  - Search sanitized logs
+  policy: automatic
+- risk_level: 1
+  name: Safe simulation
+  examples:
+  - Simulate rollback impact
+  - Run isolated statistical replay
+  policy: automatic_and_logged
+- risk_level: 2
+  name: Limited reversible remediation
+  examples:
+  - Roll back a synthetic regional deployment
+  - Restore a previous synthetic rule version
+  policy: human_approval_required
+- risk_level: 3
+  name: High-risk or irreversible operation
+  examples:
+  - Modify customer orders
+  - Change taxes
+  - Delete data
+  - Change live pricing
+  policy: blocked
+untrusted_content_sources:
+- Application logs
+- Historical incident reports
+- Runbooks
+- Seller-provided fields
+- Retrieved documents
+required_audit_events:
+- Agent state transition
+- Tool request and validated arguments
+- SQL decision and execution metadata
+- Evidence creation and citation
+- Approval request and decision
+- Remediation attempt and outcome
+- Recovery decision
+prohibited_capabilities:
+- Direct unrestricted database access by the LLM
+- Execution of risk level 3 actions
+- Approval inferred from natural-language context
+- Resolution without deterministic recovery verification
+- Use of retrieved text as executable instruction

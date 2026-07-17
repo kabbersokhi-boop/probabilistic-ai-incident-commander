@@ -1,0 +1,241 @@
+{
+  "$defs": {
+    "BaselineSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Baseline Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "purpose": {
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "required_from_phase": {
+          "minimum": 0,
+          "title": "Required From Phase",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "name",
+        "purpose",
+        "required_from_phase"
+      ],
+      "title": "BaselineSpec",
+      "type": "object"
+    },
+    "BenchmarkContract": {
+      "additionalProperties": false,
+      "properties": {
+        "decoy_change_required": {
+          "title": "Decoy Change Required",
+          "type": "boolean"
+        },
+        "fixed_seed_required": {
+          "title": "Fixed Seed Required",
+          "type": "boolean"
+        },
+        "hidden_ground_truth_required": {
+          "title": "Hidden Ground Truth Required",
+          "type": "boolean"
+        },
+        "minimum_candidate_hypotheses": {
+          "minimum": 2,
+          "title": "Minimum Candidate Hypotheses",
+          "type": "integer"
+        },
+        "minimum_contradictory_evidence_items": {
+          "minimum": 1,
+          "title": "Minimum Contradictory Evidence Items",
+          "type": "integer"
+        },
+        "minimum_demo_incidents": {
+          "minimum": 1,
+          "title": "Minimum Demo Incidents",
+          "type": "integer"
+        },
+        "minimum_incident_families": {
+          "minimum": 3,
+          "title": "Minimum Incident Families",
+          "type": "integer"
+        },
+        "minimum_total_incidents": {
+          "minimum": 5,
+          "title": "Minimum Total Incidents",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minimum_total_incidents",
+        "minimum_demo_incidents",
+        "minimum_incident_families",
+        "hidden_ground_truth_required",
+        "fixed_seed_required",
+        "decoy_change_required",
+        "minimum_candidate_hypotheses",
+        "minimum_contradictory_evidence_items"
+      ],
+      "title": "BenchmarkContract",
+      "type": "object"
+    },
+    "EvaluationMetric": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "detection",
+            "diagnosis",
+            "probability",
+            "operations",
+            "efficiency",
+            "customer_impact",
+            "security"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "target"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "formula": {
+          "minLength": 1,
+          "title": "Formula",
+          "type": "string"
+        },
+        "hard_gate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Gate"
+        },
+        "hard_gate_operator": {
+          "anyOf": [
+            {
+              "enum": [
+                ">=",
+                "<=",
+                "=="
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Gate Operator"
+        },
+        "metric_id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "required_from_phase": {
+          "minimum": 0,
+          "title": "Required From Phase",
+          "type": "integer"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric_id",
+        "category",
+        "definition",
+        "direction",
+        "unit",
+        "formula",
+        "required_from_phase"
+      ],
+      "title": "EvaluationMetric",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baselines": {
+      "items": {
+        "$ref": "#/$defs/BaselineSpec"
+      },
+      "minItems": 3,
+      "title": "Baselines",
+      "type": "array"
+    },
+    "benchmark": {
+      "$ref": "#/$defs/BenchmarkContract"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/EvaluationMetric"
+      },
+      "minItems": 5,
+      "title": "Metrics",
+      "type": "array"
+    },
+    "reporting_requirements": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 3,
+      "title": "Reporting Requirements",
+      "type": "array"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "benchmark",
+    "metrics",
+    "baselines",
+    "reporting_requirements"
+  ],
+  "title": "EvaluationContract",
+  "type": "object"
+}

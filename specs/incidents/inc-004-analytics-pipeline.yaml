@@ -1,0 +1,150 @@
+schema_version: '1.0'
+incident_id: INC-004
+title: Order dashboard decline caused by transformation regression
+family: analytics_pipeline
+business_process: Data pipeline
+difficulty: expert
+random_seed: 44004
+narrative: Reported order volume drops while customer-facing systems, payments, and fulfilment remain healthy.
+trigger: A dbt model change filters out orders whose optional campaign_id is null.
+primary_metric: reported_order_count
+symptoms:
+- The executive dashboard reports a 14 percent order decline.
+- Payment captures and fulfilment intake remain stable.
+- The discrepancy begins after a transformation deployment.
+affected_cohorts:
+  campaign_id:
+  - 'NULL'
+  reporting_model:
+  - fct_orders
+  channel:
+  - organic
+  - direct
+unaffected_cohorts:
+  campaign_id:
+  - non-null
+  reporting_model:
+  - raw_orders
+  channel:
+  - paid-search
+required_tools:
+- run_safe_sql
+- inspect_pipeline_runs
+- traverse_lineage
+- inspect_deployments
+- run_statistical_test
+candidate_hypotheses:
+- hypothesis_id: H1
+  statement: A transformation change incorrectly removes orders with null campaign IDs.
+  expected_observations:
+  - Raw orders remain stable.
+  - The discrepancy appears in fct_orders after deployment.
+  - Missing rows concentrate in organic and direct channels.
+  falsifying_observations:
+  - Raw order creation also declines.
+  - The model diff does not alter campaign filtering.
+- hypothesis_id: H2
+  statement: Checkout conversion genuinely fell.
+  expected_observations:
+  - Checkout starts remain stable but completed raw orders fall.
+  - Payment captures fall similarly.
+  falsifying_observations:
+  - Raw orders and captures remain stable.
+  - Only transformed counts decline.
+- hypothesis_id: H3
+  statement: Payment capture events stopped arriving in analytics.
+  expected_observations:
+  - Raw order events exist without matching capture events.
+  - Payment event ingestion lags.
+  falsifying_observations:
+  - Capture events and processor totals reconcile.
+  - The discrepancy is tied to campaign_id nullability.
+- hypothesis_id: H4
+  statement: The dashboard query applies an incorrect date filter.
+  expected_observations:
+  - Underlying fct_orders counts are correct.
+  - Only dashboard results differ.
+  falsifying_observations:
+  - The transformed table itself is missing rows.
+  - Date boundaries reconcile.
+evidence_expectations:
+- evidence_id: E1
+  source_type: sql
+  observation: Raw order counts remain stable while fct_orders drops for null campaign_id rows.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E2
+  source_type: deployment
+  observation: The fct_orders transformation changed from a left join to a null-rejecting filter immediately before
+    the anomaly.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E3
+  source_type: metric
+  observation: Checkout completion and payment capture remain within seasonal expectations.
+  relation: contradicts
+  hypothesis_ids:
+  - H2
+  reliability: high
+- evidence_id: E4
+  source_type: pipeline
+  observation: Payment event ingestion completeness passes and reconciles with processor totals.
+  relation: contradicts
+  hypothesis_ids:
+  - H3
+  reliability: high
+- evidence_id: E5
+  source_type: sql
+  observation: Dashboard results match the defective fct_orders table, including date boundaries.
+  relation: contradicts
+  hypothesis_ids:
+  - H4
+  reliability: high
+- evidence_id: E6
+  source_type: lineage
+  observation: reported_order_count depends on fct_orders, while payment and fulfilment operational metrics do not.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+decoy_changes:
+- change_id: D1
+  description: A checkout UI experiment was expanded shortly before the dashboard decline.
+  timing_relative_to_incident_minutes: -20
+  why_plausible: Checkout experiments can change conversion and order volume.
+  why_not_causal: Raw completed orders and payment captures remain stable in both experiment arms.
+hidden_ground_truth:
+  root_cause_hypothesis_id: H1
+  root_cause_summary: The fct_orders transformation excludes valid orders with null campaign IDs.
+  causal_chain:
+  - Transformation code changes.
+  - Null campaign IDs fail the new predicate.
+  - Valid organic and direct orders disappear from fct_orders.
+  - Dashboard reports a false business decline.
+  affected_components:
+  - dbt:fct_orders
+  - analytics_warehouse
+  - reported_order_count
+correct_remediation:
+  action_id: restore_fct_orders_model
+  description: Restore the previous null-safe transformation and rebuild the affected analytical window.
+  risk_level: 2
+  approval_required: true
+  reversible: true
+  target: dbt-model:fct_orders
+  rollback_action: Revert to the defective version only in an isolated test schema for analysis.
+recovery_expectation:
+  primary_metric: reported_order_count
+  expected_direction: return_to_baseline
+  verification_windows: 3
+  minimum_sample_size: 1000
+  success_condition: Raw and transformed order counts reconcile within tolerance across campaign-nullability cohorts.
+  guardrail_metrics:
+  - duplicate_order_rows
+  - dbt_test_failure_count
+  - warehouse_query_latency_ms
+  reopen_condition: Reopen if reconciliation fails, duplicates appear, or any downstream critical model test fails.

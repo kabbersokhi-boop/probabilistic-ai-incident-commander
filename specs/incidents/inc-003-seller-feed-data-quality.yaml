@@ -1,0 +1,156 @@
+schema_version: '1.0'
+incident_id: INC-003
+title: Unavailable inventory displayed after seller-feed change
+family: seller_feed_data_quality
+business_process: Inventory
+difficulty: hard
+random_seed: 33003
+narrative: Customers can purchase products that are no longer available because one seller feed silently stops updating
+  stock quantities.
+trigger: Seller S-204 changes quantity from integer to numeric string and the ingestion parser quarantines updates
+  without failing the overall job.
+primary_metric: inventory_accuracy_rate
+symptoms:
+- Displayed availability diverges from warehouse-confirmed stock for one seller.
+- Post-purchase cancellations rise for affected products.
+- The seller-feed pipeline reports success despite a sharp record-level quarantine increase.
+affected_cohorts:
+  seller_id:
+  - S-204
+  category:
+  - consumer-electronics
+  feed_version:
+  - v3
+unaffected_cohorts:
+  seller_id:
+  - S-101
+  - S-305
+  category:
+  - home
+  - apparel
+  feed_version:
+  - v2
+required_tools:
+- segment_metric
+- run_safe_sql
+- inspect_pipeline_runs
+- traverse_lineage
+- search_logs
+candidate_hypotheses:
+- hypothesis_id: H1
+  statement: A seller-feed schema change caused stock updates to be quarantined.
+  expected_observations:
+  - Record-level schema errors rise for S-204.
+  - Last successful stock update predates the incident.
+  - Other sellers remain fresh.
+  falsifying_observations:
+  - S-204 records parse successfully.
+  - Warehouse stock itself is incorrect.
+- hypothesis_id: H2
+  statement: Warehouse stock scans are delayed.
+  expected_observations:
+  - Physical scan timestamps are stale across sellers sharing the warehouse.
+  - Feed freshness remains normal.
+  falsifying_observations:
+  - Only one seller feed is stale.
+  - Warehouse scans arrive on time.
+- hypothesis_id: H3
+  statement: Inventory reservation logic failed to decrement stock.
+  expected_observations:
+  - Reservation events are missing after orders.
+  - The issue spans sellers using the same service.
+  falsifying_observations:
+  - Reservations are recorded correctly.
+  - The divergence begins before customer orders.
+- hypothesis_id: H4
+  statement: A cache invalidation failure serves stale availability.
+  expected_observations:
+  - Source tables are current while API responses remain stale.
+  - Cache age and hit patterns change.
+  falsifying_observations:
+  - Source inventory is also stale.
+  - Cache invalidation metrics remain normal.
+evidence_expectations:
+- evidence_id: E1
+  source_type: pipeline
+  observation: S-204 record quarantine rises after feed version v3 introduces numeric strings.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E2
+  source_type: sql
+  observation: S-204 stock freshness exceeds the expected age while other sellers remain current.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E3
+  source_type: metric
+  observation: Warehouse scan timeliness remains normal across all sellers.
+  relation: contradicts
+  hypothesis_ids:
+  - H2
+  reliability: high
+- evidence_id: E4
+  source_type: trace
+  observation: Inventory reservation events are emitted and consumed successfully.
+  relation: contradicts
+  hypothesis_ids:
+  - H3
+  reliability: high
+- evidence_id: E5
+  source_type: metric
+  observation: Cache age and invalidation rates remain within baseline.
+  relation: contradicts
+  hypothesis_ids:
+  - H4
+  reliability: high
+- evidence_id: E6
+  source_type: lineage
+  observation: The quarantined seller feed is upstream of displayed availability and cancellation risk.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+decoy_changes:
+- change_id: D1
+  description: The shared warehouse increased scan batching during the same hour.
+  timing_relative_to_incident_minutes: -12
+  why_plausible: Batching can make inventory appear stale.
+  why_not_causal: Scan timeliness remains inside the normal range and unaffected sellers using the warehouse remain
+    accurate.
+hidden_ground_truth:
+  root_cause_hypothesis_id: H1
+  root_cause_summary: Seller S-204 changed the stock quantity field type, causing silent record quarantine.
+  causal_chain:
+  - Feed schema changes.
+  - Parser quarantines quantity records.
+  - Pipeline-level status remains green.
+  - Displayed stock stops updating.
+  - Customers order unavailable products and cancellations rise.
+  affected_components:
+  - seller-feed-ingestion
+  - inventory_snapshot
+  - inventory_accuracy_rate
+correct_remediation:
+  action_id: apply_feed_schema_adapter
+  description: Pause S-204 v3 ingestion, apply a numeric-string adapter, replay quarantined records, and restore
+    freshness.
+  risk_level: 2
+  approval_required: true
+  reversible: true
+  target: seller-feed:S-204:v3
+  rollback_action: Disable the adapter and restore the last trusted inventory snapshot.
+recovery_expectation:
+  primary_metric: inventory_accuracy_rate
+  expected_direction: increase
+  verification_windows: 3
+  minimum_sample_size: 300
+  success_condition: Feed freshness normalizes, quarantined records replay successfully, and inventory accuracy
+    exceeds the configured bound.
+  guardrail_metrics:
+  - oversell_rate
+  - feed_error_rate
+  - inventory_update_latency_seconds
+  reopen_condition: Reopen if stock freshness degrades or oversell rate remains elevated after replay.

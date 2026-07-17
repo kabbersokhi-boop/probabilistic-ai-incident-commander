@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "ProjectIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "current_phase": {
+          "minimum": 0,
+          "title": "Current Phase",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "one_sentence_definition": {
+          "minLength": 1,
+          "title": "One Sentence Definition",
+          "type": "string"
+        },
+        "portfolio_goal": {
+          "minLength": 1,
+          "title": "Portfolio Goal",
+          "type": "string"
+        },
+        "primary_users": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Primary Users",
+          "type": "array"
+        },
+        "slug": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Slug",
+          "type": "string"
+        },
+        "target_roles": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Roles",
+          "type": "array"
+        },
+        "version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "slug",
+        "version",
+        "current_phase",
+        "one_sentence_definition",
+        "portfolio_goal",
+        "target_roles",
+        "primary_users"
+      ],
+      "title": "ProjectIdentity",
+      "type": "object"
+    },
+    "WorkflowStage": {
+      "enum": [
+        "DETECT",
+        "SCOPE",
+        "INVESTIGATE",
+        "FORM_HYPOTHESES",
+        "TEST_HYPOTHESES",
+        "RANK_ROOT_CAUSES",
+        "RECOMMEND_ACTION",
+        "REQUEST_APPROVAL",
+        "REMEDIATE",
+        "VERIFY_RECOVERY",
+        "REPORT"
+      ],
+      "title": "WorkflowStage",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "non_goals": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Non Goals",
+      "type": "array"
+    },
+    "principles": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 3,
+      "title": "Principles",
+      "type": "array"
+    },
+    "project": {
+      "$ref": "#/$defs/ProjectIdentity"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signature_demo": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 5,
+      "title": "Signature Demo",
+      "type": "array"
+    },
+    "workflow": {
+      "items": {
+        "$ref": "#/$defs/WorkflowStage"
+      },
+      "minItems": 3,
+      "title": "Workflow",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "project",
+    "workflow",
+    "principles",
+    "non_goals",
+    "signature_demo"
+  ],
+  "title": "ProjectContract",
+  "type": "object"
+}

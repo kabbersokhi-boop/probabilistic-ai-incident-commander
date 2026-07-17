@@ -1,0 +1,58 @@
+schema_version: '1.0'
+project:
+  name: Probabilistic AI Incident Commander
+  slug: probabilistic-ai-incident-commander
+  version: 0.1.0
+  current_phase: 0
+  one_sentence_definition: An evidence-grounded agentic system that detects commerce anomalies, investigates them
+    across business and operational data, ranks root causes probabilistically, recommends governed remediation,
+    and verifies recovery.
+  portfolio_goal: Demonstrate advanced statistics, probability, data analysis, data engineering, agentic AI, evaluation,
+    security, and product engineering in one reproducible system.
+  target_roles:
+  - Agentic AI Engineer
+  - Applied AI Engineer
+  - Forward-Deployed AI Engineer
+  - AI Platform Engineer
+  - Data and AI Engineer
+  primary_users:
+  - Commerce operations manager
+  - Incident commander
+  - Payments operations analyst
+  - Data reliability engineer
+workflow:
+- DETECT
+- SCOPE
+- INVESTIGATE
+- FORM_HYPOTHESES
+- TEST_HYPOTHESES
+- RANK_ROOT_CAUSES
+- RECOMMEND_ACTION
+- REQUEST_APPROVAL
+- REMEDIATE
+- VERIFY_RECOVERY
+- REPORT
+principles:
+- Deterministic statistical code detects anomalies; the LLM does not guess from charts.
+- The agent proposes and tests multiple hypotheses and must record contradictory evidence.
+- Probabilities are calculated and calibrated outside the LLM.
+- The LLM receives no unrestricted database or operational credentials.
+- Sensitive actions require explicit human approval and exact-target authorization.
+- An incident is resolved only after statistical recovery verification and guardrail checks.
+- Every material claim in the final report must cite a stored evidence record.
+non_goals:
+- Operating a real production commerce environment during the portfolio build.
+- Building a multi-agent swarm before a single controlled agent is evaluated.
+- Adding infrastructure technologies that do not improve measured system quality.
+- Using vector retrieval for exact operational facts.
+signature_demo:
+- Start a reproducible synthetic commerce environment.
+- Inject one hidden incident with decoy changes.
+- Detect a statistically significant anomaly and affected cohorts.
+- Show the agent planning and executing controlled tool calls.
+- Show multiple hypotheses and explicit rejection of weak explanations.
+- Rank likely root causes with calibrated probabilities.
+- Estimate immediate, churn, and revenue impact with uncertainty.
+- Request human approval for a reversible remediation.
+- Apply the simulated action and verify sustained recovery.
+- Generate an evidence-backed report and score the run against hidden ground truth.

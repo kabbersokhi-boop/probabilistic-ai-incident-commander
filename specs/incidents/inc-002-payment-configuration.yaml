@@ -1,0 +1,154 @@
+schema_version: '1.0'
+incident_id: INC-002
+title: Legitimate customers rejected by fraud rule
+family: payment_configuration
+business_process: Payments
+difficulty: expert
+random_seed: 22002
+narrative: Payment approval collapses for one issuer and platform after a fraud-policy update while external processor
+  health remains nominal.
+trigger: Activate fraud-rule version 18 with an over-broad device-risk condition.
+primary_metric: payment_approval_rate
+symptoms:
+- Payment approval falls from approximately 92 percent to below 60 percent for one issuer.
+- The decline is concentrated among returning Android customers.
+- Fraud rejection reason DEVICE_RISK rises sharply without a matching rise in confirmed fraud.
+affected_cohorts:
+  issuer:
+  - BANK-A
+  platform:
+  - android
+  customer_type:
+  - returning
+unaffected_cohorts:
+  issuer:
+  - BANK-B
+  - BANK-C
+  platform:
+  - ios
+  - web
+  customer_type:
+  - new
+required_tools:
+- segment_metric
+- run_statistical_test
+- inspect_configuration_changes
+- search_logs
+- search_historical_incidents
+- estimate_customer_impact
+candidate_hypotheses:
+- hypothesis_id: H1
+  statement: Fraud-rule version 18 incorrectly rejects legitimate BANK-A Android customers.
+  expected_observations:
+  - DEVICE_RISK rejections begin after activation.
+  - Rule version 17 remains normal in a holdout cohort.
+  - Confirmed fraud does not rise proportionally.
+  falsifying_observations:
+  - The same decline appears before activation.
+  - Processor decline codes dominate instead of internal fraud codes.
+- hypothesis_id: H2
+  statement: BANK-A is experiencing an issuer outage.
+  expected_observations:
+  - External issuer decline codes rise.
+  - The effect spans platforms and customer types.
+  falsifying_observations:
+  - External health is normal.
+  - Internal fraud codes explain the decline.
+- hypothesis_id: H3
+  statement: The payment processor has elevated latency and timeouts.
+  expected_observations:
+  - Processor latency and timeout rates rise.
+  - Several issuers are affected.
+  falsifying_observations:
+  - Latency remains normal.
+  - Only a rule-specific cohort changes.
+- hypothesis_id: H4
+  statement: A mobile application release sends malformed payment metadata.
+  expected_observations:
+  - One app version is affected across issuers.
+  - Request validation logs show malformed fields.
+  falsifying_observations:
+  - Multiple app versions within the fraud-rule cohort are affected.
+  - Request schemas validate.
+evidence_expectations:
+- evidence_id: E1
+  source_type: configuration
+  observation: Fraud-rule version 18 was activated two minutes before the change point.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E2
+  source_type: sql
+  observation: DEVICE_RISK rejections account for most incremental declines in the affected cohort.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E3
+  source_type: metric
+  observation: BANK-A external health and issuer response latency remain normal.
+  relation: contradicts
+  hypothesis_ids:
+  - H2
+  reliability: high
+- evidence_id: E4
+  source_type: metric
+  observation: Processor timeout rate remains within baseline across all issuers.
+  relation: contradicts
+  hypothesis_ids:
+  - H3
+  reliability: high
+- evidence_id: E5
+  source_type: log
+  observation: Payment request schema validation succeeds for affected attempts.
+  relation: contradicts
+  hypothesis_ids:
+  - H4
+  reliability: high
+- evidence_id: E6
+  source_type: historical_incident
+  observation: A previous over-broad device-risk rule produced a similar rejection signature.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: medium
+decoy_changes:
+- change_id: D1
+  description: A mobile payment SDK release completed five minutes before the incident.
+  timing_relative_to_incident_minutes: -5
+  why_plausible: SDK changes can alter request metadata and payment acceptance.
+  why_not_causal: Both old and new SDK versions are affected only when evaluated by fraud-rule version 18.
+hidden_ground_truth:
+  root_cause_hypothesis_id: H1
+  root_cause_summary: Fraud-rule version 18 overweights a device-risk feature for BANK-A returning Android users.
+  causal_chain:
+  - Rule version 18 becomes active.
+  - A broad condition labels legitimate devices high risk.
+  - Internal fraud decisions reject valid attempts.
+  - Payment approval and checkout conversion fall.
+  - Incident exposure increases future churn risk.
+  affected_components:
+  - fraud-decision-service
+  - fraud-rule-v18
+  - payment_approval_rate
+correct_remediation:
+  action_id: restore_fraud_rule_v17
+  description: Restore fraud-rule version 17 for the affected traffic while preserving monitoring.
+  risk_level: 2
+  approval_required: true
+  reversible: true
+  target: fraud-decision-service:rule-set:18
+  rollback_action: Re-enable version 18 only after corrected conditions pass replay and holdout tests.
+recovery_expectation:
+  primary_metric: payment_approval_rate
+  expected_direction: return_to_baseline
+  verification_windows: 4
+  minimum_sample_size: 800
+  success_condition: Approval returns inside the issuer-level seasonal interval while false-negative fraud loss
+    remains below its guardrail.
+  guardrail_metrics:
+  - confirmed_fraud_rate
+  - payment_latency_ms
+  - checkout_conversion_rate
+  reopen_condition: Reopen if approval declines again or confirmed fraud exceeds the configured safety bound.

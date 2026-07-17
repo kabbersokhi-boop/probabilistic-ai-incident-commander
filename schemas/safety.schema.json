@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "ActionClass": {
+      "additionalProperties": false,
+      "properties": {
+        "examples": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Examples",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "automatic",
+            "automatic_and_logged",
+            "human_approval_required",
+            "blocked"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "risk_level": {
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Risk Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "risk_level",
+        "name",
+        "examples",
+        "policy"
+      ],
+      "title": "ActionClass",
+      "type": "object"
+    },
+    "SqlSafetyPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "approved_schemas": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Approved Schemas",
+          "type": "array"
+        },
+        "default_role": {
+          "const": "read_only",
+          "title": "Default Role",
+          "type": "string"
+        },
+        "forbidden_statement_types": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Forbidden Statement Types",
+          "type": "array"
+        },
+        "require_audit_log": {
+          "title": "Require Audit Log",
+          "type": "boolean"
+        },
+        "require_parameterized_values": {
+          "title": "Require Parameterized Values",
+          "type": "boolean"
+        },
+        "require_query_plan_check": {
+          "title": "Require Query Plan Check",
+          "type": "boolean"
+        },
+        "result_size_bytes": {
+          "minimum": 1024,
+          "title": "Result Size Bytes",
+          "type": "integer"
+        },
+        "row_limit": {
+          "minimum": 1,
+          "title": "Row Limit",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "default_role",
+        "approved_schemas",
+        "forbidden_statement_types",
+        "row_limit",
+        "timeout_seconds",
+        "result_size_bytes",
+        "require_parameterized_values",
+        "require_audit_log",
+        "require_query_plan_check"
+      ],
+      "title": "SqlSafetyPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_classes": {
+      "items": {
+        "$ref": "#/$defs/ActionClass"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "title": "Action Classes",
+      "type": "array"
+    },
+    "default_deny": {
+      "title": "Default Deny",
+      "type": "boolean"
+    },
+    "llm_has_direct_credentials": {
+      "title": "Llm Has Direct Credentials",
+      "type": "boolean"
+    },
+    "prohibited_capabilities": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Prohibited Capabilities",
+      "type": "array"
+    },
+    "required_audit_events": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 3,
+      "title": "Required Audit Events",
+      "type": "array"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sql": {
+      "$ref": "#/$defs/SqlSafetyPolicy"
+    },
+    "untrusted_content_sources": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Untrusted Content Sources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "default_deny",
+    "llm_has_direct_credentials",
+    "sql",
+    "action_classes",
+    "untrusted_content_sources",
+    "required_audit_events",
+    "prohibited_capabilities"
+  ],
+  "title": "SafetyContract",
+  "type": "object"
+}

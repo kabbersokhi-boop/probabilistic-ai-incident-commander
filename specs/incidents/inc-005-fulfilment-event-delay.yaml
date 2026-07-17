@@ -1,0 +1,155 @@
+schema_version: '1.0'
+incident_id: INC-005
+title: Delivery promise accuracy degraded by late warehouse scans
+family: fulfilment_event_delay
+business_process: Fulfilment
+difficulty: hard
+random_seed: 55005
+narrative: Delivery promises remain optimistic even though packages from one warehouse are entering the carrier
+  network later than expected.
+trigger: Warehouse W-17 scan events are buffered by a connector after a batching configuration change.
+primary_metric: delivery_promise_accuracy_rate
+symptoms:
+- On-time delivery performance falls for orders routed through W-17.
+- The promise engine sees stale handoff timestamps.
+- Customer contacts and future churn risk rise for repeatedly exposed customers.
+affected_cohorts:
+  warehouse:
+  - W-17
+  delivery_service:
+  - standard
+  region:
+  - IN-WEST
+unaffected_cohorts:
+  warehouse:
+  - W-12
+  - W-22
+  delivery_service:
+  - express
+  region:
+  - IN-NORTH
+required_tools:
+- segment_metric
+- run_safe_sql
+- inspect_configuration_changes
+- search_logs
+- traverse_lineage
+- estimate_customer_impact
+candidate_hypotheses:
+- hypothesis_id: H1
+  statement: A warehouse connector batching change delays scan events from W-17.
+  expected_observations:
+  - Event ingestion lag rises after the configuration change.
+  - Physical scan source timestamps precede platform receipt by an unusual interval.
+  - Other warehouses remain normal.
+  falsifying_observations:
+  - Source scans themselves occur late.
+  - The same delay appears before the batching change.
+- hypothesis_id: H2
+  statement: The carrier network is slower in IN-WEST.
+  expected_observations:
+  - Carrier transit duration rises after handoff.
+  - Warehouse scan ingestion remains timely.
+  falsifying_observations:
+  - Late delivery is explained before carrier handoff.
+  - Carrier transit remains normal.
+- hypothesis_id: H3
+  statement: The promise model became too optimistic after a model release.
+  expected_observations:
+  - Several warehouses and services show systematic promise error.
+  - Prediction residuals shift after model deployment.
+  falsifying_observations:
+  - Only W-17 event timing changes.
+  - Other cohorts using the model remain calibrated.
+- hypothesis_id: H4
+  statement: Order allocation sends unsuitable products to W-17.
+  expected_observations:
+  - Affected orders have unusual product or distance mix.
+  - Routing changes precede the accuracy decline.
+  falsifying_observations:
+  - The within-route mix remains stable.
+  - Scan ingestion lag explains the timing gap.
+evidence_expectations:
+- evidence_id: E1
+  source_type: configuration
+  observation: W-17 connector batching interval increased shortly before the event-lag change point.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E2
+  source_type: sql
+  observation: Source scan timestamps are timely but platform receipt timestamps are delayed for W-17.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E3
+  source_type: metric
+  observation: Carrier transit time after handoff remains within its historical range.
+  relation: contradicts
+  hypothesis_ids:
+  - H2
+  reliability: high
+- evidence_id: E4
+  source_type: metric
+  observation: Promise-model residuals remain calibrated for other warehouses and express service.
+  relation: contradicts
+  hypothesis_ids:
+  - H3
+  reliability: high
+- evidence_id: E5
+  source_type: sql
+  observation: Product mix, distance, and route allocation remain stable for W-17.
+  relation: contradicts
+  hypothesis_ids:
+  - H4
+  reliability: high
+- evidence_id: E6
+  source_type: customer_model
+  observation: Repeated late-delivery exposure is associated with higher modeled 60-day churn risk.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: medium
+decoy_changes:
+- change_id: D1
+  description: A delivery-promise model version was deployed on the same day.
+  timing_relative_to_incident_minutes: -35
+  why_plausible: Promise-model changes can directly alter delivery accuracy.
+  why_not_causal: Prediction residuals remain calibrated outside W-17, and event receipt lag begins at the connector
+    change point.
+hidden_ground_truth:
+  root_cause_hypothesis_id: H1
+  root_cause_summary: Warehouse W-17 connector batching delays operational scan events used by the promise system.
+  causal_chain:
+  - Connector batching interval increases.
+  - Scan events arrive late despite timely physical scans.
+  - Promise system operates on stale handoff state.
+  - Delivery estimates remain too optimistic.
+  - Late deliveries and customer dissatisfaction increase.
+  affected_components:
+  - warehouse-connector-W17
+  - scan-event-stream
+  - delivery_promise_accuracy_rate
+correct_remediation:
+  action_id: restore_scan_batch_interval
+  description: Restore the prior W-17 connector batch interval and replay delayed scan events.
+  risk_level: 2
+  approval_required: true
+  reversible: true
+  target: warehouse-connector:W-17:batching
+  rollback_action: Reapply the larger interval only in a capacity test after event-lag safeguards are added.
+recovery_expectation:
+  primary_metric: delivery_promise_accuracy_rate
+  expected_direction: increase
+  verification_windows: 4
+  minimum_sample_size: 400
+  success_condition: Event receipt lag normalizes first, followed by promise accuracy returning inside its expected
+    interval as affected deliveries complete.
+  guardrail_metrics:
+  - connector_cpu_utilization
+  - event_duplicate_rate
+  - carrier_transit_time_hours
+  reopen_condition: Reopen if ingestion lag or duplicate scan events exceed bounds, or promise accuracy fails to
+    recover after the expected delay.

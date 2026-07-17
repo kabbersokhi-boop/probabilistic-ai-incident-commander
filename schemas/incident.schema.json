@@ -1,0 +1,470 @@
+{
+  "$defs": {
+    "CandidateHypothesis": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_observations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Expected Observations",
+          "type": "array"
+        },
+        "falsifying_observations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Falsifying Observations",
+          "type": "array"
+        },
+        "hypothesis_id": {
+          "pattern": "^H\\d+$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "statement",
+        "expected_observations",
+        "falsifying_observations"
+      ],
+      "title": "CandidateHypothesis",
+      "type": "object"
+    },
+    "DecoyChange": {
+      "additionalProperties": false,
+      "properties": {
+        "change_id": {
+          "pattern": "^D\\d+$",
+          "title": "Change Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "timing_relative_to_incident_minutes": {
+          "title": "Timing Relative To Incident Minutes",
+          "type": "integer"
+        },
+        "why_not_causal": {
+          "minLength": 1,
+          "title": "Why Not Causal",
+          "type": "string"
+        },
+        "why_plausible": {
+          "minLength": 1,
+          "title": "Why Plausible",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "description",
+        "timing_relative_to_incident_minutes",
+        "why_plausible",
+        "why_not_causal"
+      ],
+      "title": "DecoyChange",
+      "type": "object"
+    },
+    "EvidenceExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "pattern": "^E\\d+$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "hypothesis_ids": {
+          "items": {
+            "pattern": "^H\\d+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Hypothesis Ids",
+          "type": "array"
+        },
+        "observation": {
+          "minLength": 1,
+          "title": "Observation",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "supports",
+            "contradicts"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "reliability": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Reliability",
+          "type": "string"
+        },
+        "source_type": {
+          "enum": [
+            "metric",
+            "sql",
+            "deployment",
+            "configuration",
+            "log",
+            "trace",
+            "lineage",
+            "pipeline",
+            "historical_incident",
+            "runbook",
+            "customer_model"
+          ],
+          "title": "Source Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "source_type",
+        "observation",
+        "relation",
+        "hypothesis_ids",
+        "reliability"
+      ],
+      "title": "EvidenceExpectation",
+      "type": "object"
+    },
+    "GroundTruth": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_components": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Affected Components",
+          "type": "array"
+        },
+        "causal_chain": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Causal Chain",
+          "type": "array"
+        },
+        "root_cause_hypothesis_id": {
+          "pattern": "^H\\d+$",
+          "title": "Root Cause Hypothesis Id",
+          "type": "string"
+        },
+        "root_cause_summary": {
+          "minLength": 1,
+          "title": "Root Cause Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root_cause_hypothesis_id",
+        "root_cause_summary",
+        "causal_chain",
+        "affected_components"
+      ],
+      "title": "GroundTruth",
+      "type": "object"
+    },
+    "RecoveryExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_direction": {
+          "enum": [
+            "increase",
+            "decrease",
+            "return_to_baseline"
+          ],
+          "title": "Expected Direction",
+          "type": "string"
+        },
+        "guardrail_metrics": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Guardrail Metrics",
+          "type": "array"
+        },
+        "minimum_sample_size": {
+          "minimum": 1,
+          "title": "Minimum Sample Size",
+          "type": "integer"
+        },
+        "primary_metric": {
+          "minLength": 1,
+          "title": "Primary Metric",
+          "type": "string"
+        },
+        "reopen_condition": {
+          "minLength": 1,
+          "title": "Reopen Condition",
+          "type": "string"
+        },
+        "success_condition": {
+          "minLength": 1,
+          "title": "Success Condition",
+          "type": "string"
+        },
+        "verification_windows": {
+          "minimum": 2,
+          "title": "Verification Windows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "primary_metric",
+        "expected_direction",
+        "verification_windows",
+        "minimum_sample_size",
+        "success_condition",
+        "guardrail_metrics",
+        "reopen_condition"
+      ],
+      "title": "RecoveryExpectation",
+      "type": "object"
+    },
+    "RemediationPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "approval_required": {
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "reversible": {
+          "title": "Reversible",
+          "type": "boolean"
+        },
+        "risk_level": {
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Risk Level",
+          "type": "integer"
+        },
+        "rollback_action": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rollback Action"
+        },
+        "target": {
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "description",
+        "risk_level",
+        "approval_required",
+        "reversible",
+        "target"
+      ],
+      "title": "RemediationPlan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "affected_cohorts": {
+      "additionalProperties": {
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "propertyNames": {
+        "minLength": 1
+      },
+      "title": "Affected Cohorts",
+      "type": "object"
+    },
+    "business_process": {
+      "minLength": 1,
+      "title": "Business Process",
+      "type": "string"
+    },
+    "candidate_hypotheses": {
+      "items": {
+        "$ref": "#/$defs/CandidateHypothesis"
+      },
+      "minItems": 2,
+      "title": "Candidate Hypotheses",
+      "type": "array"
+    },
+    "correct_remediation": {
+      "$ref": "#/$defs/RemediationPlan"
+    },
+    "decoy_changes": {
+      "items": {
+        "$ref": "#/$defs/DecoyChange"
+      },
+      "minItems": 1,
+      "title": "Decoy Changes",
+      "type": "array"
+    },
+    "difficulty": {
+      "enum": [
+        "medium",
+        "hard",
+        "expert"
+      ],
+      "title": "Difficulty",
+      "type": "string"
+    },
+    "evidence_expectations": {
+      "items": {
+        "$ref": "#/$defs/EvidenceExpectation"
+      },
+      "minItems": 2,
+      "title": "Evidence Expectations",
+      "type": "array"
+    },
+    "family": {
+      "minLength": 1,
+      "title": "Family",
+      "type": "string"
+    },
+    "hidden_ground_truth": {
+      "$ref": "#/$defs/GroundTruth"
+    },
+    "incident_id": {
+      "pattern": "^INC-\\d{3}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "narrative": {
+      "minLength": 1,
+      "title": "Narrative",
+      "type": "string"
+    },
+    "primary_metric": {
+      "minLength": 1,
+      "title": "Primary Metric",
+      "type": "string"
+    },
+    "random_seed": {
+      "minimum": 1,
+      "title": "Random Seed",
+      "type": "integer"
+    },
+    "recovery_expectation": {
+      "$ref": "#/$defs/RecoveryExpectation"
+    },
+    "required_tools": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Required Tools",
+      "type": "array"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "symptoms": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Symptoms",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "trigger": {
+      "minLength": 1,
+      "title": "Trigger",
+      "type": "string"
+    },
+    "unaffected_cohorts": {
+      "additionalProperties": {
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "propertyNames": {
+        "minLength": 1
+      },
+      "title": "Unaffected Cohorts",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "incident_id",
+    "title",
+    "family",
+    "business_process",
+    "difficulty",
+    "random_seed",
+    "narrative",
+    "trigger",
+    "primary_metric",
+    "symptoms",
+    "affected_cohorts",
+    "unaffected_cohorts",
+    "required_tools",
+    "candidate_hypotheses",
+    "evidence_expectations",
+    "decoy_changes",
+    "hidden_ground_truth",
+    "correct_remediation",
+    "recovery_expectation"
+  ],
+  "title": "IncidentSpec",
+  "type": "object"
+}

@@ -1,0 +1,153 @@
+schema_version: '1.0'
+incident_id: INC-001
+title: Regional Android checkout conversion collapse
+family: checkout_deployment
+business_process: Checkout
+difficulty: hard
+random_seed: 11001
+narrative: Checkout conversion falls sharply for Android users in one region shortly after several unrelated operational
+  changes.
+trigger: Deploy checkout-service version 7.4.2 with a postal-code parsing regression in IN-SOUTH.
+primary_metric: checkout_conversion_rate
+symptoms:
+- Checkout completion falls by roughly 18 percent relative to its seasonal expectation.
+- The decline is concentrated in Android version 7.4.2 in IN-SOUTH.
+- Sessions drop before payment authorization.
+affected_cohorts:
+  region:
+  - IN-SOUTH
+  platform:
+  - android
+  app_version:
+  - 7.4.2
+unaffected_cohorts:
+  region:
+  - IN-NORTH
+  - IN-WEST
+  platform:
+  - ios
+  - web
+  app_version:
+  - 7.4.1
+required_tools:
+- segment_metric
+- run_safe_sql
+- inspect_deployments
+- search_logs
+- traverse_lineage
+candidate_hypotheses:
+- hypothesis_id: H1
+  statement: Checkout-service 7.4.2 broke address validation in IN-SOUTH.
+  expected_observations:
+  - Errors begin after the regional deployment.
+  - Address-validation failures concentrate in version 7.4.2.
+  - Unaffected versions remain near baseline.
+  falsifying_observations:
+  - Equivalent failures occur on version 7.4.1.
+  - The conversion decline begins before deployment.
+- hypothesis_id: H2
+  statement: A payment issuer outage reduced completed orders.
+  expected_observations:
+  - Payment decline rates rise for a specific issuer.
+  - Sessions reach payment normally.
+  falsifying_observations:
+  - Sessions fail before payment.
+  - Issuer approval remains within baseline.
+- hypothesis_id: H3
+  statement: A promotion configuration change reduced purchase intent.
+  expected_observations:
+  - Traffic and checkout starts fall for promotion-eligible users.
+  - The effect appears across platforms sharing the promotion.
+  falsifying_observations:
+  - Checkout starts remain normal.
+  - Only one application version is affected.
+- hypothesis_id: H4
+  statement: The analytical order pipeline dropped completed orders.
+  expected_observations:
+  - Raw checkout success remains stable while transformed order counts fall.
+  - Pipeline completeness tests fail.
+  falsifying_observations:
+  - Raw conversion and transformed metrics decline together.
+  - Pipeline counts reconcile.
+evidence_expectations:
+- evidence_id: E1
+  source_type: deployment
+  observation: Checkout-service 7.4.2 was deployed to IN-SOUTH three minutes before the detected change point.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E2
+  source_type: log
+  observation: Unsupported postal-code errors rise more than sixfold for Android 7.4.2 in IN-SOUTH.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+- evidence_id: E3
+  source_type: metric
+  observation: Payment approval among sessions that reach payment remains within its seasonal range.
+  relation: contradicts
+  hypothesis_ids:
+  - H2
+  reliability: high
+- evidence_id: E4
+  source_type: sql
+  observation: Checkout starts remain stable but address-validation completion falls for the affected cohort.
+  relation: contradicts
+  hypothesis_ids:
+  - H3
+  reliability: high
+- evidence_id: E5
+  source_type: pipeline
+  observation: Raw and transformed completed-order counts reconcile within tolerance.
+  relation: contradicts
+  hypothesis_ids:
+  - H4
+  reliability: high
+- evidence_id: E6
+  source_type: lineage
+  observation: Address validation is upstream of payment and order creation for checkout conversion.
+  relation: supports
+  hypothesis_ids:
+  - H1
+  reliability: high
+decoy_changes:
+- change_id: D1
+  description: Promotion eligibility configuration was updated shortly before the deployment.
+  timing_relative_to_incident_minutes: -8
+  why_plausible: Promotions can materially affect conversion and occurred near the anomaly.
+  why_not_causal: Eligibility and exposure remain correct, and web and iOS cohorts using the promotion are unaffected.
+hidden_ground_truth:
+  root_cause_hypothesis_id: H1
+  root_cause_summary: Checkout-service 7.4.2 rejects valid regional postal codes during address validation.
+  causal_chain:
+  - Regional deployment activates version 7.4.2.
+  - Postal-code parser rejects valid IN-SOUTH inputs.
+  - Customers cannot complete address validation.
+  - Payment attempts and completed orders fall.
+  affected_components:
+  - checkout-service
+  - address-validation
+  - checkout_conversion_rate
+correct_remediation:
+  action_id: rollback_checkout_deployment
+  description: Roll back checkout-service in IN-SOUTH from version 7.4.2 to 7.4.1.
+  risk_level: 2
+  approval_required: true
+  reversible: true
+  target: checkout-service:IN-SOUTH:7.4.2
+  rollback_action: Reapply version 7.4.2 only after the parser fix passes validation.
+recovery_expectation:
+  primary_metric: checkout_conversion_rate
+  expected_direction: return_to_baseline
+  verification_windows: 3
+  minimum_sample_size: 500
+  success_condition: Conversion returns inside the seasonal 95 percent interval for three windows and address-validation
+    errors normalize.
+  guardrail_metrics:
+  - duplicate_order_rate
+  - payment_approval_rate
+  - checkout_latency_ms
+  reopen_condition: Reopen if conversion exits the expected range or validation errors recur in either of the next
+    two windows.

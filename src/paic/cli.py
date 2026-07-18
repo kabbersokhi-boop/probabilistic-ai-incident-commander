@@ -48,6 +48,12 @@ from paic.detection.validation import (
     detection_report_to_json,
     validate_detection_directory,
 )
+from paic.impact.config import ImpactConfig, ImpactConfigError, load_impact_config
+from paic.impact.engine import ImpactBuildError, build_impact
+from paic.impact.io import ImpactIOError, export_impact, load_impact
+from paic.impact.manifest import ImpactManifest
+from paic.impact.summary import build_impact_summary
+from paic.impact.validation import impact_report_to_json, validate_impact_directory
 from paic.simulator.config import (
     SimulationConfig,
     SimulatorConfigError,
@@ -143,6 +149,8 @@ def _export_schemas(output_dir: Path) -> int:
         "analytics-manifest.schema.json": AnalyticsManifest,
         "detection-config.schema.json": DetectionConfig,
         "detection-manifest.schema.json": DetectionManifest,
+        "impact-config.schema.json": ImpactConfig,
+        "impact-manifest.schema.json": ImpactManifest,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -374,6 +382,75 @@ def _detection_summary(detection_dir: Path) -> int:
     return 0
 
 
+def _build_impact(
+    dataset_dir: Path,
+    config_path: Path,
+    output_dir: Path,
+    overwrite: bool,
+    output_format: str,
+) -> int:
+    try:
+        config = load_impact_config(config_path)
+        result = build_impact(dataset_dir, config)
+        manifest = export_impact(result, output_dir, overwrite=overwrite)
+        loaded = load_impact(output_dir)
+        summary = build_impact_summary(loaded)
+    except (
+        ImpactConfigError,
+        ImpactBuildError,
+        ImpactIOError,
+        DatasetIOError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        else:
+            print(f"IMPACT ERROR: {exc}", file=sys.stderr)
+        return 2
+    payload = {
+        "success": True,
+        "impact_id": config.impact_id,
+        "output_dir": str(output_dir.resolve()),
+        "manifest": manifest.model_dump(mode="json"),
+        "summary": summary,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    else:
+        financial = cast(dict[str, Any], summary["financial_impact"])
+        print(f"Built {config.impact_id} in {output_dir.resolve()}")
+        print(f"Customers: {manifest.customer_count:,}")
+        print(f"Exposed customers: {manifest.exposed_customer_count:,}")
+        print(f"Incremental churn rate: {financial['incremental_churn_rate']:.4f}")
+        print(f"Total financial impact: {financial['total_financial_impact']:,.2f}")
+        print("Impact quality: passed")
+    return 0
+
+
+def _validate_impact(impact_dir: Path, dataset_dir: Path | None, output_format: str) -> int:
+    report = validate_impact_directory(impact_dir, dataset_dir=dataset_dir)
+    if output_format == "json":
+        print(impact_report_to_json(report))
+    else:
+        for issue in report.issues:
+            print(f"{issue.severity.upper():7} {issue.code:34} {issue.message}")
+        print("Impact validation: " + ("passed" if report.valid else "failed"))
+        if report.summary:
+            print(json.dumps(report.summary, indent=2, sort_keys=True))
+    return 0 if report.valid else 1
+
+
+def _impact_summary(impact_dir: Path) -> int:
+    try:
+        loaded = load_impact(impact_dir)
+    except ImpactIOError as exc:
+        print(f"IMPACT ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(build_impact_summary(loaded), indent=2, sort_keys=True, default=str))
+    return 0
+
+
 def _print_dataset_report(report: DatasetValidationReport) -> None:
     for issue in report.issues:
         print(f"{issue.severity.upper():7} {issue.code:36} {issue.table or '-'}: {issue.message}")
@@ -466,6 +543,29 @@ def build_parser() -> argparse.ArgumentParser:
         "summary", help="Print detection manifest, benchmark, quality, and latest events."
     )
     detection_summary.add_argument("--detection-dir", type=Path, required=True)
+
+    impact_parser = subparsers.add_parser(
+        "impact", help="Build and inspect customer-impact and survival artifacts."
+    )
+    impact_subparsers = impact_parser.add_subparsers(dest="impact_command", required=True)
+    impact_build = impact_subparsers.add_parser(
+        "build", help="Build customer features, survival, causal, and financial impact evidence."
+    )
+    impact_build.add_argument("--dataset-dir", type=Path, required=True)
+    impact_build.add_argument("--config", type=Path, required=True)
+    impact_build.add_argument("--output-dir", type=Path, required=True)
+    impact_build.add_argument("--overwrite", action="store_true")
+    impact_build.add_argument("--format", choices=("text", "json"), default="text")
+    impact_validate = impact_subparsers.add_parser(
+        "validate", help="Validate an exported customer-impact artifact."
+    )
+    impact_validate.add_argument("--impact-dir", type=Path, required=True)
+    impact_validate.add_argument("--dataset-dir", type=Path)
+    impact_validate.add_argument("--format", choices=("text", "json"), default="text")
+    impact_summary = impact_subparsers.add_parser(
+        "summary", help="Print impact, causal, survival-model, and financial summaries."
+    )
+    impact_summary.add_argument("--impact-dir", type=Path, required=True)
     return parser
 
 
@@ -507,6 +607,14 @@ def main(argv: list[str] | None = None) -> int:
         return _validate_detection(args.detection_dir, args.analytics_dir, args.format)
     if args.command == "detection" and args.detection_command == "summary":
         return _detection_summary(args.detection_dir)
+    if args.command == "impact" and args.impact_command == "build":
+        return _build_impact(
+            args.dataset_dir, args.config, args.output_dir, args.overwrite, args.format
+        )
+    if args.command == "impact" and args.impact_command == "validate":
+        return _validate_impact(args.impact_dir, args.dataset_dir, args.format)
+    if args.command == "impact" and args.impact_command == "summary":
+        return _impact_summary(args.impact_dir)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

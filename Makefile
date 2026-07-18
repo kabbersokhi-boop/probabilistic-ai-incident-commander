@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -8,6 +8,10 @@ ANALYTICS_SMOKE_DIR ?= .artifacts/analytics-smoke
 ANALYTICS_STANDARD_DIR ?= .artifacts/analytics-standard
 DETECTION_SMOKE_DIR ?= .artifacts/detection-smoke
 DETECTION_STANDARD_DIR ?= .artifacts/detection-standard
+IMPACT_SOURCE_SMOKE_DIR ?= .artifacts/impact-source-smoke
+IMPACT_SOURCE_STANDARD_DIR ?= .artifacts/impact-source-standard
+IMPACT_SMOKE_DIR ?= .artifacts/impact-smoke
+IMPACT_STANDARD_DIR ?= .artifacts/impact-standard
 SCHEMA_TMP ?= schemas-generated
 
 install:
@@ -82,6 +86,26 @@ validate-detection-standard:
 summarize-detection-standard:
 	$(PYTHON) -m paic detection summary --detection-dir $(DETECTION_STANDARD_DIR)
 
+impact-smoke:
+	$(PYTHON) -m paic simulate --config configs/simulation/impact-smoke.yaml --output-dir $(IMPACT_SOURCE_SMOKE_DIR) --overwrite
+	$(PYTHON) -m paic impact build --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --config configs/impact/smoke.yaml --output-dir $(IMPACT_SMOKE_DIR) --overwrite
+
+validate-impact-smoke:
+	$(PYTHON) -m paic impact validate --impact-dir $(IMPACT_SMOKE_DIR) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR)
+
+summarize-impact-smoke:
+	$(PYTHON) -m paic impact summary --impact-dir $(IMPACT_SMOKE_DIR)
+
+impact-standard:
+	$(PYTHON) -m paic simulate --config configs/simulation/impact-standard.yaml --output-dir $(IMPACT_SOURCE_STANDARD_DIR) --overwrite
+	$(PYTHON) -m paic impact build --dataset-dir $(IMPACT_SOURCE_STANDARD_DIR) --config configs/impact/standard.yaml --output-dir $(IMPACT_STANDARD_DIR) --overwrite
+
+validate-impact-standard:
+	$(PYTHON) -m paic impact validate --impact-dir $(IMPACT_STANDARD_DIR) --dataset-dir $(IMPACT_SOURCE_STANDARD_DIR)
+
+summarize-impact-standard:
+	$(PYTHON) -m paic impact summary --impact-dir $(IMPACT_STANDARD_DIR)
+
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q
 
@@ -102,7 +126,7 @@ typecheck:
 
 check: validate format-check lint typecheck coverage schema-check
 
-verify: check detection-smoke validate-detection-smoke
+verify: check detection-smoke validate-detection-smoke impact-smoke validate-impact-smoke
 
 clean:
 	rm -rf .artifacts .coverage .mypy_cache .pytest_cache .ruff_cache build dist htmlcov schemas-generated

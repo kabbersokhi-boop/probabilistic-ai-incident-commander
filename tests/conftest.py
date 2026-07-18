@@ -21,6 +21,10 @@ from paic.detection.config import DetectionConfig, load_detection_config
 from paic.detection.engine import build_detection
 from paic.detection.io import export_detection
 from paic.detection.types import DetectionBuildResult
+from paic.impact.config import ImpactConfig, load_impact_config
+from paic.impact.engine import build_impact
+from paic.impact.io import export_impact
+from paic.impact.types import ImpactBuildResult
 from paic.simulator.config import SimulationConfig, load_simulation_config
 from paic.simulator.engine import simulate
 from paic.simulator.io import export_dataset
@@ -180,3 +184,46 @@ def detection_standard_result(
     detection_standard_config: DetectionConfig,
 ) -> DetectionBuildResult:
     return build_detection(analytics_standard_dir, detection_standard_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_source_config(repo_root: Path) -> SimulationConfig:
+    return load_simulation_config(repo_root / "configs" / "simulation" / "impact-smoke.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_source_result(impact_smoke_source_config: SimulationConfig) -> SimulationResult:
+    return simulate(impact_smoke_source_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_dataset_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    impact_smoke_source_result: SimulationResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("impact-source")) / "dataset"
+    export_dataset(impact_smoke_source_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_config(repo_root: Path) -> ImpactConfig:
+    return load_impact_config(repo_root / "configs" / "impact" / "smoke.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_result(
+    impact_smoke_dataset_dir: Path,
+    impact_smoke_config: ImpactConfig,
+) -> ImpactBuildResult:
+    return build_impact(impact_smoke_dataset_dir, impact_smoke_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def impact_smoke_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+    impact_smoke_result: ImpactBuildResult,
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("impact-artifact")) / "impact"
+    export_impact(impact_smoke_result, output)
+    return output

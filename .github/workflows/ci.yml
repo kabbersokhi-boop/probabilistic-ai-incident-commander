@@ -73,6 +73,18 @@ jobs:
           python -m paic detection summary \
             --detection-dir .artifacts/detection-smoke \
             > .artifacts/detection-smoke-summary.json
+      - name: Build and validate customer-impact smoke artifact
+        run: |
+          python -m paic simulate \
+            --config configs/simulation/impact-smoke.yaml \
+            --output-dir .artifacts/impact-source-smoke
+          python -m paic impact build \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --config configs/impact/smoke.yaml \
+            --output-dir .artifacts/impact-smoke
+          python -m paic impact validate \
+            --impact-dir .artifacts/impact-smoke \
+            --dataset-dir .artifacts/impact-source-smoke
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |
@@ -97,6 +109,22 @@ jobs:
           python -m paic detection summary \
             --detection-dir .artifacts/detection-standard \
             > .artifacts/detection-standard-summary.json
+      - name: Build and validate customer-impact standard artifact
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m paic simulate \
+            --config configs/simulation/impact-standard.yaml \
+            --output-dir .artifacts/impact-source-standard
+          python -m paic impact build \
+            --dataset-dir .artifacts/impact-source-standard \
+            --config configs/impact/standard.yaml \
+            --output-dir .artifacts/impact-standard
+          python -m paic impact validate \
+            --impact-dir .artifacts/impact-standard \
+            --dataset-dir .artifacts/impact-source-standard
+          python -m paic impact summary \
+            --impact-dir .artifacts/impact-standard \
+            > .artifacts/impact-standard-summary.json
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build

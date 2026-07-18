@@ -1,0 +1,300 @@
+{
+  "$defs": {
+    "BenchmarkEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "censor_probability": {
+          "default": 0.18,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Censor Probability",
+          "type": "number"
+        },
+        "delay_days": {
+          "default": 18,
+          "maximum": 180,
+          "minimum": 0,
+          "title": "Delay Days",
+          "type": "integer"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "seed": {
+          "default": 2026071704,
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "BenchmarkEffect",
+      "type": "object"
+    },
+    "CausalConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "bootstrap_samples": {
+          "default": 200,
+          "maximum": 5000,
+          "minimum": 20,
+          "title": "Bootstrap Samples",
+          "type": "integer"
+        },
+        "confidence_level": {
+          "default": 0.95,
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.5,
+          "title": "Confidence Level",
+          "type": "number"
+        },
+        "placebo_shift_days": {
+          "default": 21,
+          "maximum": 180,
+          "minimum": 7,
+          "title": "Placebo Shift Days",
+          "type": "integer"
+        },
+        "propensity_caliper": {
+          "default": 0.2,
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Propensity Caliper",
+          "type": "number"
+        },
+        "propensity_clip": {
+          "default": 0.02,
+          "exclusiveMaximum": 0.5,
+          "exclusiveMinimum": 0.0,
+          "title": "Propensity Clip",
+          "type": "number"
+        },
+        "random_seed": {
+          "default": 2026071705,
+          "title": "Random Seed",
+          "type": "integer"
+        }
+      },
+      "title": "CausalConfig",
+      "type": "object"
+    },
+    "FinancialConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "contribution_margin_rate": {
+          "default": 0.32,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Contribution Margin Rate",
+          "type": "number"
+        },
+        "recovery_cost_per_exposed_customer": {
+          "default": 12.0,
+          "minimum": 0.0,
+          "title": "Recovery Cost Per Exposed Customer",
+          "type": "number"
+        },
+        "support_cost_per_exposed_customer": {
+          "default": 35.0,
+          "minimum": 0.0,
+          "title": "Support Cost Per Exposed Customer",
+          "type": "number"
+        }
+      },
+      "title": "FinancialConfig",
+      "type": "object"
+    },
+    "IncidentDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "device": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "family": {
+          "enum": [
+            "checkout_failure",
+            "payment_decline",
+            "late_delivery",
+            "refund_delay"
+          ],
+          "title": "Family",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "minimum_interactions": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Minimum Interactions",
+          "type": "integer"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "family",
+        "started_at",
+        "ended_at"
+      ],
+      "title": "IncidentDefinition",
+      "type": "object"
+    },
+    "OutcomeDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "churn_horizon_days": {
+          "default": 60,
+          "maximum": 365,
+          "minimum": 7,
+          "title": "Churn Horizon Days",
+          "type": "integer"
+        },
+        "ltv_horizon_days": {
+          "default": 180,
+          "maximum": 730,
+          "minimum": 30,
+          "title": "Ltv Horizon Days",
+          "type": "integer"
+        },
+        "minimum_pre_orders": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Minimum Pre Orders",
+          "type": "integer"
+        },
+        "pre_period_days": {
+          "default": 45,
+          "maximum": 365,
+          "minimum": 7,
+          "title": "Pre Period Days",
+          "type": "integer"
+        }
+      },
+      "title": "OutcomeDefinition",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "compression": {
+          "default": "zstd",
+          "enum": [
+            "zstd",
+            "snappy",
+            "gzip",
+            "lz4",
+            "uncompressed"
+          ],
+          "title": "Compression",
+          "type": "string"
+        },
+        "compression_level": {
+          "anyOf": [
+            {
+              "maximum": 22,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 6,
+          "title": "Compression Level"
+        },
+        "include_statistics": {
+          "default": true,
+          "title": "Include Statistics",
+          "type": "boolean"
+        },
+        "row_group_size": {
+          "default": 25000,
+          "minimum": 100,
+          "title": "Row Group Size",
+          "type": "integer"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "benchmark_effect": {
+      "$ref": "#/$defs/BenchmarkEffect"
+    },
+    "causal": {
+      "$ref": "#/$defs/CausalConfig"
+    },
+    "financial": {
+      "$ref": "#/$defs/FinancialConfig"
+    },
+    "impact_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Impact Id",
+      "type": "string"
+    },
+    "incident": {
+      "$ref": "#/$defs/IncidentDefinition"
+    },
+    "outcome": {
+      "$ref": "#/$defs/OutcomeDefinition"
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "impact_id",
+    "incident"
+  ],
+  "title": "ImpactConfig",
+  "type": "object"
+}

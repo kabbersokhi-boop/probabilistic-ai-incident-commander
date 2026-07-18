@@ -8,7 +8,7 @@
   {"case_id":"regional-outage","ranked_hypotheses":["regional-health","payment-provider"],"probabilities":{"regional-health":0.8,"payment-provider":0.2},"cited_evidence_ids":["region","health"]},
   {"case_id":"device-specific","ranked_hypotheses":["client-device","service-latency"],"probabilities":{"client-device":0.8,"service-latency":0.2},"cited_evidence_ids":["device","conversion"]},
   {"case_id":"misleading-correlation","ranked_hypotheses":["lineage-data","checkout-deployment"],"probabilities":{"lineage-data":0.8,"checkout-deployment":0.2},"cited_evidence_ids":["lineage"]},
-  {"case_id":"multiple-causes","ranked_hypotheses":["signal-a","signal-b"],"probabilities":{"signal-a":0.6,"signal-b":0.4},"cited_evidence_ids":["signal-a"]},
+  {"case_id":"multiple-causes","ranked_hypotheses":["signal-a","signal-b"],"probabilities":{"signal-a":0.6,"signal-b":0.4},"cited_evidence_ids":["candidate-signal-1"]},
   {"case_id":"insufficient-evidence","ranked_hypotheses":["unknown","service-latency"],"probabilities":{"unknown":0.6,"service-latency":0.4},"abstained":true,"cited_evidence_ids":["weak"]},
   {"case_id":"no-action-safe","ranked_hypotheses":["safe-no-action","service-latency"],"probabilities":{"safe-no-action":0.8,"service-latency":0.2},"cited_evidence_ids":["policy"]},
   {"case_id":"payment-region","ranked_hypotheses":["payment-provider","regional-health"],"probabilities":{"payment-provider":0.8,"regional-health":0.2},"cited_evidence_ids":["payment","route"]},

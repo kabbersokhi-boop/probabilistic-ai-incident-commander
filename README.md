@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml)
 
-**Evidence-grounded, governed tooling for diagnosing commerce incidents under uncertainty.**
+**Evidence-grounded, governed agentic AI for diagnosing commerce incidents under uncertainty.**
 
 Probabilistic AI Incident Commander is an open reference implementation of an autonomous operations system that combines statistical anomaly detection, analytical investigation, probabilistic root-cause ranking, controlled remediation, and recovery verification.
 
@@ -47,19 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides deterministic simulation, analytics, detection, customer-impact analysis, operational evidence, and a read-only Governed Tool Gateway.
-
-### Governed Tool Gateway
-
-The gateway exposes compact JSON tools over validated source artifacts. It binds every invocation to the dataset manifest (and optional analytics, detection, impact, and evidence manifests), authorizes explicit `observer`, `investigator`, and `approver` roles, and records a tamper-evident invocation ledger. The initial tools are `sql.query`, `evidence.search`, `lineage.trace`, `changes.list`, `runbook.get`, `historical_incidents.search`, `anomalies.list`, `impact.summary`, and `artifacts.summary`.
-
-SQL runs in an in-memory DuckDB connection containing only registered artifact tables. A real SQL AST policy permits one `SELECT`/`WITH ... SELECT`, rejects writes, DDL, external readers, filesystem/network access, extensions, system schemas, unknown tables and columns, and enforces deterministic row and byte limits.
-
-```bash
-paic tools list
-paic tools invoke --request request.json
-paic tools audit validate --audit-dir .artifacts/audit
-```
+The repository currently provides eight working capabilities.
 
 ### Executable product and evaluation contracts
 
@@ -116,6 +104,30 @@ The simulator intentionally generates a **healthy, incident-free baseline**. Det
 - Self-validating Parquet artifacts bound to the exact source dataset and resolved impact configuration
 
 The standard reference build analyses 3,000 customers, identifies 103 incident-exposed customers, recovers a positive synthetic churn effect with its bootstrap interval covering the known benchmark effect, and produces fully reconciled financial-impact components. These are synthetic evaluation results, not production claims.
+
+### Operational evidence and lineage
+
+- Source-bound service-health, deployment, configuration, feature-flag, runbook, and historical-incident evidence
+- Canonical payload hashes, trust levels, supporting/contradictory/contextual roles, and deterministic incident timelines
+- A validated lineage DAG with reference, cycle, orphan, and reachability checks
+- Optional binding to analytics, detection, and customer-impact artifacts from the same dataset
+
+### Governed Tool Gateway
+
+- Strict read-only tool schemas and deny-by-default role authorization
+- AST-validated in-memory DuckDB SQL over explicitly registered artifact tables
+- Deterministic evidence, lineage, change, runbook, anomaly, impact, and artifact tools
+- Bounded rows, bytes, complexity, memory, and execution time
+- Canonical responses and an independently verifiable hash-chained invocation ledger
+
+### Probabilistic agentic investigation
+
+- Provider-neutral OpenAI-compatible routing: Groq GPT-OSS is the tested live adapter, while NVIDIA NIM remains an optional adapter with offline coverage
+- A bounded single-agent loop that can call only the Governed Tool Gateway
+- Competing hypotheses, explicit falsifiers, contradictory-evidence search, and unsupported-citation rejection
+- Deterministic posterior ranking, entropy, confidence, and abstention outside the language model
+- Source-bound reports, hash-chained transcripts, validation, replay, and benchmark metrics
+- Fully offline scripted-provider CI; live API access is optional and uses an environment-only key
 
 ## Quick start
 
@@ -422,10 +434,13 @@ src/paic/simulator/     Synthetic commerce generation, schemas, export, and vali
 src/paic/analytics/     Semantic metrics, cohorts, funnels, contributions, and quality checks
 src/paic/detection/     Statistical baselines, predictive tests, FDR, change detection, and benchmarks
 src/paic/impact/        Customer features, survival, causal estimates, and financial impact
+src/paic/evidence/      Operational evidence, lineage, timelines, and source binding
+src/paic/tools/         Governed read-only tools, SQL policy, authorization, and audit ledger
+src/paic/investigation/ Model routing, tool orchestration, probability, artifacts, and evaluation
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
-tests/                  Unit, invariant, CLI, reconciliation, and integrity tests
-docs/                   Architecture, data, analytics, detection, impact, evaluation, security, and decisions
+tests/                  Unit, invariant, CLI, reconciliation, integrity, and adversarial tests
+docs/                   Architecture, data, analytics, detection, impact, evidence, agents, security, and decisions
 .github/                 Continuous integration and contribution templates
 ```
 
@@ -433,10 +448,10 @@ docs/                   Architecture, data, analytics, detection, impact, evalua
 
 The next major capabilities are:
 
-1. operational evidence, lineage, and safe tool access,
-2. probabilistic agentic investigation,
-3. governed remediation and recovery verification,
-4. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
+1. governed remediation, exact approval semantics, and recovery verification,
+2. expanded hidden-incident evaluation, calibration, ablations, and security testing,
+3. developer TUI and public web product,
+4. Docker, observability, hosted demonstration, and portfolio packaging.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 
@@ -447,14 +462,3 @@ Issues and pull requests are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) 
 ## License
 
 This project is available under the [MIT License](LICENSE).
-
-### Operational Evidence And Lineage
-
-The operational evidence package binds structured service health, deployment, configuration, feature-flag, lineage, runbook, and historical-incident records to the exact source dataset. It emits canonical payload hashes, explicit supporting, contradictory, and contextual roles, plus a deterministic incident timeline. No LLM is used.
-
-```bash
-paic evidence build --dataset-dir data/generated/impact-source-smoke --impact-dir data/generated/impact-smoke --config configs/evidence/smoke.yaml --output-dir data/generated/evidence-smoke
-paic evidence validate --evidence-dir data/generated/evidence-smoke --dataset-dir data/generated/impact-source-smoke --impact-dir data/generated/impact-smoke
-```
-
-See [`docs/OPERATIONAL_EVIDENCE.md`](docs/OPERATIONAL_EVIDENCE.md).

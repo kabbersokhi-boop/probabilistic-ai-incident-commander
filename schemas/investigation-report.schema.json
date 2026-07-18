@@ -1,0 +1,469 @@
+{
+  "$defs": {
+    "ComputedHypothesis": {
+      "additionalProperties": false,
+      "properties": {
+        "contradicting_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contradicting Evidence Ids",
+          "type": "array"
+        },
+        "falsifiers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Falsifiers",
+          "type": "array"
+        },
+        "hypothesis_id": {
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "log_evidence_score": {
+          "title": "Log Evidence Score",
+          "type": "number"
+        },
+        "posterior_probability": {
+          "title": "Posterior Probability",
+          "type": "number"
+        },
+        "prior_probability": {
+          "title": "Prior Probability",
+          "type": "number"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "supporting_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supporting Evidence Ids",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "title",
+        "prior_probability",
+        "posterior_probability",
+        "log_evidence_score",
+        "rationale",
+        "supporting_evidence_ids",
+        "contradicting_evidence_ids",
+        "falsifiers"
+      ],
+      "title": "ComputedHypothesis",
+      "type": "object"
+    },
+    "EvidenceAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "support",
+            "contradict"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "evidence_record_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Evidence Record Id",
+          "type": "string"
+        },
+        "explanation": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "likelihood_ratio": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 100.0,
+          "title": "Likelihood Ratio",
+          "type": "number"
+        }
+      },
+      "required": [
+        "evidence_record_id",
+        "direction",
+        "likelihood_ratio",
+        "explanation"
+      ],
+      "title": "EvidenceAssessment",
+      "type": "object"
+    },
+    "HypothesisProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceAssessment"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "falsifiers": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Falsifiers",
+          "type": "array"
+        },
+        "hypothesis_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "prior_probability": {
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Prior Probability",
+          "type": "number"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "title",
+        "prior_probability",
+        "rationale",
+        "evidence",
+        "falsifiers"
+      ],
+      "title": "HypothesisProposal",
+      "type": "object"
+    },
+    "InvestigationProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "explicit_unknowns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Explicit Unknowns",
+          "type": "array"
+        },
+        "hypotheses": {
+          "items": {
+            "$ref": "#/$defs/HypothesisProposal"
+          },
+          "maxItems": 8,
+          "minItems": 2,
+          "title": "Hypotheses",
+          "type": "array"
+        },
+        "recommended_next_steps": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Recommended Next Steps",
+          "type": "array"
+        },
+        "summary": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "hypotheses"
+      ],
+      "title": "InvestigationProposal",
+      "type": "object"
+    },
+    "ModelAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "completion_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Completion Tokens",
+          "type": "integer"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Prompt Tokens",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "success",
+            "retryable_error",
+            "fatal_error"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "status"
+      ],
+      "title": "ModelAttempt",
+      "type": "object"
+    },
+    "ToolTraceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "call_id": {
+          "title": "Call Id",
+          "type": "string"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "evidence_record_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Record Ids",
+          "type": "array"
+        },
+        "execution_status": {
+          "enum": [
+            "success",
+            "error"
+          ],
+          "title": "Execution Status",
+          "type": "string"
+        },
+        "result_sha256": {
+          "title": "Result Sha256",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "truncated": {
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sequence",
+        "call_id",
+        "tool",
+        "arguments",
+        "execution_status",
+        "result_sha256",
+        "evidence_record_ids",
+        "truncated"
+      ],
+      "title": "ToolTraceEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "explicit_unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Explicit Unknowns",
+      "type": "array"
+    },
+    "hypotheses": {
+      "items": {
+        "$ref": "#/$defs/ComputedHypothesis"
+      },
+      "title": "Hypotheses",
+      "type": "array"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "investigation_id": {
+      "title": "Investigation Id",
+      "type": "string"
+    },
+    "model_attempts": {
+      "items": {
+        "$ref": "#/$defs/ModelAttempt"
+      },
+      "title": "Model Attempts",
+      "type": "array"
+    },
+    "normalized_entropy": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Normalized Entropy",
+      "type": "number"
+    },
+    "observed_evidence_record_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Observed Evidence Record Ids",
+      "type": "array"
+    },
+    "posterior_margin": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Posterior Margin",
+      "type": "number"
+    },
+    "proposal": {
+      "$ref": "#/$defs/InvestigationProposal"
+    },
+    "question": {
+      "title": "Question",
+      "type": "string"
+    },
+    "recommended_next_steps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recommended Next Steps",
+      "type": "array"
+    },
+    "report_sha256": {
+      "title": "Report Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_hypothesis_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Hypothesis Id"
+    },
+    "source_manifest_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Source Manifest Hashes",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "concluded",
+        "abstained",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "tool_trace": {
+      "items": {
+        "$ref": "#/$defs/ToolTraceEntry"
+      },
+      "title": "Tool Trace",
+      "type": "array"
+    },
+    "total_tokens": {
+      "minimum": 0,
+      "title": "Total Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "investigation_id",
+    "incident_id",
+    "question",
+    "status",
+    "summary",
+    "selected_hypothesis_id",
+    "confidence",
+    "normalized_entropy",
+    "posterior_margin",
+    "hypotheses",
+    "explicit_unknowns",
+    "recommended_next_steps",
+    "observed_evidence_record_ids",
+    "source_manifest_hashes",
+    "model_attempts",
+    "tool_trace",
+    "total_tokens",
+    "proposal",
+    "report_sha256"
+  ],
+  "title": "InvestigationReport",
+  "type": "object"
+}

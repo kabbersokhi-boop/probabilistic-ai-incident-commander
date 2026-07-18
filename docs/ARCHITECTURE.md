@@ -167,6 +167,13 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 - `recovery`: statistical verification and reopening
 - `evaluation`: ground truth, baselines, ablations, and adversarial tests
 - `api`, `web`, and `tui`: product interfaces over the same core services
-# Governed Tool Gateway
 
-Validated dataset, analytics, detection, impact, and evidence manifests feed a source-binding layer. Authorized requests then reach deterministic handlers; SQL requests pass through an AST policy before an in-memory DuckDB execution. Canonical responses and a hash-chained audit ledger provide reproducibility and tamper evidence. No provider, model, database, network service, or write path is part of this boundary.
+## Operational evidence and lineage
+
+`src/paic/evidence/` assembles source-bound operational evidence after statistical and customer-impact analysis. The artifact records structured health observations, changes, flags, deployments, lineage, runbooks, historical incidents, and an ordered timeline. It validates source manifests and can deterministically reconstruct every table from the bound inputs.
+
+## Probabilistic Agentic Investigation
+
+Validated artifacts feed the Governed Tool Gateway. The investigation orchestrator exposes only approved read-only tool schemas to an ordered NVIDIA NIM model route. Tool results are bounded, canonical, and treated as untrusted data. The model submits competing hypotheses with evidence identifiers and bounded likelihood ratios. Deterministic probability code verifies the citations, normalizes posterior rankings, calculates entropy and margin, and applies an abstention policy. A source-bound report and hash-chained transcript can then be validated and replayed without another model call.
+
+The provider adapter is replaceable and does not own business logic. NVIDIA NIM is the first implementation because it exposes an OpenAI-compatible chat and tool-calling interface. CI substitutes a deterministic scripted provider while exercising the same orchestration boundary.

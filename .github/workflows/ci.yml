@@ -85,21 +85,6 @@ jobs:
           python -m paic impact validate \
             --impact-dir .artifacts/impact-smoke \
             --dataset-dir .artifacts/impact-source-smoke
-      - name: Governed Tool Gateway smoke
-        run: |
-          python -m paic tools list
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          Path('.artifacts/tool-request.json').write_text(json.dumps({
-              'tool': 'artifacts.summary', 'incident_id': 'smoke', 'role': 'investigator',
-              'dataset_dir': '.artifacts/smoke', 'analytics_dir': '.artifacts/analytics-smoke',
-              'detection_dir': '.artifacts/detection-smoke', 'audit_dir': '.artifacts/tool-audit',
-              'arguments': {},
-          }))
-          PY
-          python -m paic tools invoke --request .artifacts/tool-request.json
-          python -m paic tools audit validate --audit-dir .artifacts/tool-audit
       - name: Build and validate operational evidence smoke artifact
         run: |
           python -m paic evidence build \
@@ -111,6 +96,50 @@ jobs:
             --evidence-dir .artifacts/evidence-smoke \
             --dataset-dir .artifacts/impact-source-smoke \
             --impact-dir .artifacts/impact-smoke
+      - name: Governed Tool Gateway smoke
+        run: |
+          python -m paic tools list > .artifacts/tool-catalogue.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          Path('.artifacts/tool-request.json').write_text(json.dumps({
+              'tool': 'artifacts.summary',
+              'incident_id': 'smoke',
+              'role': 'investigator',
+              'dataset_dir': '.artifacts/smoke',
+              'analytics_dir': '.artifacts/analytics-smoke',
+              'detection_dir': '.artifacts/detection-smoke',
+              'audit_dir': '.artifacts/tool-audit',
+              'arguments': {},
+          }))
+          PY
+          python -m paic tools invoke --request .artifacts/tool-request.json
+          python -m paic tools audit validate --audit-dir .artifacts/tool-audit
+      - name: Offline probabilistic investigation smoke
+        run: |
+          python examples/build_scripted_investigation_inputs.py \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --evidence-dir .artifacts/evidence-smoke \
+            --config configs/investigation/smoke.yaml \
+            --impact-dir .artifacts/impact-smoke \
+            --request .artifacts/investigation-request.json \
+            --script .artifacts/investigation-provider-script.json \
+            --audit-dir .artifacts/investigation-tool-audit
+          python -m paic investigate run \
+            --request .artifacts/investigation-request.json \
+            --config configs/investigation/smoke.yaml \
+            --provider-script .artifacts/investigation-provider-script.json \
+            --output-dir .artifacts/investigation-smoke
+          python -m paic investigate validate \
+            --investigation-dir .artifacts/investigation-smoke \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --impact-dir .artifacts/impact-smoke \
+            --evidence-dir .artifacts/evidence-smoke
+          python -m paic investigate replay \
+            --investigation-dir .artifacts/investigation-smoke \
+            > .artifacts/investigation-replay.json
+          python -m paic tools audit validate \
+            --audit-dir .artifacts/investigation-tool-audit
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |
@@ -166,6 +195,30 @@ jobs:
           python -m paic evidence summary \
             --evidence-dir .artifacts/evidence-standard \
             > .artifacts/evidence-standard-summary.json
+      - name: Offline probabilistic investigation standard
+        if: matrix.python-version == '3.11'
+        run: |
+          python examples/build_scripted_investigation_inputs.py \
+            --dataset-dir .artifacts/impact-source-standard \
+            --evidence-dir .artifacts/evidence-standard \
+            --config configs/investigation/standard.yaml \
+            --impact-dir .artifacts/impact-standard \
+            --request .artifacts/investigation-standard-request.json \
+            --script .artifacts/investigation-standard-provider-script.json \
+            --audit-dir .artifacts/investigation-standard-audit
+          python -m paic investigate run \
+            --request .artifacts/investigation-standard-request.json \
+            --config configs/investigation/standard.yaml \
+            --provider-script .artifacts/investigation-standard-provider-script.json \
+            --output-dir .artifacts/investigation-standard
+          python -m paic investigate validate \
+            --investigation-dir .artifacts/investigation-standard \
+            --dataset-dir .artifacts/impact-source-standard \
+            --impact-dir .artifacts/impact-standard \
+            --evidence-dir .artifacts/evidence-standard
+          python -m paic investigate replay \
+            --investigation-dir .artifacts/investigation-standard \
+            > .artifacts/investigation-standard-replay.json
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build

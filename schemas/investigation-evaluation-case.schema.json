@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Case Id",
+      "type": "string"
+    },
+    "investigation_dir": {
+      "minLength": 1,
+      "title": "Investigation Dir",
+      "type": "string"
+    },
+    "should_abstain": {
+      "default": false,
+      "title": "Should Abstain",
+      "type": "boolean"
+    },
+    "true_hypothesis_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "True Hypothesis Id"
+    }
+  },
+  "required": [
+    "case_id",
+    "investigation_dir"
+  ],
+  "title": "EvaluationCase",
+  "type": "object"
+}

@@ -60,6 +60,22 @@ from paic.impact.io import ImpactIOError, export_impact, load_impact
 from paic.impact.manifest import ImpactManifest
 from paic.impact.summary import build_impact_summary
 from paic.impact.validation import impact_report_to_json, validate_impact_directory
+from paic.investigation.artifact import (
+    InvestigationArtifactError,
+    export_investigation,
+    replay_investigation,
+    validate_investigation,
+)
+from paic.investigation.config import (
+    InvestigationConfig,
+    InvestigationConfigError,
+    load_investigation_config,
+)
+from paic.investigation.evaluation import EvaluationCase, evaluate_cases
+from paic.investigation.manifest import InvestigationManifest
+from paic.investigation.models import InvestigationReport, InvestigationRequest, ProviderResponse
+from paic.investigation.orchestrator import InvestigationError, Investigator, scripted_factory
+from paic.investigation.provider import ScriptedProvider
 from paic.simulator.config import (
     SimulationConfig,
     SimulatorConfigError,
@@ -165,6 +181,11 @@ def _export_schemas(output_dir: Path) -> int:
         "tool-request.schema.json": ToolRequest,
         "tool-response.schema.json": ToolResponse,
         "tool-error.schema.json": ToolError,
+        "investigation-config.schema.json": InvestigationConfig,
+        "investigation-request.schema.json": InvestigationRequest,
+        "investigation-report.schema.json": InvestigationReport,
+        "investigation-manifest.schema.json": InvestigationManifest,
+        "investigation-evaluation-case.schema.json": EvaluationCase,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -487,7 +508,8 @@ def _build_evidence(
             impact_dir=impact_dir,
         )
         manifest = export_evidence(result, output_dir, overwrite=overwrite)
-        summary = build_evidence_summary(load_evidence(output_dir))
+        loaded = load_evidence(output_dir)
+        summary = build_evidence_summary(loaded)
     except (
         EvidenceConfigError,
         EvidenceBuildError,
@@ -552,6 +574,150 @@ def _evidence_summary(evidence_dir: Path) -> int:
         print(f"EVIDENCE ERROR: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(build_evidence_summary(loaded), indent=2, sort_keys=True, default=str))
+    return 0
+
+
+def _tools_list() -> int:
+    print(json.dumps(Gateway.list_tools(), indent=2, sort_keys=True))
+    return 0
+
+
+def _tools_invoke(request_path: Path) -> int:
+    try:
+        raw = json.loads(request_path.read_text(encoding="utf-8"))
+        request = ToolRequest.model_validate(raw)
+        response = Gateway().invoke(request)
+    except (OSError, ValueError, GatewayError) as exc:
+        print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        return 2
+    print(response.model_dump_json(indent=2))
+    return 0 if response.execution_status == "success" else 1
+
+
+def _tools_audit_validate(audit_dir: Path) -> int:
+    try:
+        AuditLedger(audit_dir).validate()
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"valid": False, "error": str(exc)}, indent=2))
+        return 1
+    print(json.dumps({"valid": True, "audit_dir": str(audit_dir)}, indent=2))
+    return 0
+
+
+def _scripted_providers(path: Path, config: InvestigationConfig) -> dict[str, ScriptedProvider]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("provider script must be an object keyed by model")
+    providers: dict[str, ScriptedProvider] = {}
+    for route in config.provider.models:
+        values = raw.get(route.model)
+        if not isinstance(values, list):
+            raise ValueError(f"provider script is missing model {route.model}")
+        providers[route.model] = ScriptedProvider(
+            route.model, [ProviderResponse.model_validate(item) for item in values]
+        )
+    return providers
+
+
+def _investigate_models(config_path: Path) -> int:
+    try:
+        config = load_investigation_config(config_path)
+    except InvestigationConfigError as exc:
+        print(f"INVESTIGATION ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            [item.model_dump(mode="json") for item in config.provider.models],
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _investigate_run(
+    request_path: Path,
+    config_path: Path,
+    output_dir: Path,
+    overwrite: bool,
+    provider_script: Path | None,
+) -> int:
+    try:
+        config = load_investigation_config(config_path)
+        request = InvestigationRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
+        factory = None
+        if provider_script is not None:
+            factory = scripted_factory(_scripted_providers(provider_script, config))
+        report, transcript = Investigator(config, provider_factory=factory).run(request)
+        manifest = export_investigation(
+            report, config, request, transcript, output_dir, overwrite=overwrite
+        )
+    except (
+        OSError,
+        ValueError,
+        InvestigationConfigError,
+        InvestigationError,
+        InvestigationArtifactError,
+    ) as exc:
+        print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        return 2
+    print(
+        json.dumps(
+            {
+                "success": True,
+                "status": report.status,
+                "selected_hypothesis_id": report.selected_hypothesis_id,
+                "confidence": report.confidence,
+                "manifest": manifest.model_dump(mode="json"),
+            },
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+    )
+    return 0
+
+
+def _investigate_validate(
+    investigation_dir: Path,
+    dataset_dir: Path | None,
+    analytics_dir: Path | None,
+    detection_dir: Path | None,
+    impact_dir: Path | None,
+    evidence_dir: Path | None,
+) -> int:
+    issues = validate_investigation(
+        investigation_dir,
+        dataset_dir=dataset_dir,
+        analytics_dir=analytics_dir,
+        detection_dir=detection_dir,
+        impact_dir=impact_dir,
+        evidence_dir=evidence_dir,
+    )
+    print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
+    return 1 if issues else 0
+
+
+def _investigate_benchmark(cases_path: Path) -> int:
+    try:
+        raw = json.loads(cases_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            raise ValueError("benchmark cases must be a list")
+        summary = evaluate_cases([EvaluationCase.model_validate(item) for item in raw])
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        return 2
+    print(summary.model_dump_json(indent=2))
+    return 0
+
+
+def _investigate_replay(investigation_dir: Path) -> int:
+    try:
+        report = replay_investigation(investigation_dir)
+    except InvestigationArtifactError as exc:
+        print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        return 2
+    print(report.model_dump_json(indent=2))
     return 0
 
 
@@ -699,15 +865,56 @@ def build_parser() -> argparse.ArgumentParser:
         "summary", help="Print evidence, lineage, health, timeline, and quality summaries."
     )
     evidence_summary.add_argument("--evidence-dir", type=Path, required=True)
-    tools_parser = subparsers.add_parser("tools", help="Use the Governed Tool Gateway.")
+
+    tools_parser = subparsers.add_parser(
+        "tools", help="Invoke the read-only Governed Tool Gateway."
+    )
     tools_subparsers = tools_parser.add_subparsers(dest="tools_command", required=True)
-    tools_subparsers.add_parser("list", help="List read-only tools.")
-    invoke = tools_subparsers.add_parser("invoke", help="Invoke one deterministic tool.")
-    invoke.add_argument("--request", type=Path, required=True)
-    audit = tools_subparsers.add_parser("audit", help="Validate invocation audit records.")
-    audit_sub = audit.add_subparsers(dest="audit_command", required=True)
-    audit_validate = audit_sub.add_parser("validate")
-    audit_validate.add_argument("--audit-dir", type=Path, required=True)
+    tools_subparsers.add_parser("list", help="List available governed tools.")
+    tools_invoke = tools_subparsers.add_parser("invoke", help="Invoke a governed tool request.")
+    tools_invoke.add_argument("--request", type=Path, required=True)
+    tools_audit = tools_subparsers.add_parser("audit", help="Validate the invocation ledger.")
+    tools_audit_subparsers = tools_audit.add_subparsers(dest="tools_audit_command", required=True)
+    tools_audit_validate = tools_audit_subparsers.add_parser("validate")
+    tools_audit_validate.add_argument("--audit-dir", type=Path, required=True)
+
+    investigate_parser = subparsers.add_parser(
+        "investigate", help="Run evidence-grounded probabilistic agentic investigation."
+    )
+    investigate_subparsers = investigate_parser.add_subparsers(
+        dest="investigate_command", required=True
+    )
+    investigate_models = investigate_subparsers.add_parser(
+        "models", help="List configured model routes."
+    )
+    investigate_models.add_argument("--config", type=Path, required=True)
+    investigate_run = investigate_subparsers.add_parser("run", help="Run a bounded investigation.")
+    investigate_run.add_argument("--request", type=Path, required=True)
+    investigate_run.add_argument("--config", type=Path, required=True)
+    investigate_run.add_argument("--output-dir", type=Path, required=True)
+    investigate_run.add_argument("--overwrite", action="store_true")
+    investigate_run.add_argument(
+        "--provider-script",
+        type=Path,
+        help="Offline deterministic provider responses for CI/testing.",
+    )
+    investigate_validate = investigate_subparsers.add_parser(
+        "validate", help="Validate an exported investigation artifact."
+    )
+    investigate_validate.add_argument("--investigation-dir", type=Path, required=True)
+    investigate_validate.add_argument("--dataset-dir", type=Path)
+    investigate_validate.add_argument("--analytics-dir", type=Path)
+    investigate_validate.add_argument("--detection-dir", type=Path)
+    investigate_validate.add_argument("--impact-dir", type=Path)
+    investigate_validate.add_argument("--evidence-dir", type=Path)
+    investigate_benchmark = investigate_subparsers.add_parser(
+        "benchmark", help="Evaluate exported investigation reports against hidden truth."
+    )
+    investigate_benchmark.add_argument("--cases", type=Path, required=True)
+    investigate_replay = investigate_subparsers.add_parser(
+        "replay", help="Recompute and print a report without calling a model."
+    )
+    investigate_replay.add_argument("--investigation-dir", type=Path, required=True)
     return parser
 
 
@@ -780,34 +987,34 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "evidence" and args.evidence_command == "summary":
         return _evidence_summary(args.evidence_dir)
     if args.command == "tools" and args.tools_command == "list":
-        print(json.dumps(Gateway.list_tools(), indent=2, sort_keys=True))
-        return 0
+        return _tools_list()
     if args.command == "tools" and args.tools_command == "invoke":
-        try:
-            request = ToolRequest.model_validate_json(args.request.read_text(encoding="utf-8"))
-            response = Gateway().invoke(request)
-        except (OSError, GatewayError, ValueError) as exc:
-            print(
-                json.dumps(
-                    {"success": False, "error": {"code": "invalid_request", "message": str(exc)}},
-                    indent=2,
-                )
-            )
-            return 2
-        print(response.model_dump_json(indent=2))
-        return 0 if response.execution_status == "success" else 1
+        return _tools_invoke(args.request)
     if (
         args.command == "tools"
         and args.tools_command == "audit"
-        and args.audit_command == "validate"
+        and args.tools_audit_command == "validate"
     ):
-        try:
-            AuditLedger(args.audit_dir).validate()
-        except (OSError, ValueError) as exc:
-            print(json.dumps({"valid": False, "error": str(exc)}, indent=2))
-            return 1
-        print(json.dumps({"valid": True}, indent=2))
-        return 0
+        return _tools_audit_validate(args.audit_dir)
+    if args.command == "investigate" and args.investigate_command == "models":
+        return _investigate_models(args.config)
+    if args.command == "investigate" and args.investigate_command == "run":
+        return _investigate_run(
+            args.request, args.config, args.output_dir, args.overwrite, args.provider_script
+        )
+    if args.command == "investigate" and args.investigate_command == "validate":
+        return _investigate_validate(
+            args.investigation_dir,
+            args.dataset_dir,
+            args.analytics_dir,
+            args.detection_dir,
+            args.impact_dir,
+            args.evidence_dir,
+        )
+    if args.command == "investigate" and args.investigate_command == "benchmark":
+        return _investigate_benchmark(args.cases)
+    if args.command == "investigate" and args.investigate_command == "replay":
+        return _investigate_replay(args.investigation_dir)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

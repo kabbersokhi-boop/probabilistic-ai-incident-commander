@@ -1,0 +1,95 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "analytics_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analytics Dir"
+    },
+    "audit_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Audit Dir"
+    },
+    "dataset_dir": {
+      "minLength": 1,
+      "title": "Dataset Dir",
+      "type": "string"
+    },
+    "detection_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detection Dir"
+    },
+    "evidence_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Dir"
+    },
+    "impact_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Impact Dir"
+    },
+    "incident_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "question": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "role": {
+      "const": "investigator",
+      "default": "investigator",
+      "title": "Role",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "question",
+    "dataset_dir"
+  ],
+  "title": "InvestigationRequest",
+  "type": "object"
+}

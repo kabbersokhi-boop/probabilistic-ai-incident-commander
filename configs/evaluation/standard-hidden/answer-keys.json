@@ -8,7 +8,7 @@
   {"case_id":"regional-outage","root_cause_id":"regional-health","required_evidence_ids":["region","health"]},
   {"case_id":"device-specific","root_cause_id":"client-device","required_evidence_ids":["device","conversion"]},
   {"case_id":"misleading-correlation","root_cause_id":"lineage-data","required_evidence_ids":["lineage"]},
-  {"case_id":"multiple-causes","root_cause_id":"signal-a","acceptable_alternates":["signal-b"],"required_evidence_ids":["signal-a"]},
+  {"case_id":"multiple-causes","root_cause_id":"signal-a","acceptable_alternates":["signal-b"],"required_evidence_ids":["candidate-signal-1"]},
   {"case_id":"insufficient-evidence","root_cause_id":"unknown","should_abstain":true},
   {"case_id":"no-action-safe","root_cause_id":"safe-no-action","required_evidence_ids":["policy"],"expected_recovery":"insufficient_data"},
   {"case_id":"payment-region","root_cause_id":"payment-provider","required_evidence_ids":["payment","route"]},

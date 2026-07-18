@@ -25,6 +25,8 @@ class ModelRoute(StrictModel):
     max_tokens: Annotated[int, Field(ge=128, le=32_768)] = 4_096
     enable_thinking: bool = False
     reasoning_budget: Annotated[int, Field(ge=0, le=32_768)] = 0
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+    reasoning_format: Literal["hidden", "concise", "raw"] | None = None
 
     @model_validator(mode="after")
     def validate_reasoning(self) -> ModelRoute:
@@ -48,7 +50,7 @@ class ModelRoute(StrictModel):
 
 
 class ProviderConfig(StrictModel):
-    kind: Literal["nvidia_nim"] = "nvidia_nim"
+    kind: Literal["nvidia_nim", "groq", "scripted"] = "nvidia_nim"
     base_url: str = "https://integrate.api.nvidia.com/v1"
     api_key_env: str = Field(default="NVIDIA_API_KEY", pattern=r"^[A-Z][A-Z0-9_]*$")
     timeout_seconds: Annotated[float, Field(gt=0.0, le=120.0)] = 45.0

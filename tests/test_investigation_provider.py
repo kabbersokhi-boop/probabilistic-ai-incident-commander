@@ -9,7 +9,7 @@ import pytest
 
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.models import ChatMessage
-from paic.investigation.provider import NvidiaNIMProvider, ProviderError
+from paic.investigation.provider import GroqProvider, NvidiaNIMProvider, ProviderError
 
 
 def test_default_config_uses_ordered_nim_fallbacks(repo_root: Path) -> None:
@@ -75,6 +75,83 @@ def _live_config() -> InvestigationConfig:
             "provider": {"api_key_env": "NVIDIA_API_KEY_TEST", "models": [{"model": "x/y"}]},
         }
     )
+
+
+def test_groq_request_shape_is_explicit_and_does_not_use_nim_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    config = InvestigationConfig.model_validate(
+        {
+            "schema_version": "1.0",
+            "investigation_id": "groq-shape",
+            "provider": {
+                "kind": "groq",
+                "base_url": "https://api.groq.com/openai/v1",
+                "api_key_env": "GROQ_API_KEY_TEST",
+                "models": [{"model": "openai/gpt-oss-120b", "max_tokens": 768}],
+            },
+        }
+    )
+    monkeypatch.setenv("GROQ_API_KEY_TEST", "temporary-test-key")
+    payload = {
+        "choices": [{"finish_reason": "stop", "message": {"content": None, "tool_calls": []}}],
+        "usage": {},
+    }
+    captured: dict[str, object] = {}
+
+    def respond(request: object, *args: object, **kwargs: object) -> _HTTPResponse:
+        del args, kwargs
+        assert isinstance(request, Request)
+        captured.update(json.loads(request.data.decode()))  # type: ignore[union-attr]
+        return _HTTPResponse(json.dumps(payload).encode())
+
+    monkeypatch.setattr("paic.investigation.provider.urllib.request.urlopen", respond)
+    GroqProvider(config.provider, config.provider.models[0]).complete(
+        [ChatMessage(role="user", content="x")], []
+    )
+    assert captured["model"] == "openai/gpt-oss-120b"
+    assert captured["max_completion_tokens"] == 768
+    assert captured["reasoning_effort"] == "low"
+    assert captured["reasoning_format"] == "hidden"
+    assert captured["stream"] is False
+    assert "max_tokens" not in captured
+    assert "chat_template_kwargs" not in captured
+
+
+def test_groq_rejects_tool_call_without_function_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    config = InvestigationConfig.model_validate(
+        {
+            "schema_version": "1.0",
+            "investigation_id": "groq-parse",
+            "provider": {
+                "kind": "groq",
+                "api_key_env": "GROQ_API_KEY_TEST",
+                "models": [{"model": "openai/gpt-oss-20b"}],
+            },
+        }
+    )
+    monkeypatch.setenv("GROQ_API_KEY_TEST", "temporary-test-key")
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [{"id": "x", "function": {"name": "probe", "arguments": "{}"}}]
+                }
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        "paic.investigation.provider.urllib.request.urlopen",
+        lambda *a, **k: _HTTPResponse(json.dumps(payload).encode()),
+    )
+    with pytest.raises(ProviderError, match="malformed"):
+        GroqProvider(config.provider, config.provider.models[0]).complete(
+            [ChatMessage(role="user", content="x")], []
+        )
 
 
 def test_nim_provider_parses_openai_tool_response(monkeypatch: pytest.MonkeyPatch) -> None:

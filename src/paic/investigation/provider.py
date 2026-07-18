@@ -1,4 +1,4 @@
-"""Provider protocol, NVIDIA NIM client, and deterministic scripted provider."""
+"""Provider-neutral OpenAI-compatible clients and deterministic scripted provider."""
 
 from __future__ import annotations
 
@@ -43,9 +43,10 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON value is forbidden: {value}")
 
 
-def _http_failure(exc: urllib.error.HTTPError) -> tuple[str, str]:
+def _http_failure(exc: urllib.error.HTTPError, provider_kind: str) -> tuple[str, str]:
     """Classify HTTP failure without retaining an unbounded provider body."""
 
+    del provider_kind
     status = exc.code
     if status in {401, 403}:
         return ("authentication_failed", "fatal")
@@ -71,6 +72,8 @@ def _http_failure(exc: urllib.error.HTTPError) -> tuple[str, str]:
                 category = str(error.get("code") or error.get("type") or "").lower()
         except (OSError, ValueError, json.JSONDecodeError):
             category = ""
+        if "failed_generation" in category or ("tool" in category and "generation" in category):
+            return ("tool_generation_failed", "tool_generation")
         if any(token in category for token in ("model", "route", "unsupported")):
             return ("route_incompatible", "route")
         return ("invalid_request", "fatal")
@@ -85,12 +88,97 @@ class ChatProvider(Protocol):
     ) -> ProviderResponse: ...
 
 
-class NvidiaNIMProvider:
-    """Minimal OpenAI-compatible client that never stores the API key."""
+class _OpenAICompatibleProvider:
+    """Strict bounded OpenAI-compatible transport shared by hosted providers."""
+
+    provider_label = "provider"
 
     def __init__(self, provider: ProviderConfig, route: ModelRoute):
         self.provider = provider
         self.route = route
+
+    def _payload(
+        self, messages: Sequence[ChatMessage], tools: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.route.model,
+            "messages": [
+                message.model_dump(mode="json", exclude_none=True) for message in messages
+            ],
+            "temperature": self.route.temperature,
+            "top_p": self.route.top_p,
+            "stream": False,
+        }
+        if self.provider.kind == "groq":
+            payload["max_completion_tokens"] = self.route.max_tokens
+            payload["reasoning_effort"] = self.route.reasoning_effort or "low"
+            payload["reasoning_format"] = self.route.reasoning_format or "hidden"
+        else:
+            payload["max_tokens"] = self.route.max_tokens
+        if tools:
+            payload.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": False})
+        return payload
+
+    def _parse(
+        self, raw: bytes, known_tools: set[str], *, strict_type: bool = True
+    ) -> ProviderResponse:
+        try:
+            decoded = json.loads(
+                raw, object_pairs_hook=_unique_object, parse_constant=_reject_json_constant
+            )
+            choices = decoded.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise ValueError("choices must be a non-empty array")
+            choice = choices[0]
+            if not isinstance(choice, dict) or not isinstance(choice.get("message"), dict):
+                raise ValueError("message must be an object")
+            message = choice["message"]
+            content = message.get("content")
+            if content is not None and not isinstance(content, str):
+                raise TypeError("message content must be a string or null")
+            calls: list[ProviderToolCall] = []
+            raw_calls = message.get("tool_calls", [])
+            if raw_calls is not None and not isinstance(raw_calls, list):
+                raise TypeError("tool_calls must be an array")
+            for item in raw_calls or []:
+                if not isinstance(item, dict) or (strict_type and item.get("type") != "function"):
+                    raise ValueError("tool call must be a function")
+                function = item.get("function")
+                if not isinstance(function, dict) or not isinstance(item.get("id"), str):
+                    raise ValueError("tool call id and function are required")
+                name = function.get("name")
+                if not isinstance(name, str) or (
+                    known_tools and name not in known_tools and name != "submit_investigation"
+                ):
+                    raise ValueError("unknown tool function")
+                arguments = json.loads(
+                    function.get("arguments") or "{}",
+                    object_pairs_hook=_unique_object,
+                    parse_constant=_reject_json_constant,
+                )
+                if not isinstance(arguments, dict):
+                    raise TypeError("tool arguments must be an object")
+                calls.append(ProviderToolCall(id=item["id"], name=name, arguments=arguments))
+            usage_raw = decoded.get("usage") or {}
+            if not isinstance(usage_raw, dict):
+                raise TypeError("usage must be an object")
+            usage = ProviderUsage(
+                **{
+                    key: usage_raw.get(key, 0) or 0
+                    for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+                }
+            )
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ProviderError(
+                "invalid_response", f"{self.provider_label} response is malformed", kind="transient"
+            ) from exc
+        return ProviderResponse(
+            model=self.route.model,
+            content=content,
+            tool_calls=calls,
+            finish_reason=choice.get("finish_reason"),
+            usage=usage,
+        )
 
     def complete(
         self,
@@ -104,34 +192,7 @@ class NvidiaNIMProvider:
                 f"environment variable {self.provider.api_key_env} is not set",
                 kind="fatal",
             )
-        payload: dict[str, Any] = {
-            "model": self.route.model,
-            "messages": [
-                message.model_dump(mode="json", exclude_none=True) for message in messages
-            ],
-            "temperature": self.route.temperature,
-            "top_p": self.route.top_p,
-            "max_tokens": self.route.max_tokens,
-            "stream": False,
-        }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-            payload["parallel_tool_calls"] = False
-        # NVIDIA's hosted route references document these as request-root fields
-        # (OpenAI SDK examples call that container ``extra_body``).
-        if self.route.model == "nvidia/nemotron-3-super-120b-a12b":
-            payload["chat_template_kwargs"] = {
-                "enable_thinking": self.route.enable_thinking,
-                "force_nonempty_content": True,
-            }
-            if self.route.enable_thinking and self.route.reasoning_budget:
-                payload["reasoning_budget"] = self.route.reasoning_budget
-        elif self.route.model in {
-            "qwen/qwen3.5-122b-a10b",
-            "nvidia/nemotron-3-nano-30b-a3b",
-        }:
-            payload["chat_template_kwargs"] = {"enable_thinking": self.route.enable_thinking}
+        payload = self._payload(messages, tools)
         request = urllib.request.Request(
             self.provider.base_url.rstrip("/") + "/chat/completions",
             data=json.dumps(payload, separators=(",", ":")).encode(),
@@ -152,7 +213,7 @@ class NvidiaNIMProvider:
                         kind="transient",
                     )
         except urllib.error.HTTPError as exc:
-            code, kind = _http_failure(exc)
+            code, kind = _http_failure(exc, self.provider.kind)
             raise ProviderError(
                 code, f"NVIDIA NIM request failed with HTTP {exc.code}", kind=kind
             ) from exc
@@ -161,60 +222,42 @@ class NvidiaNIMProvider:
                 "transport_error", "NVIDIA NIM request failed", kind="transient"
             ) from exc
         try:
-            decoded = json.loads(
+            return self._parse(
                 raw,
-                object_pairs_hook=_unique_object,
-                parse_constant=_reject_json_constant,
+                {str(item.get("function", {}).get("name")) for item in tools},
+                strict_type=self.provider.kind == "groq",
             )
-            choice = decoded["choices"][0]
-            message = choice["message"]
-            content = message.get("content")
-            if content is not None and not isinstance(content, str):
-                raise TypeError("message content must be a string or null")
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
-            raise ProviderError(
-                "invalid_response", "NVIDIA NIM response is malformed", kind="transient"
-            ) from exc
-        calls: list[ProviderToolCall] = []
-        for item in message.get("tool_calls") or []:
-            try:
-                function = item["function"]
-                arguments = json.loads(
-                    function.get("arguments") or "{}",
-                    object_pairs_hook=_unique_object,
-                    parse_constant=_reject_json_constant,
-                )
-                if not isinstance(arguments, dict):
-                    raise TypeError
-                calls.append(
-                    ProviderToolCall(
-                        id=str(item["id"]),
-                        name=str(function["name"]),
-                        arguments=arguments,
-                    )
-                )
-            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-                raise ProviderError(
-                    "invalid_tool_call", "model returned a malformed tool call", kind="route"
-                ) from exc
-        usage_raw = decoded.get("usage") or {}
-        try:
-            usage = ProviderUsage(
-                prompt_tokens=int(usage_raw.get("prompt_tokens", 0) or 0),
-                completion_tokens=int(usage_raw.get("completion_tokens", 0) or 0),
-                total_tokens=int(usage_raw.get("total_tokens", 0) or 0),
-            )
-        except (TypeError, ValueError) as exc:
-            raise ProviderError(
-                "invalid_response", "NVIDIA NIM usage metadata is malformed", kind="transient"
-            ) from exc
-        return ProviderResponse(
-            model=self.route.model,
-            content=content,
-            tool_calls=calls,
-            finish_reason=choice.get("finish_reason"),
-            usage=usage,
-        )
+        except ProviderError:
+            raise
+
+
+class NvidiaNIMProvider(_OpenAICompatibleProvider):
+    """NVIDIA NIM OpenAI-compatible client with explicit route fields."""
+
+    provider_label = "NVIDIA NIM"
+
+    def _payload(
+        self, messages: Sequence[ChatMessage], tools: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        payload = super()._payload(messages, tools)
+        payload.pop("reasoning_effort", None)
+        payload.pop("reasoning_format", None)
+        if self.route.model == "nvidia/nemotron-3-super-120b-a12b":
+            payload["chat_template_kwargs"] = {
+                "enable_thinking": self.route.enable_thinking,
+                "force_nonempty_content": True,
+            }
+            if self.route.enable_thinking and self.route.reasoning_budget:
+                payload["reasoning_budget"] = self.route.reasoning_budget
+        elif self.route.model in {"qwen/qwen3.5-122b-a10b", "nvidia/nemotron-3-nano-30b-a3b"}:
+            payload["chat_template_kwargs"] = {"enable_thinking": self.route.enable_thinking}
+        return payload
+
+
+class GroqProvider(_OpenAICompatibleProvider):
+    """Groq OpenAI-compatible client for GPT-OSS routes."""
+
+    provider_label = "Groq"
 
 
 class ScriptedProvider:

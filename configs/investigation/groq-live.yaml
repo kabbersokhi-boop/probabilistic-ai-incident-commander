@@ -1,0 +1,27 @@
+schema_version: "1.0"
+investigation_id: checkout-investigation-groq-live
+provider:
+  kind: groq
+  base_url: https://api.groq.com/openai/v1
+  api_key_env: GROQ_API_KEY
+  timeout_seconds: 30
+  max_response_bytes: 2000000
+  models:
+    - model: openai/gpt-oss-120b
+      temperature: 0.2
+      top_p: 0.95
+      max_tokens: 768
+      reasoning_effort: low
+      reasoning_format: hidden
+    - model: openai/gpt-oss-20b
+      temperature: 0.2
+      top_p: 0.95
+      max_tokens: 768
+      reasoning_effort: low
+      reasoning_format: hidden
+budget:
+  max_rounds: 4
+  max_tool_calls: 8
+  max_provider_failures: 2
+  max_total_tokens: 6000
+  max_tool_result_bytes: 100000

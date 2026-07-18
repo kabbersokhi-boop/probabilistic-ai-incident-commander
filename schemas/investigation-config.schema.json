@@ -119,6 +119,40 @@
           "title": "Reasoning Budget",
           "type": "integer"
         },
+        "reasoning_effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoning Effort"
+        },
+        "reasoning_format": {
+          "anyOf": [
+            {
+              "enum": [
+                "hidden",
+                "concise",
+                "raw"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoning Format"
+        },
         "temperature": {
           "default": 0.2,
           "maximum": 1.0,
@@ -155,8 +189,12 @@
           "type": "string"
         },
         "kind": {
-          "const": "nvidia_nim",
           "default": "nvidia_nim",
+          "enum": [
+            "nvidia_nim",
+            "groq",
+            "scripted"
+          ],
           "title": "Kind",
           "type": "string"
         },

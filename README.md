@@ -122,7 +122,7 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 
 ### Probabilistic agentic investigation
 
-- Ordered NVIDIA NIM routing with Nemotron 3 Super as primary, Qwen 3.5 as the first fallback, and Nemotron 3 Nano as the fast fallback
+- Provider-neutral OpenAI-compatible routing: Groq GPT-OSS is the tested live adapter, while NVIDIA NIM remains an optional adapter with offline coverage
 - A bounded single-agent loop that can call only the Governed Tool Gateway
 - Competing hypotheses, explicit falsifiers, contradictory-evidence search, and unsupported-citation rejection
 - Deterministic posterior ranking, entropy, confidence, and abstention outside the language model

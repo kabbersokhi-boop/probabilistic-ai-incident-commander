@@ -7,7 +7,7 @@ from typing import Any
 
 from paic.investigation.config import InvestigationConfig, ModelRoute
 from paic.investigation.models import ChatMessage, ModelAttempt, ProviderResponse
-from paic.investigation.provider import ChatProvider, NvidiaNIMProvider, ProviderError
+from paic.investigation.provider import ChatProvider, GroqProvider, NvidiaNIMProvider, ProviderError
 
 ProviderFactory = Callable[[ModelRoute], ChatProvider]
 
@@ -19,7 +19,14 @@ class ModelRouter:
         factory: ProviderFactory | None = None,
     ):
         self.config = config
-        self.factory = factory or (lambda route: NvidiaNIMProvider(config.provider, route))
+        if factory is not None:
+            self.factory = factory
+        elif config.provider.kind == "groq":
+            self.factory = lambda route: GroqProvider(config.provider, route)
+        elif config.provider.kind == "nvidia_nim":
+            self.factory = lambda route: NvidiaNIMProvider(config.provider, route)
+        else:
+            raise ValueError("scripted provider requires an explicit provider factory")
         self.attempts: list[ModelAttempt] = []
         self.failures = 0
         self.preferred_route_index = 0

@@ -74,7 +74,9 @@ def test_benchmark_rejects_direct_hidden_label_disclosure(tmp_path: Path) -> Non
         load_benchmark(visible, answers)
 
 
-def test_benchmark_rejects_hidden_label_in_structured_visible_fields(tmp_path: Path) -> None:
+def test_benchmark_rejects_hidden_label_in_structured_visible_fields(
+    tmp_path: Path,
+) -> None:
     visible = tmp_path / "visible"
     answers = tmp_path / "answers"
     visible.mkdir()

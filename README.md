@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml)
 
-**Evidence-grounded, governed agentic AI for diagnosing commerce incidents under uncertainty.**
+**Evidence-grounded, governed tooling for diagnosing commerce incidents under uncertainty.**
 
 Probabilistic AI Incident Commander is an open reference implementation of an autonomous operations system that combines statistical anomaly detection, analytical investigation, probabilistic root-cause ranking, controlled remediation, and recovery verification.
 
@@ -47,7 +47,19 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides five working foundations.
+The repository currently provides deterministic simulation, analytics, detection, customer-impact analysis, operational evidence, and a read-only Governed Tool Gateway.
+
+### Governed Tool Gateway
+
+The gateway exposes compact JSON tools over validated source artifacts. It binds every invocation to the dataset manifest (and optional analytics, detection, impact, and evidence manifests), authorizes explicit `observer`, `investigator`, and `approver` roles, and records a tamper-evident invocation ledger. The initial tools are `sql.query`, `evidence.search`, `lineage.trace`, `changes.list`, `runbook.get`, `historical_incidents.search`, `anomalies.list`, `impact.summary`, and `artifacts.summary`.
+
+SQL runs in an in-memory DuckDB connection containing only registered artifact tables. A real SQL AST policy permits one `SELECT`/`WITH ... SELECT`, rejects writes, DDL, external readers, filesystem/network access, extensions, system schemas, unknown tables and columns, and enforces deterministic row and byte limits.
+
+```bash
+paic tools list
+paic tools invoke --request request.json
+paic tools audit validate --audit-dir .artifacts/audit
+```
 
 ### Executable product and evaluation contracts
 

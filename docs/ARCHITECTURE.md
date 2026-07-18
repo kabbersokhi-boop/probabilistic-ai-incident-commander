@@ -167,3 +167,6 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 - `recovery`: statistical verification and reopening
 - `evaluation`: ground truth, baselines, ablations, and adversarial tests
 - `api`, `web`, and `tui`: product interfaces over the same core services
+# Governed Tool Gateway
+
+Validated dataset, analytics, detection, impact, and evidence manifests feed a source-binding layer. Authorized requests then reach deterministic handlers; SQL requests pass through an AST policy before an in-memory DuckDB execution. Canonical responses and a hash-chained audit ledger provide reproducibility and tamper evidence. No provider, model, database, network service, or write path is part of this boundary.

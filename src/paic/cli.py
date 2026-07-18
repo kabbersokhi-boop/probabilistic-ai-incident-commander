@@ -75,6 +75,9 @@ from paic.simulator.validation import (
     validate_dataset_directory,
     validate_simulation_result,
 )
+from paic.tools.gateway import Gateway, GatewayError
+from paic.tools.ledger import AuditLedger
+from paic.tools.models import ToolError, ToolRequest, ToolResponse
 
 
 def _validate_contracts(spec_dir: Path, output_format: str) -> int:
@@ -159,6 +162,9 @@ def _export_schemas(output_dir: Path) -> int:
         "impact-manifest.schema.json": ImpactManifest,
         "evidence-config.schema.json": EvidenceConfig,
         "evidence-manifest.schema.json": EvidenceManifest,
+        "tool-request.schema.json": ToolRequest,
+        "tool-response.schema.json": ToolResponse,
+        "tool-error.schema.json": ToolError,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -693,6 +699,15 @@ def build_parser() -> argparse.ArgumentParser:
         "summary", help="Print evidence, lineage, health, timeline, and quality summaries."
     )
     evidence_summary.add_argument("--evidence-dir", type=Path, required=True)
+    tools_parser = subparsers.add_parser("tools", help="Use the Governed Tool Gateway.")
+    tools_subparsers = tools_parser.add_subparsers(dest="tools_command", required=True)
+    tools_subparsers.add_parser("list", help="List read-only tools.")
+    invoke = tools_subparsers.add_parser("invoke", help="Invoke one deterministic tool.")
+    invoke.add_argument("--request", type=Path, required=True)
+    audit = tools_subparsers.add_parser("audit", help="Validate invocation audit records.")
+    audit_sub = audit.add_subparsers(dest="audit_command", required=True)
+    audit_validate = audit_sub.add_parser("validate")
+    audit_validate.add_argument("--audit-dir", type=Path, required=True)
     return parser
 
 
@@ -764,6 +779,35 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "evidence" and args.evidence_command == "summary":
         return _evidence_summary(args.evidence_dir)
+    if args.command == "tools" and args.tools_command == "list":
+        print(json.dumps(Gateway.list_tools(), indent=2, sort_keys=True))
+        return 0
+    if args.command == "tools" and args.tools_command == "invoke":
+        try:
+            request = ToolRequest.model_validate_json(args.request.read_text(encoding="utf-8"))
+            response = Gateway().invoke(request)
+        except (OSError, GatewayError, ValueError) as exc:
+            print(
+                json.dumps(
+                    {"success": False, "error": {"code": "invalid_request", "message": str(exc)}},
+                    indent=2,
+                )
+            )
+            return 2
+        print(response.model_dump_json(indent=2))
+        return 0 if response.execution_status == "success" else 1
+    if (
+        args.command == "tools"
+        and args.tools_command == "audit"
+        and args.audit_command == "validate"
+    ):
+        try:
+            AuditLedger(args.audit_dir).validate()
+        except (OSError, ValueError) as exc:
+            print(json.dumps({"valid": False, "error": str(exc)}, indent=2))
+            return 1
+        print(json.dumps({"valid": True}, indent=2))
+        return 0
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

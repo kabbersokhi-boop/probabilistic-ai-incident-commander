@@ -85,6 +85,21 @@ jobs:
           python -m paic impact validate \
             --impact-dir .artifacts/impact-smoke \
             --dataset-dir .artifacts/impact-source-smoke
+      - name: Governed Tool Gateway smoke
+        run: |
+          python -m paic tools list
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          Path('.artifacts/tool-request.json').write_text(json.dumps({
+              'tool': 'artifacts.summary', 'incident_id': 'smoke', 'role': 'investigator',
+              'dataset_dir': '.artifacts/smoke', 'analytics_dir': '.artifacts/analytics-smoke',
+              'detection_dir': '.artifacts/detection-smoke', 'audit_dir': '.artifacts/tool-audit',
+              'arguments': {},
+          }))
+          PY
+          python -m paic tools invoke --request .artifacts/tool-request.json
+          python -m paic tools audit validate --audit-dir .artifacts/tool-audit
       - name: Build and validate operational evidence smoke artifact
         run: |
           python -m paic evidence build \

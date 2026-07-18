@@ -39,4 +39,6 @@ Tool output and retrieved text are untrusted data. Prompt-like instructions insi
 
 `NVIDIA_API_KEY` is read at request time from the process environment. It is excluded from provider payloads, errors, request receipts, transcripts, gateway ledgers, test fixtures, and generated artifacts. CI and ordinary tests use an offline scripted provider and must never require a live key.
 
+Provider free-form content and any reasoning trace are runtime-only. Investigation exports record only bounded operational metadata and a SHA-256 receipt for that content; they never serialize the prose itself.
+
 Thinking content is not persisted. The system records structured tool calls, bounded tool results, model route attempts, accepted proposals, deterministic probability outputs, and integrity hashes rather than hidden model reasoning.

@@ -94,6 +94,9 @@ def _responses(evidence_ids: list[str], *, bad_first: bool = False) -> list[Prov
                                                 "explanation": "bad",
                                             }
                                         ],
+                                        "falsifiers": [
+                                            "The cited event is not present in governed output."
+                                        ],
                                     },
                                     {
                                         "hypothesis_id": "b",
@@ -107,6 +110,9 @@ def _responses(evidence_ids: list[str], *, bad_first: bool = False) -> list[Prov
                                                 "likelihood_ratio": 2,
                                                 "explanation": "observed",
                                             }
+                                        ],
+                                        "falsifiers": [
+                                            "The observed record contradicts this explanation."
                                         ],
                                     },
                                 ],
@@ -161,6 +167,9 @@ def _responses(evidence_ids: list[str], *, bad_first: bool = False) -> list[Prov
                                             "likelihood_ratio": 0.2,
                                             "explanation": "Evidence does not align with that service.",
                                         }
+                                    ],
+                                    "falsifiers": [
+                                        "The unrelated service shows a matching regression."
                                     ],
                                 },
                             ],

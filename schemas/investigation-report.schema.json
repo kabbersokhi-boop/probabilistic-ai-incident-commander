@@ -119,6 +119,7 @@
             "type": "string"
           },
           "maxItems": 10,
+          "minItems": 1,
           "title": "Falsifiers",
           "type": "array"
         },
@@ -151,7 +152,8 @@
         "title",
         "prior_probability",
         "rationale",
-        "evidence"
+        "evidence",
+        "falsifiers"
       ],
       "title": "HypothesisProposal",
       "type": "object"

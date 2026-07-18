@@ -107,6 +107,8 @@ def export_investigation(
 
 
 def _safe_path(root: Path, relative: str) -> Path:
+    if Path(relative).name != relative or relative in {"", ".", ".."}:
+        raise InvestigationArtifactError("artifact file path is unsafe")
     candidate = (root / relative).resolve()
     resolved = root.resolve()
     if candidate != resolved and resolved not in candidate.parents:
@@ -114,8 +116,41 @@ def _safe_path(root: Path, relative: str) -> Path:
     return candidate
 
 
+_PAYLOAD_FILES = {
+    "investigation.config.resolved.json",
+    "request.receipt.json",
+    "report.json",
+    "transcript.jsonl",
+}
+_ARTIFACT_FILES = _PAYLOAD_FILES | {"manifest.json", "_SUCCESS"}
+
+
+def _closed_world_issues(root: Path) -> list[str]:
+    """Reject anything other than the six flat, regular export files."""
+
+    issues: list[str] = []
+    try:
+        if not root.is_dir() or root.is_symlink():
+            return ["investigation artifact root is not a regular directory"]
+        entries = list(root.iterdir())
+    except OSError as exc:
+        return [f"cannot inspect investigation artifact: {exc}"]
+    names = {entry.name for entry in entries}
+    if names != _ARTIFACT_FILES:
+        issues.append("investigation artifact contains missing or undeclared paths")
+    for entry in entries:
+        if entry.is_symlink():
+            issues.append(f"investigation artifact contains symbolic link: {entry.name}")
+        elif not entry.is_file():
+            issues.append(f"investigation artifact contains nested or non-file path: {entry.name}")
+    return issues
+
+
 def load_investigation(path: str | Path) -> LoadedInvestigation:
     root = Path(path)
+    layout_issues = _closed_world_issues(root)
+    if layout_issues:
+        raise InvestigationArtifactError("; ".join(layout_issues))
     try:
         manifest = InvestigationManifest.model_validate_json(
             (root / "manifest.json").read_text(encoding="utf-8")
@@ -148,21 +183,25 @@ def validate_investigation(
 ) -> list[str]:
     root = Path(path)
     issues: list[str] = []
+    issues.extend(_closed_world_issues(root))
+    if issues:
+        return issues
     try:
         loaded = load_investigation(root)
     except InvestigationArtifactError as exc:
         return [str(exc)]
-    required_files = {
-        "investigation.config.resolved.json",
-        "request.receipt.json",
-        "report.json",
-        "transcript.jsonl",
-    }
-    declared_files = {item.relative_path for item in loaded.manifest.files}
-    if declared_files != required_files:
+    declared_paths = [item.relative_path for item in loaded.manifest.files]
+    declared_files = set(declared_paths)
+    if len(declared_files) != len(declared_paths):
+        issues.append("investigation manifest contains duplicate file paths")
+    if declared_files != _PAYLOAD_FILES:
         issues.append("investigation manifest file set is incomplete or unexpected")
     for item in loaded.manifest.files:
-        target = _safe_path(root, item.relative_path)
+        try:
+            target = _safe_path(root, item.relative_path)
+        except InvestigationArtifactError as exc:
+            issues.append(str(exc))
+            continue
         if not target.is_file():
             issues.append(f"missing file: {item.relative_path}")
             continue

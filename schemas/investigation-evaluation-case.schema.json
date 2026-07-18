@@ -7,9 +7,9 @@
       "title": "Case Id",
       "type": "string"
     },
-    "report_path": {
+    "investigation_dir": {
       "minLength": 1,
-      "title": "Report Path",
+      "title": "Investigation Dir",
       "type": "string"
     },
     "should_abstain": {
@@ -32,7 +32,7 @@
   },
   "required": [
     "case_id",
-    "report_path"
+    "investigation_dir"
   ],
   "title": "EvaluationCase",
   "type": "object"

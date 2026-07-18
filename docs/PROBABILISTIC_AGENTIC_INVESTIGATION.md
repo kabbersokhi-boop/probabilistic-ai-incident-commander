@@ -64,6 +64,10 @@ An exported investigation contains:
 
 Validation recomputes file hashes, transcript links, report probabilities, report hash, source-manifest bindings, and counts. Replay verifies and returns the report without accessing NVIDIA NIM.
 
+The exported transcript contains only bounded provider operational metadata: model, finish reason, usage, validated tool calls, and a presence/byte-count/SHA-256 receipt for free-form content. It never persists provider `content`, reasoning traces, or unrestricted model prose. Exports are closed-world: the six documented regular files are the only permitted paths.
+
+Benchmark cases use `investigation_dir`, not a standalone `report.json`. Each case is loaded through complete artifact validation and replay before scoring. The multiclass Brier metric uses the project's sum-style convention; a true hypothesis omitted from the report contributes its full `(0 - 1)^2` error term.
+
 ## CLI
 
 ```bash
@@ -73,6 +77,8 @@ paic investigate validate --investigation-dir .artifacts/investigation --dataset
 paic investigate replay --investigation-dir .artifacts/investigation
 paic investigate benchmark --cases benchmark-cases.json
 ```
+
+Each benchmark case contains `investigation_dir`, `true_hypothesis_id`, and `should_abstain`.
 
 Use `--provider-script` for deterministic local and CI execution. A live NIM call is manual and requires the environment-only API key.
 

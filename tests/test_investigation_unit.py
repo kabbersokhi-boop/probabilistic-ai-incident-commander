@@ -101,6 +101,7 @@ def _proposal(*, bad_id: bool = False) -> dict[str, Any]:
                         "explanation": "The record contradicts it.",
                     }
                 ],
+                "falsifiers": ["The other service remains healthy during the interval."],
             },
         ],
         "explicit_unknowns": ["Recovery is unverified."],
@@ -420,4 +421,4 @@ def test_artifact_rejects_missing_file_and_bad_success_marker(
     (output / "transcript.jsonl").unlink()
     (output / "_SUCCESS").write_text("0" * 64 + "\n", encoding="utf-8")
     issues = validate_investigation(output)
-    assert any("cannot load" in issue for issue in issues)
+    assert any("missing or undeclared" in issue for issue in issues)

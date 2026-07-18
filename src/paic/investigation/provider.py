@@ -19,10 +19,15 @@ from paic.investigation.models import (
 
 
 class ProviderError(RuntimeError):
-    def __init__(self, code: str, message: str, *, retryable: bool):
+    def __init__(
+        self, code: str, message: str, *, kind: str | None = None, retryable: bool | None = None
+    ):
         super().__init__(message)
         self.code = code
-        self.retryable = retryable
+        # ``retryable`` remains accepted for scripted test doubles and callers;
+        # production classifications use a precise failure kind.
+        self.kind = kind or ("transient" if retryable else "fatal")
+        self.retryable = self.kind in {"transient", "route"}
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -36,6 +41,40 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON value is forbidden: {value}")
+
+
+def _http_failure(exc: urllib.error.HTTPError) -> tuple[str, str]:
+    """Classify HTTP failure without retaining an unbounded provider body."""
+
+    status = exc.code
+    if status in {401, 403}:
+        return ("authentication_failed", "fatal")
+    if status == 429:
+        return ("rate_limited", "transient")
+    if status in {408, 425, 500, 502, 503, 504}:
+        return (f"http_{status}", "transient")
+    if status == 404:
+        return ("model_unavailable", "route")
+    if status in {400, 422}:
+        # A bounded error code is sufficient to identify documented route/model
+        # incompatibility. We do not retain or surface provider response prose.
+        category = ""
+        try:
+            raw = exc.read(4096)
+            decoded = json.loads(
+                raw,
+                object_pairs_hook=_unique_object,
+                parse_constant=_reject_json_constant,
+            )
+            error = decoded.get("error", {}) if isinstance(decoded, dict) else {}
+            if isinstance(error, dict):
+                category = str(error.get("code") or error.get("type") or "").lower()
+        except (OSError, ValueError, json.JSONDecodeError):
+            category = ""
+        if any(token in category for token in ("model", "route", "unsupported")):
+            return ("route_incompatible", "route")
+        return ("invalid_request", "fatal")
+    return (f"http_{status}", "fatal")
 
 
 class ChatProvider(Protocol):
@@ -63,7 +102,7 @@ class NvidiaNIMProvider:
             raise ProviderError(
                 "missing_api_key",
                 f"environment variable {self.provider.api_key_env} is not set",
-                retryable=False,
+                kind="fatal",
             )
         payload: dict[str, Any] = {
             "model": self.route.model,
@@ -79,17 +118,20 @@ class NvidiaNIMProvider:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
             payload["parallel_tool_calls"] = False
-        # NVIDIA model cards show these provider-specific fields inside
-        # ``extra_body`` when using the OpenAI SDK. This raw HTTP client must
-        # merge them into the request root. Avoid sending Nemotron-only fields
-        # to other model families so fallback routes remain interoperable.
-        if self.route.model.startswith("nvidia/nemotron"):
+        # NVIDIA's hosted route references document these as request-root fields
+        # (OpenAI SDK examples call that container ``extra_body``).
+        if self.route.model == "nvidia/nemotron-3-super-120b-a12b":
             payload["chat_template_kwargs"] = {
                 "enable_thinking": self.route.enable_thinking,
                 "force_nonempty_content": True,
             }
             if self.route.enable_thinking and self.route.reasoning_budget:
                 payload["reasoning_budget"] = self.route.reasoning_budget
+        elif self.route.model in {
+            "qwen/qwen3.5-122b-a10b",
+            "nvidia/nemotron-3-nano-30b-a3b",
+        }:
+            payload["chat_template_kwargs"] = {"enable_thinking": self.route.enable_thinking}
         request = urllib.request.Request(
             self.provider.base_url.rstrip("/") + "/chat/completions",
             data=json.dumps(payload, separators=(",", ":")).encode(),
@@ -107,17 +149,16 @@ class NvidiaNIMProvider:
                     raise ProviderError(
                         "response_too_large",
                         "NVIDIA NIM response exceeded the configured byte limit",
-                        retryable=True,
+                        kind="transient",
                     )
         except urllib.error.HTTPError as exc:
-            retryable = exc.code in {400, 404, 408, 409, 422, 425, 429, 500, 502, 503, 504}
-            code = "rate_limited" if exc.code == 429 else f"http_{exc.code}"
+            code, kind = _http_failure(exc)
             raise ProviderError(
-                code, f"NVIDIA NIM request failed with HTTP {exc.code}", retryable=retryable
+                code, f"NVIDIA NIM request failed with HTTP {exc.code}", kind=kind
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise ProviderError(
-                "transport_error", "NVIDIA NIM request failed", retryable=True
+                "transport_error", "NVIDIA NIM request failed", kind="transient"
             ) from exc
         try:
             decoded = json.loads(
@@ -132,7 +173,7 @@ class NvidiaNIMProvider:
                 raise TypeError("message content must be a string or null")
         except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
             raise ProviderError(
-                "invalid_response", "NVIDIA NIM response is malformed", retryable=True
+                "invalid_response", "NVIDIA NIM response is malformed", kind="transient"
             ) from exc
         calls: list[ProviderToolCall] = []
         for item in message.get("tool_calls") or []:
@@ -154,7 +195,7 @@ class NvidiaNIMProvider:
                 )
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ProviderError(
-                    "invalid_tool_call", "model returned a malformed tool call", retryable=True
+                    "invalid_tool_call", "model returned a malformed tool call", kind="route"
                 ) from exc
         usage_raw = decoded.get("usage") or {}
         try:
@@ -165,7 +206,7 @@ class NvidiaNIMProvider:
             )
         except (TypeError, ValueError) as exc:
             raise ProviderError(
-                "invalid_response", "NVIDIA NIM usage metadata is malformed", retryable=True
+                "invalid_response", "NVIDIA NIM usage metadata is malformed", kind="transient"
             ) from exc
         return ProviderResponse(
             model=self.route.model,
@@ -195,7 +236,7 @@ class ScriptedProvider:
         del messages, tools
         if self.index >= len(self.responses):
             raise ProviderError(
-                "script_exhausted", "scripted provider has no remaining responses", retryable=False
+                "script_exhausted", "scripted provider has no remaining responses", kind="fatal"
             )
         response = self.responses[self.index]
         self.index += 1

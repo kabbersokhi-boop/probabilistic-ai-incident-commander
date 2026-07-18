@@ -32,6 +32,18 @@ class ModelRoute(StrictModel):
             raise ValueError("reasoning_budget requires enable_thinking")
         if self.reasoning_budget > self.max_tokens:
             raise ValueError("reasoning_budget cannot exceed max_tokens")
+        # NVIDIA's current hosted Qwen and Nemotron Nano references expose the
+        # thinking switch but do not document this route's reasoning budget.
+        # Reject it instead of silently dropping configured intent.
+        if (
+            self.model
+            in {
+                "qwen/qwen3.5-122b-a10b",
+                "nvidia/nemotron-3-nano-30b-a3b",
+            }
+            and self.reasoning_budget
+        ):
+            raise ValueError("reasoning_budget is unsupported for this hosted model route")
         return self
 
 

@@ -14,6 +14,7 @@ from paic.investigation.artifact import (
     _safe_path,
     export_investigation,
     load_investigation,
+    validate_investigation,
 )
 from paic.investigation.config import (
     DecisionPolicy,
@@ -34,7 +35,13 @@ from paic.investigation.models import (
     ProviderUsage,
     TranscriptEvent,
 )
-from paic.investigation.orchestrator import InvestigationError, Investigator, scripted_factory
+from paic.investigation.orchestrator import (
+    InvestigationError,
+    Investigator,
+    _event,
+    _provider_event_payload,
+    scripted_factory,
+)
 from paic.investigation.probability import score_proposal
 from paic.investigation.provider import NvidiaNIMProvider, ProviderError, ScriptedProvider
 from paic.investigation.router import ModelRouter
@@ -87,6 +94,7 @@ def _proposal() -> InvestigationProposal:
                             "explanation": "Cohort alignment.",
                         },
                     ],
+                    "falsifiers": ["Expected corroboration is absent."],
                 },
                 {
                     "hypothesis_id": "other",
@@ -101,6 +109,7 @@ def _proposal() -> InvestigationProposal:
                             "explanation": "Contradictory observation.",
                         }
                     ],
+                    "falsifiers": ["A competing cause fully explains the timing."],
                 },
             ],
         }
@@ -202,6 +211,41 @@ def test_proposal_models_reject_direction_duplicates_and_bad_priors() -> None:
         InvestigationProposal.model_validate(raw)
 
 
+def test_investigation_quality_contract_rejects_invalid_proposals() -> None:
+    raw = _proposal().model_dump(mode="json")
+    raw["hypotheses"][0]["falsifiers"] = []
+    with pytest.raises(ValueError, match="at least 1"):
+        InvestigationProposal.model_validate(raw)
+    raw = _proposal().model_dump(mode="json")
+    raw["hypotheses"][0]["falsifiers"] = ["same", " same "]
+    with pytest.raises(ValueError, match="falsifiers must be unique"):
+        InvestigationProposal.model_validate(raw)
+    raw = _proposal().model_dump(mode="json")
+    raw["explicit_unknowns"] = [" "]
+    with pytest.raises(ValueError, match="explicit_unknowns must be non-blank"):
+        InvestigationProposal.model_validate(raw)
+    raw = _proposal().model_dump(mode="json")
+    raw["recommended_next_steps"] = ["x", " x "]
+    with pytest.raises(ValueError, match="recommended_next_steps must be unique"):
+        InvestigationProposal.model_validate(raw)
+    abstaining = _proposal().model_copy(
+        update={"explicit_unknowns": [], "recommended_next_steps": []}
+    )
+    with pytest.raises(Exception, match="explicit unknown"):
+        score_proposal(
+            abstaining,
+            investigation_id="quality",
+            incident_id="inc",
+            question="why",
+            policy=DecisionPolicy(minimum_top_posterior=1.0),
+            observed_evidence={"E1", "E2"},
+            source_hashes={},
+            attempts=[],
+            trace=[],
+            total_tokens=0,
+        )
+
+
 class _HTTPResponse:
     def __init__(self, payload: bytes):
         self.payload = payload
@@ -238,7 +282,7 @@ def test_provider_family_fields_strict_json_transport_and_exhaustion(
     NvidiaNIMProvider(generic, generic.models[0]).complete(
         [ChatMessage(role="user", content="x")], []
     )
-    assert "chat_template_kwargs" not in captured[-1]
+    assert captured[-1]["chat_template_kwargs"] == {"enable_thinking": False}
 
     nemotron = _config(
         models=[
@@ -257,6 +301,14 @@ def test_provider_family_fields_strict_json_transport_and_exhaustion(
     assert captured[-1]["reasoning_budget"] == 128
     assert captured[-1]["chat_template_kwargs"]["enable_thinking"] is True
     assert captured[-1]["parallel_tool_calls"] is False
+
+    nano = _config(
+        models=[{"model": "nvidia/nemotron-3-nano-30b-a3b", "enable_thinking": True}]
+    ).provider.model_copy(update={"api_key_env": "NVIDIA_API_KEY_TEST"})
+    NvidiaNIMProvider(nano, nano.models[0]).complete([ChatMessage(role="user", content="x")], [])
+    assert captured[-1]["chat_template_kwargs"] == {"enable_thinking": True}
+    assert "reasoning_budget" not in captured[-1]
+    assert "force_nonempty_content" not in captured[-1]["chat_template_kwargs"]
 
     malformed_payloads = [
         b'{"choices":[],"choices":[]}',
@@ -435,10 +487,59 @@ def test_artifact_export_path_and_load_failures(tmp_path: Path) -> None:
     file_target.write_text("x", encoding="utf-8")
     with pytest.raises(InvestigationArtifactError, match="output path is a file"):
         export_investigation(report, config, request, [event], file_target, overwrite=True)
-    with pytest.raises(InvestigationArtifactError, match="escapes"):
+    with pytest.raises(InvestigationArtifactError, match="unsafe"):
         _safe_path(output, "../outside")
-    with pytest.raises(InvestigationArtifactError, match="cannot load"):
+    with pytest.raises(InvestigationArtifactError, match="root is not"):
         load_investigation(tmp_path / "missing")
+
+
+def test_artifact_validation_is_closed_world(tmp_path: Path) -> None:
+    config, request, report = _report()
+    base = {
+        "sequence": 1,
+        "event_type": "proposal_accepted",
+        "payload": {"report_sha256": report.report_sha256},
+        "previous_event_sha256": "0" * 64,
+    }
+    event = TranscriptEvent.model_validate(
+        {**base, "event_sha256": __import__("hashlib").sha256(canonical(base).encode()).hexdigest()}
+    )
+    output = tmp_path / "artifact"
+    export_investigation(report, config, request, [event], output)
+    (output / "extra.txt").write_text("x", encoding="utf-8")
+    assert validate_investigation(output)
+    (output / "extra.txt").unlink()
+    (output / "nested").mkdir()
+    assert validate_investigation(output)
+    (output / "nested").rmdir()
+    try:
+        (output / "report.json").unlink()
+        (output / "report.json").symlink_to(output / "manifest.json")
+    except OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+    assert validate_investigation(output)
+
+
+def test_exported_transcript_never_persists_provider_free_form_content(tmp_path: Path) -> None:
+    config, request, report = _report()
+    marker = "nvapi-EXAMPLE-DO-NOT-PERSIST"
+    events: list[TranscriptEvent] = []
+    _event(
+        events,
+        "provider_response",
+        _provider_event_payload(ProviderResponse(model="unit", content=marker)),
+    )
+    _event(
+        events,
+        "proposal_accepted",
+        {"report_sha256": report.report_sha256, "status": report.status},
+    )
+    output = tmp_path / "artifact"
+    export_investigation(report, config, request, events, output)
+    assert marker not in "".join(
+        path.read_text(encoding="utf-8") for path in output.iterdir() if path.is_file()
+    )
+    assert not validate_investigation(output)
 
 
 def test_gateway_sql_policy_ledger_and_empty_evaluation_edges(tmp_path: Path) -> None:

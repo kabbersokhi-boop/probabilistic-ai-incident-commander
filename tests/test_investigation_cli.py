@@ -51,6 +51,9 @@ def _script(evidence_ids: list[str]) -> dict[str, list[dict[str, object]]]:
                                             "explanation": "Second evidence.",
                                         },
                                     ],
+                                    "falsifiers": [
+                                        "The primary service stays healthy after the change."
+                                    ],
                                 },
                                 {
                                     "hypothesis_id": "second",
@@ -64,6 +67,9 @@ def _script(evidence_ids: list[str]) -> dict[str, list[dict[str, object]]]:
                                             "likelihood_ratio": 0.2,
                                             "explanation": "Evidence contradicts it.",
                                         }
+                                    ],
+                                    "falsifiers": [
+                                        "The alternative service lacks a matching regression."
                                     ],
                                 },
                             ],
@@ -155,7 +161,7 @@ def test_investigation_cli_scripted_run_validate_replay_and_benchmark(
             [
                 {
                     "case_id": "smoke",
-                    "report_path": str(output / "report.json"),
+                    "investigation_dir": str(output),
                     "true_hypothesis_id": "first",
                     "should_abstain": False,
                 }

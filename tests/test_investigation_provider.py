@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import urllib.error
 from email.message import Message
 from pathlib import Path
 from urllib.request import Request
@@ -174,3 +175,34 @@ def test_nim_provider_classifies_http_and_malformed_errors(
             [ChatMessage(role="user", content="investigate")], []
         )
     assert malformed.value.code == "invalid_response"
+
+
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
+    ("status", "body", "code", "kind"),
+    [
+        (401, b"", "authentication_failed", "fatal"),
+        (403, b"", "authentication_failed", "fatal"),
+        (404, b"", "model_unavailable", "route"),
+        (429, b"", "rate_limited", "transient"),
+        (500, b"", "http_500", "transient"),
+        (400, b'{"error":{"code":"unsupported_model"}}', "route_incompatible", "route"),
+        (422, b'{"error":{"code":"invalid_arguments"}}', "invalid_request", "fatal"),
+    ],
+)
+def test_nim_provider_failure_kinds_are_explicit(
+    monkeypatch: pytest.MonkeyPatch, status: int, body: bytes, code: str, kind: str
+) -> None:
+    config = _live_config()
+    monkeypatch.setenv("NVIDIA_API_KEY_TEST", "temporary-test-key")
+
+    def fail(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise urllib.error.HTTPError(
+            "url", status, "error", Message(), __import__("io").BytesIO(body)
+        )
+
+    monkeypatch.setattr("paic.investigation.provider.urllib.request.urlopen", fail)
+    with pytest.raises(ProviderError) as exc:
+        NvidiaNIMProvider(config.provider, config.provider.models[0]).complete([], [])
+    assert exc.value.code == code
+    assert exc.value.kind == kind

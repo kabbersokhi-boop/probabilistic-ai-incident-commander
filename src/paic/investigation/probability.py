@@ -106,6 +106,10 @@ def score_proposal(
         and len(distinct_evidence) >= policy.minimum_distinct_evidence
         and entropy <= policy.maximum_normalized_entropy
     )
+    if not concluded and not proposal.explicit_unknowns:
+        raise ProposalValidationError("abstained investigations require an explicit unknown")
+    if not concluded and not proposal.recommended_next_steps:
+        raise ProposalValidationError("abstained investigations require a read-only next check")
     confidence = max(0.0, min(1.0, top.posterior_probability * (1.0 - entropy)))
     payload: dict[str, Any] = {
         "schema_version": "1.0",

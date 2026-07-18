@@ -80,13 +80,17 @@ class HypothesisProposal(StrictModel):
     prior_probability: float = Field(gt=0.0, lt=1.0)
     rationale: str = Field(min_length=1, max_length=2_000)
     evidence: list[EvidenceAssessment] = Field(min_length=1, max_length=30)
-    falsifiers: list[str] = Field(default_factory=list, max_length=10)
+    falsifiers: list[str] = Field(min_length=1, max_length=10)
 
     @model_validator(mode="after")
     def unique_evidence(self) -> HypothesisProposal:
         ids = [item.evidence_record_id for item in self.evidence]
         if len(ids) != len(set(ids)):
             raise ValueError("evidence records must be unique within a hypothesis")
+        if any(not item.strip() for item in self.falsifiers):
+            raise ValueError("falsifiers must be non-blank")
+        if len({item.strip() for item in self.falsifiers}) != len(self.falsifiers):
+            raise ValueError("falsifiers must be unique")
         return self
 
 
@@ -104,6 +108,14 @@ class InvestigationProposal(StrictModel):
         prior_total = sum(item.prior_probability for item in self.hypotheses)
         if abs(prior_total - 1.0) > 1e-6:
             raise ValueError("hypothesis prior probabilities must sum to 1")
+        for label, values in (
+            ("explicit_unknowns", self.explicit_unknowns),
+            ("recommended_next_steps", self.recommended_next_steps),
+        ):
+            if any(not value.strip() for value in values):
+                raise ValueError(f"{label} must be non-blank")
+            if len({value.strip() for value in values}) != len(values):
+                raise ValueError(f"{label} must be unique")
         return self
 
 

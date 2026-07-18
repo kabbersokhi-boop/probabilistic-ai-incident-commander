@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from paic.investigation.artifact import InvestigationArtifactError, replay_investigation
 from paic.investigation.models import InvestigationReport
 
 
@@ -15,7 +16,7 @@ class StrictModel(BaseModel):
 
 class EvaluationCase(StrictModel):
     case_id: str = Field(min_length=1, max_length=200)
-    report_path: str = Field(min_length=1)
+    investigation_dir: str = Field(min_length=1)
     true_hypothesis_id: str | None = None
     should_abstain: bool = False
 
@@ -31,7 +32,16 @@ class EvaluationSummary(StrictModel):
 
 
 def _load_report(path: str | Path) -> InvestigationReport:
-    return InvestigationReport.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    """Load only a verified, complete investigation export.
+
+    A standalone report is deliberately not a benchmark input: it has no
+    manifest, transcript, receipt, or success-marker integrity context.
+    """
+
+    root = Path(path)
+    if root.name == "report.json" or not root.is_dir():
+        raise InvestigationArtifactError("benchmark cases require an investigation_dir export")
+    return replay_investigation(root)
 
 
 def evaluate_cases(cases: list[EvaluationCase]) -> EvaluationSummary:
@@ -54,7 +64,7 @@ def evaluate_cases(cases: list[EvaluationCase]) -> EvaluationSummary:
     unsupported = 0
     cited = 0
     for case in cases:
-        report = _load_report(case.report_path)
+        report = _load_report(case.investigation_dir)
         ranked = sorted(
             report.hypotheses,
             key=lambda item: (-item.posterior_probability, item.hypothesis_id),
@@ -64,13 +74,18 @@ def evaluate_cases(cases: list[EvaluationCase]) -> EvaluationSummary:
                 top1 += 1
             if case.true_hypothesis_id in {item.hypothesis_id for item in ranked[:3]}:
                 top3 += 1
+            probabilities = {item.hypothesis_id: item.posterior_probability for item in ranked}
+            class_support = set(probabilities)
+            class_support.add(case.true_hypothesis_id)
+            # This project intentionally reports the sum-style multiclass Brier
+            # score. The omitted true class therefore contributes (0 - 1)^2.
             brier_total += sum(
                 (
-                    item.posterior_probability
-                    - (1.0 if item.hypothesis_id == case.true_hypothesis_id else 0.0)
+                    probabilities.get(hypothesis_id, 0.0)
+                    - (1.0 if hypothesis_id == case.true_hypothesis_id else 0.0)
                 )
                 ** 2
-                for item in ranked
+                for hypothesis_id in class_support
             )
         abstained = report.status == "abstained"
         abstention_correct += int(abstained == case.should_abstain)

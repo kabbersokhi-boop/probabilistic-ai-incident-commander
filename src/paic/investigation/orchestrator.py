@@ -58,6 +58,24 @@ def _event(
     return event
 
 
+def _provider_event_payload(response: Any) -> dict[str, Any]:
+    """Persist bounded operational metadata, never model free-form output."""
+
+    content = response.content or ""
+    return {
+        "model": response.model,
+        "finish_reason": response.finish_reason,
+        "usage": response.usage.model_dump(mode="json"),
+        "tool_calls": [
+            {"id": call.id, "name": call.name, "arguments": call.arguments}
+            for call in response.tool_calls
+        ],
+        "content_present": response.content is not None,
+        "content_byte_count": len(content.encode("utf-8")),
+        "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+
+
 class Investigator:
     def __init__(
         self,
@@ -112,9 +130,7 @@ class Investigator:
             _event(
                 events,
                 "provider_response",
-                response.model_dump(
-                    mode="json", exclude={"content"} if response.tool_calls else set()
-                ),
+                _provider_event_payload(response),
             )
             assistant_calls = [
                 {

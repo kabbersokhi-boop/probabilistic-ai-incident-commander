@@ -48,6 +48,7 @@ def _proposal() -> InvestigationProposal:
                             "explanation": "Payment health remained normal.",
                         }
                     ],
+                    "falsifiers": ["Payment service degradation becomes independently observable."],
                 },
             ],
             "explicit_unknowns": ["Rollback has not been observed."],

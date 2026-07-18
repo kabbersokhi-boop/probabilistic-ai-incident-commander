@@ -76,6 +76,13 @@ class ProviderConfig(StrictModel):
             raise ValueError("at least one model route is required")
         if len(names) != len(set(names)):
             raise ValueError("model routes must be unique")
+        if self.kind == "groq":
+            if any(name not in {"openai/gpt-oss-120b", "openai/gpt-oss-20b"} for name in names):
+                raise ValueError("Groq routes must use the configured GPT-OSS models")
+            if any(route.temperature <= 0 for route in self.models):
+                raise ValueError("Groq routes require temperature greater than zero")
+            if any(route.reasoning_budget for route in self.models):
+                raise ValueError("reasoning_budget is unsupported for Groq routes")
         return self
 
 

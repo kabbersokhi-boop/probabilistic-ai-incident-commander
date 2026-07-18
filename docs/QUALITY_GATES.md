@@ -173,3 +173,20 @@ Investigation changes require:
 - deterministic replay without an API call,
 - benchmark outputs for Top-1, Top-3, Brier score, abstention, citation coverage, and unsupported evidence,
 - full Python 3.11 and 3.12 tests, schemas, smoke workflows, wheel/sdist builds, and clean-install checks.
+
+
+## Governed remediation quality gates
+
+Remediation changes require:
+
+- strict configuration, state, proposal, plan, approval, token-claim, execution, and manifest models;
+- a non-empty trusted approver registry, per-identity decision attestations, and token-signing material distinct from attestation keys;
+- complete source-bound plan reconstruction from the validated investigation and control state;
+- denial tests for abstention, weak probability evidence, unsupported citations, stale state, disallowed actions, excessive blast radius, and critical risk;
+- requester separation, rejection veto, unique approvers, independent high-risk groups, expiry, and hash-chain tests;
+- HMAC signature, wrong-secret, stale-snapshot, wrong-plan, action-set, expiry, nonce replay, and plan replay tests;
+- atomic execution tests for all registered action types and exact inverse rollback construction;
+- closed-world artifact tests for extra files, directories, symlinks, path traversal, marker drift, metadata drift, and semantic tampering;
+- no secret or raw token persistence in manifests, receipts, logs, fixtures, or committed artifacts;
+- smoke plan, two-person approval, token issuance, execution, state validation, receipt validation, and token cleanup on Python 3.11 and 3.12;
+- recovery remaining separate: an executed receipt must never be interpreted as proof of business recovery.

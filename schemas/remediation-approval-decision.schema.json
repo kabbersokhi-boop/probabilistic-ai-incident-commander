@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "ApprovalAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "nonce": {
+          "maxLength": 200,
+          "minLength": 16,
+          "title": "Nonce",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "nonce",
+        "signature"
+      ],
+      "title": "ApprovalAttestation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approver_group": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Approver Group",
+      "type": "string"
+    },
+    "approver_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Approver Id",
+      "type": "string"
+    },
+    "approver_role": {
+      "const": "approver",
+      "default": "approver",
+      "title": "Approver Role",
+      "type": "string"
+    },
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApprovalAttestation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "decided_at": {
+      "format": "date-time",
+      "title": "Decided At",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "approve",
+        "reject"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "plan_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Plan Sha256",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_sha256",
+    "approver_id",
+    "approver_group",
+    "decision",
+    "reason",
+    "decided_at"
+  ],
+  "title": "ApprovalDecision",
+  "type": "object"
+}

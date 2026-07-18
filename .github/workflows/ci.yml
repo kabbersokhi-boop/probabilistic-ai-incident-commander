@@ -140,6 +140,60 @@ jobs:
             > .artifacts/investigation-replay.json
           python -m paic tools audit validate \
             --audit-dir .artifacts/investigation-tool-audit
+      - name: Governed remediation and approval smoke
+        run: |
+          export PAIC_APPROVAL_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export PAIC_APPROVER_ONCALL_PRIMARY_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export PAIC_APPROVER_CHANGE_MANAGER_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          python examples/build_remediation_smoke_inputs.py \
+            --investigation-dir .artifacts/investigation-smoke \
+            --state-input .artifacts/remediation-state-input.json \
+            --proposal .artifacts/remediation-proposal.json
+          python -m paic remediate state build \
+            --input .artifacts/remediation-state-input.json \
+            --output-dir .artifacts/remediation-state
+          python -m paic remediate plan build \
+            --investigation-dir .artifacts/investigation-smoke \
+            --state-dir .artifacts/remediation-state \
+            --proposal .artifacts/remediation-proposal.json \
+            --config configs/remediation/smoke.yaml \
+            --output-dir .artifacts/remediation-plan
+          python examples/build_remediation_smoke_inputs.py \
+            --plan-dir .artifacts/remediation-plan \
+            --decision-one .artifacts/remediation-decision-one.json \
+            --decision-two .artifacts/remediation-decision-two.json \
+            --execution-request .artifacts/remediation-execution-request.json
+          python -m paic remediate approval record \
+            --plan-dir .artifacts/remediation-plan \
+            --approval-dir .artifacts/remediation-approval \
+            --decision .artifacts/remediation-decision-one.json
+          python -m paic remediate approval record \
+            --plan-dir .artifacts/remediation-plan \
+            --approval-dir .artifacts/remediation-approval \
+            --decision .artifacts/remediation-decision-two.json
+          python -m paic remediate token issue \
+            --plan-dir .artifacts/remediation-plan \
+            --approval-dir .artifacts/remediation-approval \
+            --at 2026-07-18T00:07:00+00:00 \
+            --output .artifacts/remediation-approval.token
+          python -m paic remediate execute \
+            --plan-dir .artifacts/remediation-plan \
+            --state-dir .artifacts/remediation-state \
+            --state-store .artifacts/remediation-state-store \
+            --approval-dir .artifacts/remediation-approval \
+            --token-file .artifacts/remediation-approval.token \
+            --request .artifacts/remediation-execution-request.json \
+            --output-state-dir .artifacts/remediation-state-after \
+            --output-dir .artifacts/remediation-execution
+          python -m paic remediate state validate \
+            --state-dir .artifacts/remediation-state-after
+          python -m paic remediate plan validate \
+            --plan-dir .artifacts/remediation-plan \
+            --investigation-dir .artifacts/investigation-smoke \
+            --state-dir .artifacts/remediation-state
+          python -m paic remediate execution validate \
+            --execution-dir .artifacts/remediation-execution
+          rm -f .artifacts/remediation-approval.token
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |

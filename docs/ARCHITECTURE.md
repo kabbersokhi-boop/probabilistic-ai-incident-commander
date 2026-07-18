@@ -118,7 +118,9 @@ The synthetic potential-outcomes perturbation exists only in the impact analysis
 - dataset generation, validation, and summaries,
 - analytical build, validation, and summaries,
 - detector build, validation, benchmark, and summaries,
-- customer-impact build, validation, and summaries.
+- customer-impact build, validation, and summaries,
+- operational evidence, governed tools, and probabilistic investigation,
+- remediation state, planning, approval, token, execution, and rollback-proposal commands.
 
 The simulator and analytical layer are usable without a language model, database service, or web interface.
 
@@ -162,8 +164,6 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 - `evidence`: logs, deployments, configuration, lineage, retrieval
 - `tools`: scoped interfaces and SQL gateway
 - `agent`: controlled state machine and investigation policy
-- `governance`: approvals and action policies
-- `remediation`: reversible synthetic actions
 - `recovery`: statistical verification and reopening
 - `evaluation`: ground truth, baselines, ablations, and adversarial tests
 - `api`, `web`, and `tui`: product interfaces over the same core services
@@ -174,6 +174,15 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 
 ## Probabilistic Agentic Investigation
 
-Validated artifacts feed the Governed Tool Gateway. The investigation orchestrator exposes only approved read-only tool schemas to an ordered NVIDIA NIM model route. Tool results are bounded, canonical, and treated as untrusted data. The model submits competing hypotheses with evidence identifiers and bounded likelihood ratios. Deterministic probability code verifies the citations, normalizes posterior rankings, calculates entropy and margin, and applies an abstention policy. A source-bound report and hash-chained transcript can then be validated and replayed without another model call.
+Validated artifacts feed the Governed Tool Gateway. The investigation orchestrator exposes only approved read-only tool schemas to provider-neutral OpenAI-compatible model routes. Tool results are bounded, canonical, and treated as untrusted data. The model submits competing hypotheses with evidence identifiers and bounded likelihood ratios. Deterministic probability code verifies the citations, normalizes posterior rankings, calculates entropy and margin, and applies an abstention policy. A source-bound report and hash-chained transcript can then be validated and replayed without another model call.
 
-The provider adapter is replaceable and does not own business logic. NVIDIA NIM is the first implementation because it exposes an OpenAI-compatible chat and tool-calling interface. CI substitutes a deterministic scripted provider while exercising the same orchestration boundary.
+The provider adapter is replaceable and does not own business logic. Groq GPT-OSS is the tested live adapter, NVIDIA NIM remains optional, and neither provider owns business logic or tool execution. CI substitutes a deterministic scripted provider while exercising the same orchestration boundary.
+
+
+## Governed Remediation and Approval
+
+`src/paic/remediation/` treats every action proposal as untrusted input. It binds the proposal to a validated investigation report and immutable synthetic control state, applies deterministic investigation, evidence, action, state, blast-radius, and risk checks, and exports an immutable plan.
+
+Approval decisions are appended to a hash-chained ledger and independently attested by keys assigned to identities in the trusted approver registry. Requesters cannot self-approve, rejection vetoes execution, high-risk plans require independent authoritative groups, and short-lived HMAC tokens bind the exact plan, action order, approval snapshot, validity window, and one-time nonce. Attestation keys and the token-signing key are separate environment-only inputs.
+
+The executor commits through a locked local control-state transaction store. Deployment rollback, feature-flag changes, and configuration restoration are exact-precondition operations computed atomically in memory. The current-generation pointer advances only after a staged after-state and execution receipt validate together; callers cannot reset replay protection by supplying an old state artifact. A pre-pointer generation is inert and recovery removes it under lock. Execution receipts contain before/after hashes and inverse actions. Rollback is a fresh proposal that must pass the full approval path again.

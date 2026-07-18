@@ -9,6 +9,7 @@ import urllib.request
 from collections.abc import Sequence
 from typing import Any, Protocol
 
+from paic import __version__
 from paic.investigation.config import ModelRoute, ProviderConfig
 from paic.investigation.models import (
     ChatMessage,
@@ -210,7 +211,7 @@ class _OpenAICompatibleProvider:
                 # Groq's edge rejects Python urllib's default user agent even
                 # when the API credential is valid. Keep this stable and free
                 # of host, path, credential, and request-specific data.
-                "User-Agent": "paic/0.8.0",
+                "User-Agent": f"paic/{__version__}",
             },
             method="POST",
         )
@@ -220,17 +221,17 @@ class _OpenAICompatibleProvider:
                 if len(raw) > self.provider.max_response_bytes:
                     raise ProviderError(
                         "response_too_large",
-                        "NVIDIA NIM response exceeded the configured byte limit",
+                        f"{self.provider_label} response exceeded the configured byte limit",
                         kind="transient",
                     )
         except urllib.error.HTTPError as exc:
             code, kind = _http_failure(exc, self.provider.kind)
             raise ProviderError(
-                code, f"NVIDIA NIM request failed with HTTP {exc.code}", kind=kind
+                code, f"{self.provider_label} request failed with HTTP {exc.code}", kind=kind
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise ProviderError(
-                "transport_error", "NVIDIA NIM request failed", kind="transient"
+                "transport_error", f"{self.provider_label} request failed", kind="transient"
             ) from exc
         try:
             return self._parse(

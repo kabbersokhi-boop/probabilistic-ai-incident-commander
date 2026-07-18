@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "ApprovalPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_requester_approval": {
+          "default": false,
+          "title": "Allow Requester Approval",
+          "type": "boolean"
+        },
+        "approver_registry": {
+          "items": {
+            "$ref": "#/$defs/ApproverIdentity"
+          },
+          "maxItems": 100,
+          "title": "Approver Registry",
+          "type": "array"
+        },
+        "high_risk_approvals": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 2,
+          "title": "High Risk Approvals",
+          "type": "integer"
+        },
+        "low_risk_approvals": {
+          "default": 1,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Low Risk Approvals",
+          "type": "integer"
+        },
+        "medium_risk_approvals": {
+          "default": 1,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Medium Risk Approvals",
+          "type": "integer"
+        },
+        "minimum_secret_bytes": {
+          "default": 32,
+          "maximum": 4096,
+          "minimum": 32,
+          "title": "Minimum Secret Bytes",
+          "type": "integer"
+        },
+        "plan_ttl_minutes": {
+          "default": 30,
+          "maximum": 1440,
+          "minimum": 1,
+          "title": "Plan Ttl Minutes",
+          "type": "integer"
+        },
+        "require_distinct_groups_for_high_risk": {
+          "default": true,
+          "title": "Require Distinct Groups For High Risk",
+          "type": "boolean"
+        },
+        "secret_env": {
+          "default": "PAIC_APPROVAL_SECRET",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Secret Env",
+          "type": "string"
+        },
+        "token_ttl_minutes": {
+          "default": 10,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Token Ttl Minutes",
+          "type": "integer"
+        }
+      },
+      "title": "ApprovalPolicy",
+      "type": "object"
+    },
+    "ApproverIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "approver_group": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Approver Group",
+          "type": "string"
+        },
+        "approver_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Approver Id",
+          "type": "string"
+        },
+        "key_env": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Key Env",
+          "type": "string"
+        },
+        "key_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approver_id",
+        "approver_group",
+        "key_id",
+        "key_env"
+      ],
+      "title": "ApproverIdentity",
+      "type": "object"
+    },
+    "InvestigationGate": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_normalized_entropy": {
+          "default": 0.65,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Maximum Normalized Entropy",
+          "type": "number"
+        },
+        "minimum_confidence": {
+          "default": 0.8,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Minimum Confidence",
+          "type": "number"
+        },
+        "minimum_posterior_margin": {
+          "default": 0.2,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Minimum Posterior Margin",
+          "type": "number"
+        },
+        "minimum_selected_posterior": {
+          "default": 0.75,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Minimum Selected Posterior",
+          "type": "number"
+        },
+        "minimum_supporting_evidence": {
+          "default": 2,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Minimum Supporting Evidence",
+          "type": "integer"
+        }
+      },
+      "title": "InvestigationGate",
+      "type": "object"
+    },
+    "RemediationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_action_types": {
+          "items": {
+            "enum": [
+              "deployment.rollback",
+              "feature_flag.set",
+              "configuration.restore"
+            ],
+            "type": "string"
+          },
+          "title": "Allowed Action Types",
+          "type": "array"
+        },
+        "deny_critical_risk": {
+          "default": true,
+          "title": "Deny Critical Risk",
+          "type": "boolean"
+        },
+        "maximum_actions": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Maximum Actions",
+          "type": "integer"
+        },
+        "maximum_blast_radius": {
+          "default": "multi_service",
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Maximum Blast Radius",
+          "type": "string"
+        }
+      },
+      "title": "RemediationPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval": {
+      "$ref": "#/$defs/ApprovalPolicy"
+    },
+    "investigation_gate": {
+      "$ref": "#/$defs/InvestigationGate"
+    },
+    "policy_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Policy Id",
+      "type": "string"
+    },
+    "remediation": {
+      "$ref": "#/$defs/RemediationPolicy"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "policy_id"
+  ],
+  "title": "RemediationConfig",
+  "type": "object"
+}

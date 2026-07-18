@@ -1,9 +1,11 @@
 # Current Status
 
-The repository provides deterministic contracts, synthetic commerce data, analytics, statistical anomaly detection, customer-impact modelling, operational evidence and lineage, a read-only Governed Tool Gateway, and probabilistic agentic investigation.
+The repository provides deterministic contracts, synthetic commerce data, analytics, statistical anomaly detection, customer-impact modelling, operational evidence and lineage, a read-only Governed Tool Gateway, probabilistic agentic investigation, and governed simulated remediation.
 
-The investigation runtime can use an ordered NVIDIA NIM model route, call only governed read-only tools, propose competing hypotheses, seek contradictory evidence, and produce a source-bound report. Evidence identifiers are verified against actual tool results. Posterior ranking, entropy, confidence, and abstention are calculated outside the model and can be replayed without another API call.
+The investigation runtime uses provider-neutral OpenAI-compatible adapters, calls only governed read-only tools, proposes competing hypotheses, and produces a source-bound report. Probability, confidence, entropy, abstention, validation, and replay remain deterministic.
 
-CI uses deterministic scripted model responses and therefore requires no external credentials. Live NIM execution is an optional manual integration test using an environment-only key.
+A validated concluded investigation can now feed an untrusted strict remediation proposal. Deterministic policy checks evidence support, confidence, state preconditions, action allowlists, blast radius, risk, and approval quorum. Decisions are hash chained and independently HMAC-attested by identities in a trusted local approver registry. A short-lived separate HMAC token authorizes atomic reversible mutation through a canonical control-state store. The source state remains immutable, unreachable prepared generations are inert, receipts are closed-world artifacts, and rollback requires a fresh approved plan.
 
-Not yet implemented: remediation execution, approval tokens, recovery verification, production credentials, persistent services, UI, Docker, or hosted infrastructure.
+CI remains credential-free. Provider live tests are optional. The remediation smoke generates ephemeral process-local signing material at runtime and never targets production infrastructure.
+
+Not yet implemented: statistical recovery verification, automatic reopening, production identity and key management, persistent services, UI, Docker, or hosted infrastructure.

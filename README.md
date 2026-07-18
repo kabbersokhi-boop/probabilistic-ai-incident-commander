@@ -459,8 +459,7 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 
 The next major capabilities are:
 
-1. governed remediation, exact approval semantics, and recovery verification,
-2. expanded hidden-incident evaluation, calibration, ablations, and security testing,
+1. expanded hidden-incident evaluation, calibration, ablations, and security testing,
 3. developer TUI and public web product,
 4. Docker, observability, hosted demonstration, and portfolio packaging.
 

@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "RecoveryMetricPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_lookback_periods": {
+          "default": 24,
+          "maximum": 10000,
+          "minimum": 4,
+          "title": "Baseline Lookback Periods",
+          "type": "integer"
+        },
+        "cohort": {
+          "default": "overall",
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Cohort",
+          "type": "string"
+        },
+        "equivalence_margin_absolute": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Equivalence Margin Absolute",
+          "type": "number"
+        },
+        "equivalence_margin_relative": {
+          "default": 0.05,
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Equivalence Margin Relative",
+          "type": "number"
+        },
+        "healthy_direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "target"
+          ],
+          "title": "Healthy Direction",
+          "type": "string"
+        },
+        "metric_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "minimum_baseline_periods": {
+          "default": 8,
+          "minimum": 3,
+          "title": "Minimum Baseline Periods",
+          "type": "integer"
+        },
+        "minimum_improvement_fraction": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Minimum Improvement Fraction",
+          "type": "number"
+        },
+        "minimum_post_periods": {
+          "default": 4,
+          "minimum": 2,
+          "title": "Minimum Post Periods",
+          "type": "integer"
+        },
+        "minimum_sample_size": {
+          "default": 20,
+          "minimum": 1,
+          "title": "Minimum Sample Size",
+          "type": "integer"
+        },
+        "minimum_within_band_fraction": {
+          "default": 0.8,
+          "maximum": 1.0,
+          "minimum": 0.5,
+          "title": "Minimum Within Band Fraction",
+          "type": "number"
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "guardrail"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "severe_robust_z": {
+          "default": 4.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Severe Robust Z",
+          "type": "number"
+        },
+        "sustain_periods": {
+          "default": 3,
+          "minimum": 2,
+          "title": "Sustain Periods",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "metric_id",
+        "role",
+        "healthy_direction"
+      ],
+      "title": "RecoveryMetricPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "alpha": {
+      "default": 0.05,
+      "exclusiveMaximum": 0.5,
+      "exclusiveMinimum": 0.0,
+      "title": "Alpha",
+      "type": "number"
+    },
+    "immediate_reopen_on_severe_guardrail": {
+      "default": true,
+      "title": "Immediate Reopen On Severe Guardrail",
+      "type": "boolean"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/RecoveryMetricPolicy"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Metrics",
+      "type": "array"
+    },
+    "recovery_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "reopen_after_consecutive_failures": {
+      "default": 2,
+      "maximum": 20,
+      "minimum": 1,
+      "title": "Reopen After Consecutive Failures",
+      "type": "integer"
+    },
+    "scale_floor": {
+      "default": 1e-09,
+      "exclusiveMinimum": 0.0,
+      "title": "Scale Floor",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "recovery_id",
+    "incident_id",
+    "metrics"
+  ],
+  "title": "RecoveryConfig",
+  "type": "object"
+}

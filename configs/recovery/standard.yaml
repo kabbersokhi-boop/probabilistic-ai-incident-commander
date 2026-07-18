@@ -1,0 +1,64 @@
+schema_version: "1.0"
+recovery_id: standard-commerce-recovery
+incident_id: checkout-address-validation-smoke
+alpha: 0.05
+scale_floor: 0.0001
+reopen_after_consecutive_failures: 2
+immediate_reopen_on_severe_guardrail: true
+metrics:
+  - metric_id: checkout_conversion
+    cohort: eu_android
+    role: primary
+    healthy_direction: higher_is_better
+    baseline_lookback_periods: 24
+    minimum_baseline_periods: 12
+    minimum_post_periods: 6
+    sustain_periods: 4
+    minimum_sample_size: 250
+    equivalence_margin_relative: 0.04
+    equivalence_margin_absolute: 0.0125
+    minimum_within_band_fraction: 0.75
+    minimum_improvement_fraction: 0.6
+    severe_robust_z: 5.0
+  - metric_id: checkout_error_rate
+    cohort: eu_android
+    role: primary
+    healthy_direction: lower_is_better
+    baseline_lookback_periods: 24
+    minimum_baseline_periods: 12
+    minimum_post_periods: 6
+    sustain_periods: 4
+    minimum_sample_size: 250
+    equivalence_margin_relative: 0.10
+    equivalence_margin_absolute: 0.005
+    minimum_within_band_fraction: 0.75
+    minimum_improvement_fraction: 0.6
+    severe_robust_z: 5.0
+  - metric_id: payment_approval
+    cohort: eu_android
+    role: guardrail
+    healthy_direction: higher_is_better
+    baseline_lookback_periods: 24
+    minimum_baseline_periods: 12
+    minimum_post_periods: 6
+    sustain_periods: 4
+    minimum_sample_size: 250
+    equivalence_margin_relative: 0.025
+    equivalence_margin_absolute: 0.008
+    minimum_within_band_fraction: 0.75
+    minimum_improvement_fraction: 0.5
+    severe_robust_z: 4.0
+  - metric_id: checkout_latency_p95
+    cohort: eu_android
+    role: guardrail
+    healthy_direction: lower_is_better
+    baseline_lookback_periods: 24
+    minimum_baseline_periods: 12
+    minimum_post_periods: 6
+    sustain_periods: 4
+    minimum_sample_size: 250
+    equivalence_margin_relative: 0.08
+    equivalence_margin_absolute: 25.0
+    minimum_within_band_fraction: 0.75
+    minimum_improvement_fraction: 0.5
+    severe_robust_z: 4.0

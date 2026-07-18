@@ -74,6 +74,12 @@ def test_export_schemas_writes_thirty_documents(
         "remediation-execution-request.schema.json",
         "remediation-execution-receipt.schema.json",
         "remediation-artifact-manifest.schema.json",
+        "recovery-config.schema.json",
+        "recovery-observation-set.schema.json",
+        "recovery-report.schema.json",
+        "recovery-lifecycle-state.schema.json",
+        "recovery-lifecycle-event.schema.json",
+        "recovery-artifact-manifest.schema.json",
     }
 
 

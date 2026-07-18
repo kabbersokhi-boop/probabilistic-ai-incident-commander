@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "RecoveryObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "cohort": {
+          "default": "overall",
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Cohort",
+          "type": "string"
+        },
+        "metric_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "sample_size": {
+          "minimum": 1,
+          "title": "Sample Size",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric_id",
+        "observed_at",
+        "value",
+        "sample_size",
+        "source_sha256"
+      ],
+      "title": "RecoveryObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "executed_at": {
+      "format": "date-time",
+      "title": "Executed At",
+      "type": "string"
+    },
+    "execution_receipt_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Receipt Sha256",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "observation_set_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Observation Set Id",
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/RecoveryObservation"
+      },
+      "maxItems": 100000,
+      "minItems": 1,
+      "title": "Observations",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "observation_set_id",
+    "incident_id",
+    "execution_receipt_sha256",
+    "executed_at",
+    "generated_at",
+    "observations"
+  ],
+  "title": "RecoveryObservationSet",
+  "type": "object"
+}

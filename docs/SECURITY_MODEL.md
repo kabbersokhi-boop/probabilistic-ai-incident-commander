@@ -55,3 +55,11 @@ Thinking content is not persisted. The system records structured tool calls, bou
 - A locked local state-store owns each simulated state lineage. It records only token and nonce hashes, rejects replay, preserves the source state, and advances its current pointer only after a validated state-and-receipt transaction is staged. Generations not named by the pointer are inert; the pointer is the sole commit authority.
 - Rollback actions are recorded, but rollback requires a new plan and new approval.
 - The reference executor cannot access cloud, deployment, shell, filesystem paths outside its artifacts, or production credentials.
+
+## Recovery verification controls
+
+- Execution receipts are evidence of action completion, never evidence of business recovery.
+- Recovery status is deterministic and source-bound to the incident, execution receipt and manifest, observations, resolved configuration, and report semantics; no language model can set it.
+- Primary metrics require adequate samples, explicit equivalence or recovery-distance checks, and sustained healthy windows. Guardrails can block recovery and trigger severe-regression reopening.
+- Reports and lifecycle events are immutable, hash validated, replayable, and reject duplicate, stale, out-of-order, undeclared, symlinked, or semantically altered inputs.
+- The lifecycle guarantee is scoped to one local filesystem store and its locking semantics. It does not claim distributed exactly-once behavior or automatic re-remediation.

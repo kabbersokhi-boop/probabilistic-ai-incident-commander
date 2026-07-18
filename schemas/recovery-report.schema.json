@@ -1,0 +1,318 @@
+{
+  "$defs": {
+    "RecoveryMetricEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_center": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Baseline Center"
+        },
+        "baseline_count": {
+          "minimum": 0,
+          "title": "Baseline Count",
+          "type": "integer"
+        },
+        "baseline_scale": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Baseline Scale"
+        },
+        "cohort": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Cohort",
+          "type": "string"
+        },
+        "distance_slope": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Slope"
+        },
+        "equivalence_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Equivalence Margin"
+        },
+        "equivalence_pvalue": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Equivalence Pvalue"
+        },
+        "healthy_direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "target"
+          ],
+          "title": "Healthy Direction",
+          "type": "string"
+        },
+        "improvement_fraction": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Improvement Fraction"
+        },
+        "latest_center": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Center"
+        },
+        "latest_robust_z": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Robust Z"
+        },
+        "metric_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "post_count": {
+          "minimum": 0,
+          "title": "Post Count",
+          "type": "integer"
+        },
+        "reason_codes": {
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "guardrail"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "severe_breach": {
+          "default": false,
+          "title": "Severe Breach",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "recovered",
+            "recovering",
+            "failed",
+            "insufficient_data"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "sustain_count": {
+          "minimum": 0,
+          "title": "Sustain Count",
+          "type": "integer"
+        },
+        "within_band_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Within Band Fraction"
+        }
+      },
+      "required": [
+        "metric_id",
+        "cohort",
+        "role",
+        "healthy_direction",
+        "status",
+        "baseline_count",
+        "post_count",
+        "sustain_count",
+        "baseline_center",
+        "baseline_scale",
+        "latest_center",
+        "equivalence_margin",
+        "latest_robust_z",
+        "distance_slope",
+        "improvement_fraction",
+        "reason_codes"
+      ],
+      "title": "RecoveryMetricEvaluation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "recovered",
+        "recovering",
+        "failed",
+        "insufficient_data"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "evaluated_at": {
+      "format": "date-time",
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "execution_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Manifest Sha256",
+      "type": "string"
+    },
+    "execution_receipt_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Receipt Sha256",
+      "type": "string"
+    },
+    "guardrail_total": {
+      "minimum": 0,
+      "title": "Guardrail Total",
+      "type": "integer"
+    },
+    "guardrails_healthy": {
+      "minimum": 0,
+      "title": "Guardrails Healthy",
+      "type": "integer"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "metric_evaluations": {
+      "items": {
+        "$ref": "#/$defs/RecoveryMetricEvaluation"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Metric Evaluations",
+      "type": "array"
+    },
+    "observation_set_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Observation Set Id",
+      "type": "string"
+    },
+    "observation_set_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Observation Set Sha256",
+      "type": "string"
+    },
+    "primary_recovered": {
+      "minimum": 0,
+      "title": "Primary Recovered",
+      "type": "integer"
+    },
+    "primary_total": {
+      "minimum": 1,
+      "title": "Primary Total",
+      "type": "integer"
+    },
+    "recovery_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "report_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Report Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "severe_guardrail_breach": {
+      "title": "Severe Guardrail Breach",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "recovery_id",
+    "incident_id",
+    "observation_set_id",
+    "execution_receipt_sha256",
+    "execution_manifest_sha256",
+    "config_sha256",
+    "observation_set_sha256",
+    "evaluated_at",
+    "decision",
+    "primary_recovered",
+    "primary_total",
+    "guardrails_healthy",
+    "guardrail_total",
+    "severe_guardrail_breach",
+    "metric_evaluations",
+    "report_sha256"
+  ],
+  "title": "RecoveryReport",
+  "type": "object"
+}

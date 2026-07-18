@@ -1,6 +1,6 @@
 # Current Status
 
-The repository provides deterministic contracts, synthetic commerce data, analytics, statistical anomaly detection, customer-impact modelling, operational evidence and lineage, a read-only Governed Tool Gateway, probabilistic agentic investigation, and governed simulated remediation.
+The repository provides deterministic contracts, synthetic commerce data, analytics, statistical anomaly detection, customer-impact modelling, operational evidence and lineage, a read-only Governed Tool Gateway, probabilistic agentic investigation, governed simulated remediation, and deterministic recovery verification with automatic reopening.
 
 The investigation runtime uses provider-neutral OpenAI-compatible adapters, calls only governed read-only tools, proposes competing hypotheses, and produces a source-bound report. Probability, confidence, entropy, abstention, validation, and replay remain deterministic.
 
@@ -8,4 +8,6 @@ A validated concluded investigation can now feed an untrusted strict remediation
 
 CI remains credential-free. Provider live tests are optional. The remediation smoke generates ephemeral process-local signing material at runtime and never targets production infrastructure.
 
-Not yet implemented: statistical recovery verification, automatic reopening, production identity and key management, persistent services, UI, Docker, or hosted infrastructure.
+Recovery is decided by ordinary deterministic code from source-bound primary and guardrail observations. Execution success cannot declare recovery. Minimum sample sizes, equivalence margins, robust distance, sustained windows, adverse trends, severe breaches, immutable lifecycle generations, replay, and duplicate/stale report rejection are enforced. The local lifecycle store is atomic only within one locked filesystem lineage; it is not distributed coordination.
+
+Not yet implemented: production identity and key management, persistent services, UI, Docker, or hosted infrastructure. Results remain synthetic deterministic evaluation results.

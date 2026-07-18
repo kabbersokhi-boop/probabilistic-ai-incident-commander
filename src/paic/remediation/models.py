@@ -240,11 +240,19 @@ class ApprovalDecision(StrictModel):
     decision: Literal["approve", "reject"]
     reason: str = Field(min_length=1, max_length=2_000)
     decided_at: datetime
+    attestation: ApprovalAttestation | None = None
 
     @field_validator("decided_at")
     @classmethod
     def aware_decided_at(cls, value: datetime) -> datetime:
         return _require_aware(value)
+
+
+class ApprovalAttestation(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    key_id: Identifier
+    nonce: str = Field(min_length=16, max_length=200)
+    signature: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class ApprovalLedgerRecord(StrictModel):

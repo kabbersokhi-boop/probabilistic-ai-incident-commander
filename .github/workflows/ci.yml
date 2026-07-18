@@ -141,9 +141,10 @@ jobs:
           python -m paic tools audit validate \
             --audit-dir .artifacts/investigation-tool-audit
       - name: Governed remediation and approval smoke
-        env:
-          PAIC_APPROVAL_SECRET: ci-only-remediation-secret-0123456789abcdef0123456789abcdef
         run: |
+          export PAIC_APPROVAL_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export PAIC_APPROVER_ONCALL_PRIMARY_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export PAIC_APPROVER_CHANGE_MANAGER_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           python examples/build_remediation_smoke_inputs.py \
             --investigation-dir .artifacts/investigation-smoke \
             --state-input .artifacts/remediation-state-input.json \
@@ -178,6 +179,7 @@ jobs:
           python -m paic remediate execute \
             --plan-dir .artifacts/remediation-plan \
             --state-dir .artifacts/remediation-state \
+            --state-store .artifacts/remediation-state-store \
             --approval-dir .artifacts/remediation-approval \
             --token-file .artifacts/remediation-approval.token \
             --request .artifacts/remediation-execution-request.json \

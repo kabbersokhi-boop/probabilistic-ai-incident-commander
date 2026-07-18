@@ -49,9 +49,9 @@ Thinking content is not persisted. The system records structured tool calls, bou
 - Only three reversible simulated action types are registered.
 - Every plan is bound to the exact investigation report, selected hypothesis, source manifests, and control-state manifest.
 - Abstained, failed, low-confidence, high-entropy, weakly supported, stale, unsupported, excessive-blast-radius, and critical-risk proposals are denied.
-- Natural language never constitutes approval. Decisions use strict schemas and an append-only hash chain.
-- The requester cannot approve the same plan; rejections veto execution; high-risk approvals require independent groups.
-- `PAIC_APPROVAL_SECRET` is environment-only. Tokens are short lived and are not persisted in exported artifacts.
-- Execution records only token and nonce hashes, rejects replay, preserves the source state, and writes a new state generation.
+- Natural language never constitutes approval. Decisions use strict schemas, a trusted approver registry, per-identity HMAC attestations, and an append-only hash chain. Decision JSON cannot assert its own group.
+- The requester cannot approve the same plan; rejections veto execution; high-risk approvals require distinct authoritative groups.
+- `PAIC_APPROVAL_SECRET` and distinct per-approver attestation keys are environment-only. Tokens are short lived and neither tokens nor key material are persisted in exported artifacts.
+- A locked local state-store owns each simulated state lineage. It records only token and nonce hashes, rejects replay, preserves the source state, and advances its current pointer only after a validated state-and-receipt transaction is staged. Generations not named by the pointer are inert; the pointer is the sole commit authority.
 - Rollback actions are recorded, but rollback requires a new plan and new approval.
 - The reference executor cannot access cloud, deployment, shell, filesystem paths outside its artifacts, or production credentials.

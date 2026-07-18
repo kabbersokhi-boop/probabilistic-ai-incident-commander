@@ -13,6 +13,7 @@ from paic.investigation.artifact import replay_investigation
 from paic.remediation.approval import (
     ApprovalError,
     ApprovalLedger,
+    attest_decision,
     evaluate_approval,
     issue_token,
     load_approval_secret,
@@ -34,7 +35,7 @@ from paic.remediation.config import (
     RemediationConfigError,
     load_remediation_config,
 )
-from paic.remediation.executor import ExecutionError, build_rollback_proposal, execute_plan
+from paic.remediation.executor import ExecutionError, build_rollback_proposal
 from paic.remediation.models import (
     ApprovalDecision,
     ControlState,
@@ -42,6 +43,7 @@ from paic.remediation.models import (
     RemediationProposal,
 )
 from paic.remediation.policy import build_plan
+from paic.remediation.state_store import ControlStateStore, StateStoreError
 
 
 def _parse_time(value: str | None) -> datetime:
@@ -76,6 +78,12 @@ def _state_build(args: argparse.Namespace) -> int:
 
 def _state_validate(args: argparse.Namespace) -> int:
     issues = validate_control_state(args.state_dir)
+    print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
+    return 1 if issues else 0
+
+
+def _store_validate(args: argparse.Namespace) -> int:
+    issues = ControlStateStore(args.state_store).validate()
     print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
     return 1 if issues else 0
 
@@ -139,6 +147,21 @@ def _approval_record(args: argparse.Namespace) -> int:
         decision = ApprovalDecision.model_validate_json(args.decision.read_text(encoding="utf-8"))
         if decision.plan_sha256 != loaded.plan.plan_sha256:
             raise ApprovalError("approval decision is bound to a different plan")
+        if loaded.config.approval.approver_registry:
+            identity = next(
+                (
+                    item
+                    for item in loaded.config.approval.approver_registry
+                    if item.approver_id == decision.approver_id
+                ),
+                None,
+            )
+            if identity is None:
+                raise ApprovalError("approver identity is not in the trusted registry")
+            value = os.environ.get(identity.key_env)
+            if value is None:
+                raise ApprovalError("approval attestation key is unavailable")
+            decision = attest_decision(decision, loaded.config, secret=value.encode("utf-8"))
         record = ApprovalLedger(args.approval_dir).append(decision)
     except (OSError, ValueError, RemediationArtifactError, ApprovalError) as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2))
@@ -188,43 +211,34 @@ def _token_issue(args: argparse.Namespace) -> int:
 def _execute(args: argparse.Namespace) -> int:
     try:
         loaded_plan = load_plan(args.plan_dir)
-        loaded_state = load_control_state(args.state_dir)
         request = ExecutionRequest.model_validate_json(args.request.read_text(encoding="utf-8"))
-        at = request.executed_at
-        status = evaluate_approval(
-            loaded_plan.plan,
-            ApprovalLedger(args.approval_dir),
-            loaded_plan.config,
-            at=at,
-        )
         token = args.token_file.read_text(encoding="utf-8").strip()
         secret = load_approval_secret(loaded_plan.config)
-        after_state, receipt = execute_plan(
+        store_root = args.state_store or args.state_dir.parent / f".{args.state_dir.name}.lineage"
+        store = ControlStateStore(store_root)
+        store.initialize(args.state_dir)
+        transaction_dir, receipt = store.execute(
             loaded_plan.plan,
-            loaded_state.state,
-            status,
+            ApprovalLedger(args.approval_dir),
             loaded_plan.config,
             request,
             token=token,
             secret=secret,
-            before_state_manifest_sha256=manifest_sha256(args.state_dir),
         )
+        # Compatibility exports are copies only; authorization and replay
+        # protection are owned exclusively by the canonical transaction store.
+        after_state = load_control_state(transaction_dir / "state").state
         state_manifest = export_control_state(
-            after_state,
-            args.output_state_dir,
-            overwrite=args.overwrite,
+            after_state, args.output_state_dir, overwrite=args.overwrite
         )
-        execution_manifest = export_execution(
-            receipt,
-            args.output_dir,
-            overwrite=args.overwrite,
-        )
+        execution_manifest = export_execution(receipt, args.output_dir, overwrite=args.overwrite)
     except (
         OSError,
         ValueError,
         RemediationArtifactError,
         ApprovalError,
         ExecutionError,
+        StateStoreError,
     ) as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2))
         return 2
@@ -293,6 +307,8 @@ def register_remediation_parser(subparsers: Any) -> None:
     state_build.add_argument("--overwrite", action="store_true")
     state_validate = state_commands.add_parser("validate")
     state_validate.add_argument("--state-dir", type=Path, required=True)
+    store_validate = state_commands.add_parser("store-validate")
+    store_validate.add_argument("--state-store", type=Path, required=True)
 
     plan = commands.add_parser("plan", help="Build or validate a governed remediation plan.")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
@@ -330,6 +346,11 @@ def register_remediation_parser(subparsers: Any) -> None:
     execute = commands.add_parser("execute", help="Execute an approved plan in simulated state.")
     execute.add_argument("--plan-dir", type=Path, required=True)
     execute.add_argument("--state-dir", type=Path, required=True)
+    execute.add_argument(
+        "--state-store",
+        type=Path,
+        help="Canonical local control-state lineage store (defaults beside --state-dir).",
+    )
     execute.add_argument("--approval-dir", type=Path, required=True)
     execute.add_argument("--token-file", type=Path, required=True)
     execute.add_argument("--request", type=Path, required=True)
@@ -358,6 +379,8 @@ def dispatch_remediation(args: argparse.Namespace) -> int:
         return _state_build(args)
     if args.remediate_command == "state" and args.state_command == "validate":
         return _state_validate(args)
+    if args.remediate_command == "state" and args.state_command == "store-validate":
+        return _store_validate(args)
     if args.remediate_command == "plan" and args.plan_command == "build":
         return _plan_build(args)
     if args.remediate_command == "plan" and args.plan_command == "validate":

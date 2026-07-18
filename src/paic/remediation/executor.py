@@ -24,6 +24,7 @@ from paic.remediation.models import (
     RollbackDeploymentAction,
     SetFeatureFlagAction,
 )
+from paic.remediation.policy import verify_plan
 from paic.tools.ledger import digest
 
 
@@ -106,6 +107,10 @@ def execute_plan(
     secret: bytes,
     before_state_manifest_sha256: str,
 ) -> tuple[ControlState, ExecutionReceipt]:
+    try:
+        verify_plan(plan)
+    except RuntimeError as exc:
+        raise ExecutionError("remediation plan integrity validation failed") from exc
     if plan.status != "awaiting_approval":
         raise ExecutionError("only policy-allowed remediation plans may execute")
     if before_state_manifest_sha256 != plan.control_state_manifest_sha256:

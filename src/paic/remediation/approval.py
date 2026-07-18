@@ -14,8 +14,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from paic.remediation.config import RemediationConfig
+from paic.remediation.config import ApproverIdentity, RemediationConfig
 from paic.remediation.models import (
+    ApprovalAttestation,
     ApprovalDecision,
     ApprovalLedgerRecord,
     ApprovalStatus,
@@ -32,6 +33,82 @@ except ImportError:  # pragma: no cover
 
 class ApprovalError(RuntimeError):
     pass
+
+
+def _registered_identity(config: RemediationConfig, approver_id: str) -> ApproverIdentity:
+    for identity in config.approval.approver_registry:
+        if identity.approver_id == approver_id:
+            return identity
+    raise ApprovalError("approver identity is not in the trusted registry")
+
+
+def _attestation_payload(decision: ApprovalDecision, group: str, key_id: str, nonce: str) -> bytes:
+    return canonical(
+        {
+            "schema_version": "1.0",
+            "plan_sha256": decision.plan_sha256,
+            "approver_id": decision.approver_id,
+            "approver_group": group,
+            "decision": decision.decision,
+            "decided_at": decision.decided_at,
+            "nonce": nonce,
+            "key_id": key_id,
+        }
+    ).encode("utf-8")
+
+
+def attest_decision(
+    decision: ApprovalDecision,
+    config: RemediationConfig,
+    *,
+    secret: bytes,
+    nonce: str | None = None,
+) -> ApprovalDecision:
+    """Attach a per-identity HMAC attestation; group input is never trusted."""
+
+    identity = _registered_identity(config, decision.approver_id)
+    if len(secret) < config.approval.minimum_secret_bytes:
+        raise ApprovalError("approval attestation secret is shorter than the configured minimum")
+    issued_nonce = nonce or secrets.token_urlsafe(24)
+    signature = hmac.new(
+        secret,
+        _attestation_payload(decision, identity.approver_group, identity.key_id, issued_nonce),
+        hashlib.sha256,
+    ).hexdigest()
+    return decision.model_copy(
+        update={
+            "approver_group": identity.approver_group,
+            "attestation": ApprovalAttestation(
+                key_id=identity.key_id, nonce=issued_nonce, signature=signature
+            ),
+        }
+    )
+
+
+def _verify_attestation(
+    decision: ApprovalDecision, config: RemediationConfig, seen_nonces: set[str]
+) -> None:
+    if not config.approval.approver_registry:
+        raise ApprovalError("approval identity registry is required")
+    identity = _registered_identity(config, decision.approver_id)
+    attestation = decision.attestation
+    if attestation is None or attestation.key_id != identity.key_id:
+        raise ApprovalError("approval attestation is missing or uses an unknown key")
+    if decision.approver_group != identity.approver_group:
+        raise ApprovalError("approval group differs from the trusted registry")
+    if attestation.nonce in seen_nonces:
+        raise ApprovalError("approval attestation nonce is duplicated")
+    value = os.environ.get(identity.key_env)
+    if value is None or len(value.encode("utf-8")) < config.approval.minimum_secret_bytes:
+        raise ApprovalError("approval attestation key is unavailable")
+    expected = hmac.new(
+        value.encode("utf-8"),
+        _attestation_payload(decision, identity.approver_group, identity.key_id, attestation.nonce),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(attestation.signature, expected):
+        raise ApprovalError("approval attestation signature is invalid")
+    seen_nonces.add(attestation.nonce)
 
 
 @contextmanager
@@ -55,6 +132,18 @@ class ApprovalLedger:
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "decisions.jsonl"
         self.lock_path = self.root / ".approval.lock"
+
+    @contextmanager
+    def locked(self) -> Iterator[None]:
+        """Hold the approval ledger lock for a read/commit decision boundary.
+
+        Execution always obtains the state-store lock before this lock.  The
+        ledger itself never obtains the state-store lock, which gives rejection
+        and execution a single observable ordering without deadlocks.
+        """
+
+        with _locked(self.lock_path):
+            yield
 
     def records(self) -> list[ApprovalLedgerRecord]:
         if not self.path.exists():
@@ -124,8 +213,10 @@ def evaluate_approval(
         raise ApprovalError("approval evaluation time must include a timezone offset")
     records = ledger.validate()
     decisions: list[ApprovalDecision] = []
+    seen_nonces: set[str] = set()
     for record in records:
         decision = record.decision
+        _verify_attestation(decision, config, seen_nonces)
         if decision.plan_sha256 != plan.plan_sha256:
             raise ApprovalError("approval decision is bound to a different plan")
         if decision.decided_at < plan.requested_at or decision.decided_at >= plan.expires_at:
@@ -200,9 +291,15 @@ def _b64encode(value: bytes) -> str:
 def _b64decode(value: str) -> bytes:
     padding = "=" * (-len(value) % 4)
     try:
-        return base64.b64decode(value + padding, altchars=b"-_", validate=True)
+        decoded = base64.b64decode(value + padding, altchars=b"-_", validate=True)
+        # Reject alternate encodings that differ only in unused trailing bits.
+        # HMAC verification is over decoded bytes, so accepting them would make
+        # a modified token text indistinguishable from the issued token.
+        if _b64encode(decoded) != value:
+            raise ValueError("non-canonical base64url")
+        return decoded
     except (ValueError, TypeError) as exc:
-        raise ApprovalError("approval token encoding is invalid") from exc
+        raise ApprovalError("approval token signature or encoding is invalid") from exc
 
 
 def issue_token(

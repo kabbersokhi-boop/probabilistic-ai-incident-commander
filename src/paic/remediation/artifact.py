@@ -6,6 +6,7 @@ import os
 import shutil
 import tempfile
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -82,19 +83,29 @@ def _publish(root: Path, destination: Path, *, replace: bool) -> None:
     """Atomically publish a fully validated staged artifact, restoring on failure."""
 
     backup: Path | None = None
+    committed = False
     try:
         if replace:
             backup = destination.with_name(f".{destination.name}.previous-{uuid4().hex}")
             os.replace(destination, backup)
         os.replace(root, destination)
-        _fsync_directory(destination.parent)
+        committed = True
+        try:
+            _fsync_directory(destination.parent)
+        except OSError as exc:
+            # The rename is the visibility/commit point.  Do not report a
+            # committed artifact as failed solely because durability
+            # confirmation is interrupted; a later validator can inspect it.
+            if not destination.is_dir() or destination.is_symlink():
+                raise RemediationArtifactError("published artifact is unavailable") from exc
     except OSError as exc:
-        if backup is not None and backup.exists() and not destination.exists():
+        if not committed and backup is not None and backup.exists() and not destination.exists():
             os.replace(backup, destination)
             _fsync_directory(destination.parent)
         raise RemediationArtifactError(f"cannot atomically publish artifact: {exc}") from exc
     if backup is not None:
-        shutil.rmtree(backup)
+        with suppress(OSError):
+            shutil.rmtree(backup)
 
 
 def _export(

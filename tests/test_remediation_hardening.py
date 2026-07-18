@@ -19,6 +19,7 @@ from paic.remediation import artifact as remediation_artifact
 from paic.remediation.approval import (
     ApprovalError,
     ApprovalLedger,
+    attest_decision,
     evaluate_approval,
     issue_token,
     load_approval_secret,
@@ -36,6 +37,8 @@ from paic.remediation.artifact import (
     validate_plan,
 )
 from paic.remediation.config import (
+    ApprovalPolicy,
+    ApproverIdentity,
     InvestigationGate,
     RemediationConfig,
     RemediationConfigError,
@@ -71,6 +74,14 @@ from paic.simulator.io import file_sha256
 from paic.tools.ledger import canonical
 
 NOW = datetime(2026, 7, 18, tzinfo=UTC)
+APPROVER_ONE_SECRET = b"h" * 64
+APPROVER_TWO_SECRET = b"i" * 64
+
+
+@pytest.fixture(autouse=True)  # type: ignore[untyped-decorator]
+def _approval_identity_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PAIC_HARDENING_APPROVER_ONE_KEY", APPROVER_ONE_SECRET.decode("ascii"))
+    monkeypatch.setenv("PAIC_HARDENING_APPROVER_TWO_KEY", APPROVER_TWO_SECRET.decode("ascii"))
 
 
 def _fixture() -> tuple[InvestigationReport, ControlState, RemediationProposal, RemediationConfig]:
@@ -170,7 +181,30 @@ def _fixture() -> tuple[InvestigationReport, ControlState, RemediationProposal, 
             ],
         }
     )
-    return report, state, proposal, RemediationConfig(policy_id="hardening-policy")
+    return (
+        report,
+        state,
+        proposal,
+        RemediationConfig(
+            policy_id="hardening-policy",
+            approval=ApprovalPolicy(
+                approver_registry=[
+                    ApproverIdentity(
+                        approver_id="operator/one",
+                        approver_group="group/one",
+                        key_id="hardening-one-v1",
+                        key_env="PAIC_HARDENING_APPROVER_ONE_KEY",
+                    ),
+                    ApproverIdentity(
+                        approver_id="operator/two",
+                        approver_group="group/two",
+                        key_id="hardening-two-v1",
+                        key_env="PAIC_HARDENING_APPROVER_TWO_KEY",
+                    ),
+                ]
+            ),
+        ),
+    )
 
 
 def _plan(tmp_path: Path) -> tuple[RemediationPlan, Path, RemediationConfig]:
@@ -216,9 +250,33 @@ def _approved_status(
         ),
     ]
     ledger = ApprovalLedger(directory)
+    secrets_by_identity = {
+        "operator/one": APPROVER_ONE_SECRET,
+        "operator/two": APPROVER_TWO_SECRET,
+    }
     for decision in reversed(decisions) if reverse else decisions:
-        ledger.append(decision)
+        ledger.append(
+            attest_decision(
+                decision,
+                config,
+                secret=secrets_by_identity[decision.approver_id],
+                nonce=f"hardening-{decision.approver_id.replace('/', '-')}-attestation-000000",
+            )
+        )
     return ledger, evaluate_approval(plan, ledger, config, at=NOW + timedelta(minutes=3))
+
+
+def _attest(decision: ApprovalDecision, config: RemediationConfig) -> ApprovalDecision:
+    secrets_by_identity = {
+        "operator/one": APPROVER_ONE_SECRET,
+        "operator/two": APPROVER_TWO_SECRET,
+    }
+    return attest_decision(
+        decision,
+        config,
+        secret=secrets_by_identity[decision.approver_id],
+        nonce=f"hardening-{decision.approver_id.replace('/', '-')}-attestation-000000",
+    )
 
 
 def _execution_export(
@@ -286,6 +344,16 @@ def test_policy_fails_closed_when_every_structured_gate_is_violated() -> None:
             allowed_action_types=["deployment.rollback"],
             maximum_blast_radius="single_instance",
         ),
+        approval=ApprovalPolicy(
+            approver_registry=[
+                ApproverIdentity(
+                    approver_id="operator/one",
+                    approver_group="group/one",
+                    key_id="closed-one-v1",
+                    key_env="PAIC_HARDENING_APPROVER_ONE_KEY",
+                )
+            ]
+        ),
     )
     decision = assess_proposal(report, state, RemediationProposal.model_validate(raw), constrained)
     assert decision.outcome == "deny"
@@ -310,6 +378,26 @@ def test_duplicate_approver_record_is_rejected(tmp_path: Path) -> None:
 
 def test_high_risk_same_group_is_rejected(tmp_path: Path) -> None:
     report, state, proposal, config = _fixture()
+    config = config.model_copy(
+        update={
+            "approval": ApprovalPolicy(
+                approver_registry=[
+                    ApproverIdentity(
+                        approver_id="operator/one",
+                        approver_group="group/shared",
+                        key_id="hardening-one-v1",
+                        key_env="PAIC_HARDENING_APPROVER_ONE_KEY",
+                    ),
+                    ApproverIdentity(
+                        approver_id="operator/two",
+                        approver_group="group/shared",
+                        key_id="hardening-two-v1",
+                        key_env="PAIC_HARDENING_APPROVER_TWO_KEY",
+                    ),
+                ]
+            )
+        }
+    )
     raw = proposal.model_dump(mode="json")
     raw["actions"] = [
         {
@@ -346,13 +434,16 @@ def test_high_risk_same_group_is_rejected(tmp_path: Path) -> None:
     ledger = ApprovalLedger(tmp_path / "approval-high")
     for approver in ("operator/one", "operator/two"):
         ledger.append(
-            ApprovalDecision(
-                plan_sha256=plan.plan_sha256,
-                approver_id=approver,
-                approver_group="group/shared",
-                decision="approve",
-                reason="Approved.",
-                decided_at=NOW + timedelta(minutes=1),
+            _attest(
+                ApprovalDecision(
+                    plan_sha256=plan.plan_sha256,
+                    approver_id=approver,
+                    approver_group="group/shared",
+                    decision="approve",
+                    reason="Approved.",
+                    decided_at=NOW + timedelta(minutes=1),
+                ),
+                config,
             )
         )
     with pytest.raises(ApprovalError, match="distinct groups"):
@@ -363,13 +454,16 @@ def test_expired_plan_cannot_issue_token(tmp_path: Path) -> None:
     plan, _, config = _plan(tmp_path)
     ledger = ApprovalLedger(tmp_path / "approval-expired")
     ledger.append(
-        ApprovalDecision(
-            plan_sha256=plan.plan_sha256,
-            approver_id="operator/one",
-            approver_group="group/one",
-            decision="approve",
-            reason="Approved.",
-            decided_at=NOW + timedelta(minutes=1),
+        _attest(
+            ApprovalDecision(
+                plan_sha256=plan.plan_sha256,
+                approver_id="operator/one",
+                approver_group="group/one",
+                decision="approve",
+                reason="Approved.",
+                decided_at=NOW + timedelta(minutes=1),
+            ),
+            config,
         )
     )
     at = plan.expires_at + timedelta(seconds=1)
@@ -436,13 +530,16 @@ def test_future_dated_approval_is_not_counted_early(tmp_path: Path) -> None:
     plan, _, config = _plan(tmp_path)
     ledger = ApprovalLedger(tmp_path / "approval-future")
     ledger.append(
-        ApprovalDecision(
-            plan_sha256=plan.plan_sha256,
-            approver_id="operator/one",
-            approver_group="group/one",
-            decision="approve",
-            reason="Approved for the scheduled window.",
-            decided_at=NOW + timedelta(minutes=5),
+        _attest(
+            ApprovalDecision(
+                plan_sha256=plan.plan_sha256,
+                approver_id="operator/one",
+                approver_group="group/one",
+                decision="approve",
+                reason="Approved for the scheduled window.",
+                decided_at=NOW + timedelta(minutes=5),
+            ),
+            config,
         )
     )
     with pytest.raises(ApprovalError, match="after the evaluation time"):
@@ -465,13 +562,16 @@ def test_plan_and_token_expiry_are_exclusive_boundaries(tmp_path: Path) -> None:
     plan, _, config = _plan(tmp_path)
     ledger = ApprovalLedger(tmp_path / "approval-boundary")
     ledger.append(
-        ApprovalDecision(
-            plan_sha256=plan.plan_sha256,
-            approver_id="operator/one",
-            approver_group="group/one",
-            decision="approve",
-            reason="Approved.",
-            decided_at=NOW + timedelta(minutes=1),
+        _attest(
+            ApprovalDecision(
+                plan_sha256=plan.plan_sha256,
+                approver_id="operator/one",
+                approver_group="group/one",
+                decision="approve",
+                reason="Approved.",
+                decided_at=NOW + timedelta(minutes=1),
+            ),
+            config,
         )
     )
     status = evaluate_approval(plan, ledger, config, at=plan.expires_at)
@@ -524,7 +624,19 @@ def test_token_verification_fails_closed_for_bound_claims_and_time(
 def test_secret_loading_never_accepts_missing_or_short_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    config = RemediationConfig(policy_id="secret-policy")
+    config = RemediationConfig(
+        policy_id="secret-policy",
+        approval=ApprovalPolicy(
+            approver_registry=[
+                ApproverIdentity(
+                    approver_id="operator/one",
+                    approver_group="group/one",
+                    key_id="secret-one-v1",
+                    key_env="PAIC_HARDENING_APPROVER_ONE_KEY",
+                )
+            ]
+        ),
+    )
     monkeypatch.delenv(config.approval.secret_env, raising=False)
     with pytest.raises(ApprovalError, match="is not set"):
         load_approval_secret(config)
@@ -1015,7 +1127,7 @@ def test_execution_requires_matching_plan_state_and_incident_bindings(tmp_path: 
             secret=b"z" * 64,
             before_state_manifest_sha256=plan.control_state_manifest_sha256,
         )
-    with pytest.raises(ExecutionError, match="only policy-allowed"):
+    with pytest.raises(ExecutionError, match="integrity"):
         execute_plan(
             plan.model_copy(update={"status": "denied"}),
             state,
@@ -1125,13 +1237,16 @@ def test_approval_evaluation_rejects_decisions_bound_to_another_plan_or_window(
     plan, _, config = _plan(tmp_path)
     ledger = ApprovalLedger(tmp_path / "approval-windows")
     ledger.append(
-        ApprovalDecision(
-            plan_sha256="d" * 64,
-            approver_id="operator/one",
-            approver_group="group/one",
-            decision="approve",
-            reason="Deliberately mismatched plan.",
-            decided_at=NOW + timedelta(minutes=1),
+        _attest(
+            ApprovalDecision(
+                plan_sha256="d" * 64,
+                approver_id="operator/one",
+                approver_group="group/one",
+                decision="approve",
+                reason="Deliberately mismatched plan.",
+                decided_at=NOW + timedelta(minutes=1),
+            ),
+            config,
         )
     )
     with pytest.raises(ApprovalError, match="different plan"):
@@ -1139,13 +1254,16 @@ def test_approval_evaluation_rejects_decisions_bound_to_another_plan_or_window(
 
     ledger = ApprovalLedger(tmp_path / "approval-before-window")
     ledger.append(
-        ApprovalDecision(
-            plan_sha256=plan.plan_sha256,
-            approver_id="operator/one",
-            approver_group="group/one",
-            decision="approve",
-            reason="Deliberately predates the plan.",
-            decided_at=NOW - timedelta(seconds=1),
+        _attest(
+            ApprovalDecision(
+                plan_sha256=plan.plan_sha256,
+                approver_id="operator/one",
+                approver_group="group/one",
+                decision="approve",
+                reason="Deliberately predates the plan.",
+                decided_at=NOW - timedelta(seconds=1),
+            ),
+            config,
         )
     )
     with pytest.raises(ApprovalError, match="validity window"):
@@ -1280,11 +1398,24 @@ def test_remediation_config_loader_rejects_missing_invalid_and_duplicate_policy_
     duplicate_actions = tmp_path / "duplicate-actions.yaml"
     duplicate_actions.write_text(
         "policy_id: remediation-test\nremediation:\n  allowed_action_types:\n"
-        "    - feature_flag.set\n    - feature_flag.set\n",
+        "    - feature_flag.set\n    - feature_flag.set\napproval:\n  approver_registry:\n"
+        "    - approver_id: operator/one\n      approver_group: group/one\n"
+        "      key_id: loader-one-v1\n      key_env: PAIC_HARDENING_APPROVER_ONE_KEY\n",
         encoding="utf-8",
     )
     with pytest.raises(RemediationConfigError, match="unique"):
         load_remediation_config(duplicate_actions)
+
+
+def test_remediation_config_loader_accepts_a_registry_bound_policy(tmp_path: Path) -> None:
+    config_path = tmp_path / "valid-registry.yaml"
+    config_path.write_text(
+        "policy_id: remediation-test\napproval:\n  approver_registry:\n"
+        "    - approver_id: operator/one\n      approver_group: group/one\n"
+        "      key_id: loader-one-v1\n      key_env: PAIC_HARDENING_APPROVER_ONE_KEY\n",
+        encoding="utf-8",
+    )
+    assert load_remediation_config(config_path).policy_id == "remediation-test"
 
 
 def test_manifest_models_reject_unsafe_and_duplicate_declared_paths() -> None:
@@ -1442,3 +1573,214 @@ def test_control_state_validation_rejects_non_directory_roots_and_forged_markers
     export_control_state(state, state_dir)
     (state_dir / "_SUCCESS").write_text("0" * 64 + "\n", encoding="utf-8")
     assert any("success marker" in issue for issue in validate_control_state(state_dir))
+
+
+def test_registry_attestation_rejects_forged_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan, _, _ = _plan(tmp_path)
+    config = RemediationConfig(
+        policy_id="attestation-policy",
+        approval=ApprovalPolicy(
+            approver_registry=[
+                ApproverIdentity(
+                    approver_id="operator/trusted",
+                    approver_group="group/trusted",
+                    key_id="trusted-v1",
+                    key_env="PAIC_TRUSTED_APPROVER_KEY",
+                )
+            ]
+        ),
+    )
+    monkeypatch.setenv("PAIC_TRUSTED_APPROVER_KEY", "t" * 64)
+    raw = ApprovalDecision(
+        plan_sha256=plan.plan_sha256,
+        approver_id="operator/trusted",
+        approver_group="attacker/group",
+        decision="approve",
+        reason="Reviewed.",
+        decided_at=NOW + timedelta(minutes=1),
+    )
+    signed = attest_decision(raw, config, secret=b"t" * 64, nonce="attestation-nonce-00000000")
+    assert signed.approver_group == "group/trusted"
+    ledger = ApprovalLedger(tmp_path / "attested-ledger")
+    ledger.append(signed)
+    assert (
+        evaluate_approval(plan, ledger, config, at=NOW + timedelta(minutes=2)).status == "approved"
+    )
+
+    forged = signed.model_copy(update={"approver_group": "attacker/group"})
+    forged_ledger = ApprovalLedger(tmp_path / "forged-group")
+    forged_ledger.append(forged)
+    with pytest.raises(ApprovalError, match="group differs"):
+        evaluate_approval(plan, forged_ledger, config, at=NOW + timedelta(minutes=2))
+
+
+def test_approval_registry_rejects_unknown_missing_wrong_and_replayed_attestations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every approval identity property is verified against the trusted registry."""
+
+    plan, _, config = _plan(tmp_path)
+    unsigned = ApprovalDecision(
+        plan_sha256=plan.plan_sha256,
+        approver_id="operator/one",
+        approver_group="group/one",
+        decision="approve",
+        reason="Reviewed.",
+        decided_at=NOW + timedelta(minutes=1),
+    )
+    unknown = unsigned.model_copy(update={"approver_id": "operator/unregistered"})
+    unknown_ledger = ApprovalLedger(tmp_path / "approval-unknown")
+    unknown_ledger.append(unknown)
+    with pytest.raises(ApprovalError, match="trusted registry"):
+        evaluate_approval(plan, unknown_ledger, config, at=NOW + timedelta(minutes=2))
+
+    missing_ledger = ApprovalLedger(tmp_path / "approval-missing")
+    missing_ledger.append(unsigned)
+    with pytest.raises(ApprovalError, match="attestation is missing"):
+        evaluate_approval(plan, missing_ledger, config, at=NOW + timedelta(minutes=2))
+
+    signed = attest_decision(unsigned, config, secret=APPROVER_ONE_SECRET, nonce="registry-nonce-a")
+    assert signed.attestation is not None
+    unknown_key = signed.model_copy(
+        update={"attestation": signed.attestation.model_copy(update={"key_id": "unknown-v1"})}
+    )
+    unknown_key_ledger = ApprovalLedger(tmp_path / "approval-unknown-key")
+    unknown_key_ledger.append(unknown_key)
+    with pytest.raises(ApprovalError, match="unknown key"):
+        evaluate_approval(plan, unknown_key_ledger, config, at=NOW + timedelta(minutes=2))
+
+    wrong_key = attest_decision(
+        unsigned, config, secret=APPROVER_TWO_SECRET, nonce="registry-nonce-b"
+    )
+    wrong_key_ledger = ApprovalLedger(tmp_path / "approval-wrong-key")
+    wrong_key_ledger.append(wrong_key)
+    with pytest.raises(ApprovalError, match="signature"):
+        evaluate_approval(plan, wrong_key_ledger, config, at=NOW + timedelta(minutes=2))
+
+    monkeypatch.delenv("PAIC_HARDENING_APPROVER_ONE_KEY")
+    absent_key_ledger = ApprovalLedger(tmp_path / "approval-absent-key")
+    absent_key_ledger.append(signed)
+    with pytest.raises(ApprovalError, match="key is unavailable"):
+        evaluate_approval(plan, absent_key_ledger, config, at=NOW + timedelta(minutes=2))
+
+
+def test_approval_attestation_nonce_cannot_span_distinct_identities(tmp_path: Path) -> None:
+    plan, _, config = _plan(tmp_path)
+    first = ApprovalDecision(
+        plan_sha256=plan.plan_sha256,
+        approver_id="operator/one",
+        approver_group="group/one",
+        decision="approve",
+        reason="Reviewed.",
+        decided_at=NOW + timedelta(minutes=1),
+    )
+    second = first.model_copy(
+        update={
+            "approver_id": "operator/two",
+            "approver_group": "group/two",
+            "decided_at": NOW + timedelta(minutes=2),
+        }
+    )
+    ledger = ApprovalLedger(tmp_path / "approval-duplicate-attestation-nonce")
+    nonce = "reused-attestation-nonce-000000"
+    ledger.append(attest_decision(first, config, secret=APPROVER_ONE_SECRET, nonce=nonce))
+    ledger.append(attest_decision(second, config, secret=APPROVER_TWO_SECRET, nonce=nonce))
+    with pytest.raises(ApprovalError, match="nonce is duplicated"):
+        evaluate_approval(plan, ledger, config, at=NOW + timedelta(minutes=3))
+
+
+def test_approval_policy_requires_unique_trusted_registry_entries() -> None:
+    with pytest.raises(ValidationError, match="must contain"):
+        ApprovalPolicy()
+    identity = ApproverIdentity(
+        approver_id="operator/one",
+        approver_group="group/one",
+        key_id="registry-one-v1",
+        key_env="PAIC_HARDENING_APPROVER_ONE_KEY",
+    )
+    with pytest.raises(ValidationError, match="identities must be unique"):
+        ApprovalPolicy(approver_registry=[identity, identity])
+    duplicate_key = identity.model_copy(update={"approver_id": "operator/two"})
+    with pytest.raises(ValidationError, match="key IDs must be unique"):
+        ApprovalPolicy(approver_registry=[identity, duplicate_key])
+
+
+def test_attestation_and_token_fail_closed_at_secret_status_and_expiry_boundaries(
+    tmp_path: Path,
+) -> None:
+    plan, _, config = _plan(tmp_path)
+    unsigned = ApprovalDecision(
+        plan_sha256=plan.plan_sha256,
+        approver_id="operator/one",
+        approver_group="group/one",
+        decision="approve",
+        reason="Reviewed.",
+        decided_at=NOW + timedelta(minutes=1),
+    )
+    with pytest.raises(ApprovalError, match="shorter"):
+        attest_decision(unsigned, config, secret=b"short")
+    ledger = ApprovalLedger(tmp_path / "approval-pending")
+    pending = evaluate_approval(plan, ledger, config, at=NOW + timedelta(minutes=2))
+    assert pending.status == "pending"
+    with pytest.raises(ApprovalError, match="approved plan"):
+        issue_token(plan, pending, config, at=NOW + timedelta(minutes=2), secret=b"x" * 64)
+    approved_ledger, approved = _approved_status(plan, config, tmp_path / "approval-approved")
+    assert approved_ledger.validate()
+    with pytest.raises(ApprovalError, match="different plan"):
+        issue_token(
+            plan,
+            approved.model_copy(update={"plan_sha256": "f" * 64}),
+            config,
+            at=NOW + timedelta(minutes=3),
+            secret=b"x" * 64,
+        )
+    with pytest.raises(ApprovalError, match="expired"):
+        issue_token(plan, approved, config, at=plan.expires_at, secret=b"x" * 64)
+    with pytest.raises(ApprovalError, match="shorter"):
+        verify_token("a.b", plan, approved, config, at=NOW + timedelta(minutes=3), secret=b"x")
+
+
+def test_approval_evaluation_requires_a_timezone_aware_clock(tmp_path: Path) -> None:
+    plan, _, config = _plan(tmp_path)
+    with pytest.raises(ApprovalError, match="timezone"):
+        evaluate_approval(
+            plan, ApprovalLedger(tmp_path / "approval-naive"), config, at=NOW.replace(tzinfo=None)
+        )
+
+
+def test_token_parser_rejects_signed_invalid_payloads_and_revoked_status(tmp_path: Path) -> None:
+    plan, _, config = _plan(tmp_path)
+    _, status = _approved_status(plan, config, tmp_path / "approval-token-parser")
+    at = NOW + timedelta(minutes=3)
+    token = issue_token(plan, status, config, at=at, secret=b"z" * 64)
+    with pytest.raises(ApprovalError, match="no longer approved"):
+        verify_token(
+            token,
+            plan,
+            status.model_copy(update={"status": "pending"}),
+            config,
+            at=at,
+            secret=b"z" * 64,
+        )
+    payload = b"not-json"
+    malformed = (
+        base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+        + "."
+        + base64.urlsafe_b64encode(hmac.new(b"z" * 64, payload, hashlib.sha256).digest())
+        .rstrip(b"=")
+        .decode()
+    )
+    with pytest.raises(ApprovalError, match="payload"):
+        verify_token(malformed, plan, status, config, at=at, secret=b"z" * 64)
+    duplicate_payload = b'{"schema_version":"1.0","schema_version":"1.0"}'
+    duplicate = (
+        base64.urlsafe_b64encode(duplicate_payload).rstrip(b"=").decode()
+        + "."
+        + base64.urlsafe_b64encode(hmac.new(b"z" * 64, duplicate_payload, hashlib.sha256).digest())
+        .rstrip(b"=")
+        .decode()
+    )
+    with pytest.raises(ApprovalError, match="payload"):
+        verify_token(duplicate, plan, status, config, at=at, secret=b"z" * 64)

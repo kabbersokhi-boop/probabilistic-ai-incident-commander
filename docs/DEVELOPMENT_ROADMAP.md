@@ -12,7 +12,7 @@ The roadmap is organised as capability milestones. Each milestone ends with work
 | Complete | Operational evidence and lineage | Service health, changes, lineage, runbooks, historical incidents, and deterministic timelines |
 | Complete | Governed Tool Gateway | Source binding, read-only tools, parsed SQL, authorization, limits, and hash-chained audit records |
 | Complete | Probabilistic agentic investigation | Provider-neutral routing, bounded tool loop, competing hypotheses, probability ranking, abstention, replay, and evaluation |
-| Complete | Approval and governed remediation | Exact human approval, reversible simulated actions, risk policy, short-lived tokens, and tamper-evident receipts |
+| Complete | Approval and governed remediation | Trusted approver attestations, exact human approval, reversible simulated actions, risk policy, short-lived tokens, canonical local state lineage, and tamper-evident receipts |
 | Planned | Recovery verification and reopening | Guardrail metrics, statistical recovery, regression detection, and automatic reopening |
 | Planned | Expanded evaluation and adversarial testing | Hidden benchmark, calibration, model comparisons, ablations, regression tests, and security attacks |
 | Planned | TUI and web product | Developer TUI and public live-investigation dashboard |

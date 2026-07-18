@@ -26,7 +26,7 @@ REMEDIATION_PLAN_DIR ?= .artifacts/remediation-plan
 REMEDIATION_APPROVAL_DIR ?= .artifacts/remediation-approval
 REMEDIATION_EXECUTION_DIR ?= .artifacts/remediation-execution
 REMEDIATION_STATE_AFTER_DIR ?= .artifacts/remediation-state-after
-REMEDIATION_TEST_SECRET ?= ci-only-remediation-secret-0123456789abcdef0123456789abcdef
+REMEDIATION_STATE_STORE ?= .artifacts/remediation-state-store
 SCHEMA_TMP ?= schemas-generated
 
 install:
@@ -162,15 +162,12 @@ replay-investigation-smoke:
 	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR)
 
 remediation-smoke: investigation-smoke
-	rm -rf $(REMEDIATION_STATE_DIR) $(REMEDIATION_PLAN_DIR) $(REMEDIATION_APPROVAL_DIR) $(REMEDIATION_EXECUTION_DIR) $(REMEDIATION_STATE_AFTER_DIR) .artifacts/remediation-approval.token
+	rm -rf $(REMEDIATION_STATE_DIR) $(REMEDIATION_PLAN_DIR) $(REMEDIATION_APPROVAL_DIR) $(REMEDIATION_EXECUTION_DIR) $(REMEDIATION_STATE_AFTER_DIR) $(REMEDIATION_STATE_STORE) .artifacts/remediation-approval.token
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-input .artifacts/remediation-state-input.json --proposal .artifacts/remediation-proposal.json
 	$(PYTHON) -m paic remediate state build --input .artifacts/remediation-state-input.json --output-dir $(REMEDIATION_STATE_DIR) --overwrite
 	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --plan-dir $(REMEDIATION_PLAN_DIR) --decision-one .artifacts/remediation-decision-one.json --decision-two .artifacts/remediation-decision-two.json --execution-request .artifacts/remediation-execution-request.json
-	$(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-one.json
-	$(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-two.json
-	env PAIC_APPROVAL_SECRET=$(REMEDIATION_TEST_SECRET) $(PYTHON) -m paic remediate token issue --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --at 2026-07-18T00:07:00+00:00 --output .artifacts/remediation-approval.token
-	env PAIC_APPROVAL_SECRET=$(REMEDIATION_TEST_SECRET) $(PYTHON) -m paic remediate execute --plan-dir $(REMEDIATION_PLAN_DIR) --state-dir $(REMEDIATION_STATE_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --token-file .artifacts/remediation-approval.token --request .artifacts/remediation-execution-request.json --output-state-dir $(REMEDIATION_STATE_AFTER_DIR) --output-dir $(REMEDIATION_EXECUTION_DIR) --overwrite
+	@secret="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; primary="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; manager="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; export PAIC_APPROVAL_SECRET="$$secret" PAIC_APPROVER_ONCALL_PRIMARY_KEY="$$primary" PAIC_APPROVER_CHANGE_MANAGER_KEY="$$manager"; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-one.json; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-two.json; $(PYTHON) -m paic remediate token issue --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --at 2026-07-18T00:07:00+00:00 --output .artifacts/remediation-approval.token; $(PYTHON) -m paic remediate execute --plan-dir $(REMEDIATION_PLAN_DIR) --state-dir $(REMEDIATION_STATE_DIR) --state-store $(REMEDIATION_STATE_STORE) --approval-dir $(REMEDIATION_APPROVAL_DIR) --token-file .artifacts/remediation-approval.token --request .artifacts/remediation-execution-request.json --output-state-dir $(REMEDIATION_STATE_AFTER_DIR) --output-dir $(REMEDIATION_EXECUTION_DIR) --overwrite
 	rm -f .artifacts/remediation-approval.token
 
 validate-remediation-smoke:

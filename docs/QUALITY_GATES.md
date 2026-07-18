@@ -180,6 +180,7 @@ Investigation changes require:
 Remediation changes require:
 
 - strict configuration, state, proposal, plan, approval, token-claim, execution, and manifest models;
+- a non-empty trusted approver registry, per-identity decision attestations, and token-signing material distinct from attestation keys;
 - complete source-bound plan reconstruction from the validated investigation and control state;
 - denial tests for abstention, weak probability evidence, unsupported citations, stale state, disallowed actions, excessive blast radius, and critical risk;
 - requester separation, rejection veto, unique approvers, independent high-risk groups, expiry, and hash-chain tests;

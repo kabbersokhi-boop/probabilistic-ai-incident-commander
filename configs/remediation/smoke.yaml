@@ -24,3 +24,12 @@ approval:
   low_risk_approvals: 1
   medium_risk_approvals: 1
   high_risk_approvals: 2
+  approver_registry:
+    - approver_id: operator/oncall-primary
+      approver_group: operations/primary
+      key_id: oncall-primary-v1
+      key_env: PAIC_APPROVER_ONCALL_PRIMARY_KEY
+    - approver_id: operator/change-manager
+      approver_group: operations/change-management
+      key_id: change-manager-v1
+      key_env: PAIC_APPROVER_CHANGE_MANAGER_KEY

@@ -35,6 +35,26 @@ class ApprovalPolicy(StrictModel):
     low_risk_approvals: Annotated[int, Field(ge=1, le=10)] = 1
     medium_risk_approvals: Annotated[int, Field(ge=1, le=10)] = 1
     high_risk_approvals: Annotated[int, Field(ge=2, le=10)] = 2
+    approver_registry: list[ApproverIdentity] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def unique_approvers(self) -> ApprovalPolicy:
+        if not self.approver_registry:
+            raise ValueError("approval registry must contain at least one trusted identity")
+        if len({item.approver_id for item in self.approver_registry}) != len(
+            self.approver_registry
+        ):
+            raise ValueError("approval registry identities must be unique")
+        if len({item.key_id for item in self.approver_registry}) != len(self.approver_registry):
+            raise ValueError("approval registry key IDs must be unique")
+        return self
+
+
+class ApproverIdentity(StrictModel):
+    approver_id: str = Field(pattern=r"^[a-z0-9]+(?:[._/-][a-z0-9]+)*$")
+    approver_group: str = Field(pattern=r"^[a-z0-9]+(?:[._/-][a-z0-9]+)*$")
+    key_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    key_env: str = Field(pattern=r"^[A-Z][A-Z0-9_]*$")
 
 
 def _default_allowed_action_types() -> list[

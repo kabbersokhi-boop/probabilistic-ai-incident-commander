@@ -1,4 +1,40 @@
 {
+  "$defs": {
+    "ApprovalAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "nonce": {
+          "maxLength": 200,
+          "minLength": 16,
+          "title": "Nonce",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "nonce",
+        "signature"
+      ],
+      "title": "ApprovalAttestation",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "approver_group": {
@@ -16,6 +52,17 @@
       "default": "approver",
       "title": "Approver Role",
       "type": "string"
+    },
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApprovalAttestation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "decided_at": {
       "format": "date-time",

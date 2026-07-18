@@ -24,12 +24,14 @@ from paic.remediation.models import (
     RemediationProposal,
 )
 from paic.remediation.policy import assess_proposal, build_plan
+from paic.remediation.state_store import ControlStateStore
 
 __all__ = [
     "ApprovalDecision",
     "ApprovalLedger",
     "ApprovalStatus",
     "ControlState",
+    "ControlStateStore",
     "ExecutionReceipt",
     "ExecutionRequest",
     "RemediationConfig",

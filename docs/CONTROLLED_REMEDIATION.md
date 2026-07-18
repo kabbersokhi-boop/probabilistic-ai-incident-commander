@@ -29,7 +29,7 @@ Deterministic policy assessment
 Immutable remediation plan
         |
         v
-Append-only human approval ledger
+Trusted approver registry and append-only human approval ledger
         |
         v
 Short-lived HMAC approval token
@@ -58,7 +58,7 @@ An abstained or failed investigation cannot produce an executable plan.
 
 Risk is deterministic. The action kind supplies a base risk, while blast radius may escalate it. Critical-risk actions are denied by the reference policy. High-risk plans require two independent approvals from distinct approver groups.
 
-The requester cannot approve their own plan. Any rejection vetoes execution. Decisions outside the plan validity window are invalid.
+The requester cannot approve their own plan. Any rejection vetoes execution. Decisions outside the plan validity window are invalid. Every configured approver has an authoritative group, key ID, and separate environment-only attestation key. A decision binds its plan, identity, authoritative group, decision, timestamp, and nonce with a per-approver HMAC; asserted groups from decision input are ignored. An empty registry, an unknown identity or key ID, a missing attestation, and a duplicate attestation nonce all fail closed.
 
 ## Approval token
 
@@ -91,11 +91,13 @@ Control-state, remediation-plan, and execution artifacts are flat, closed-world 
 
 A complete plan validation can reconstruct the deterministic plan from the original investigation, state, proposal, and resolved policy.
 
-## Atomic execution
+## Local transaction store
 
-All action preconditions are checked and all state changes are computed in memory before output is written. The source state artifact is immutable. A successful execution produces a new generation of the control-state artifact.
+All action preconditions are checked and all state changes are computed in memory before output is written. The source state artifact is immutable. Execution initializes a local, locked transaction store bound to that initial artifact. Subsequent execution reads only the store's current generation; re-supplying the original state export cannot reset replay protection.
 
-The new state records consumed token-nonce hashes and executed plan hashes. Reusing an approval token or executing the same plan again on that state lineage is rejected.
+Each staged generation contains both the after-state and receipt. A generation becomes current only when the atomically replaced store pointer names the fully validated pair. A staged generation renamed before that pointer update is unreachable, inert, and deterministically removed by a retry under the store lock. A pointer update is the commit point; failed backup cleanup or a post-rename fsync confirmation does not turn a completed execution into a retryable failure.
+
+Exactly-once is scoped to callers sharing the same local store path and filesystem locking semantics. This reference implementation is not a distributed coordination service, and it does not mutate production infrastructure.
 
 ## Rollback
 
@@ -146,7 +148,7 @@ rm -f .artifacts/remediation-approval.token
 ## Deliberate limitations
 
 - No production infrastructure is mutated.
-- Approver identity is asserted input, not SSO-backed identity.
+- The local approver registry and per-identity environment keys are the reference trust boundary, not SSO-backed identity or managed keys.
 - HMAC secrets are process-environment inputs, not managed-key-service keys.
 - Recovery is not inferred from action completion. Statistical recovery verification and automatic reopening belong to the next capability.
 - Docker and cloud deployment remain later capability milestones and must not be pulled into this implementation.

@@ -134,7 +134,7 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 - Strict reversible action proposals bound to a validated, concluded investigation
 - Deterministic confidence, evidence, state-precondition, blast-radius, and risk policy
 - Immutable source-bound remediation plans and closed-world artifact validation
-- Append-only human approval decisions with requester separation and rejection vetoes
+- Append-only human approval decisions with requester separation, trusted per-identity attestations, and rejection vetoes
 - Short-lived HMAC approval tokens bound to the exact approval snapshot and action set
 - Atomic simulated deployment rollback, feature-flag, and configuration execution
 - One-time token and plan replay protection plus fresh inverse rollback proposals

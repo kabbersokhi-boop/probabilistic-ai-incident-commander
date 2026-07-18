@@ -8,6 +8,14 @@
           "title": "Allow Requester Approval",
           "type": "boolean"
         },
+        "approver_registry": {
+          "items": {
+            "$ref": "#/$defs/ApproverIdentity"
+          },
+          "maxItems": 100,
+          "title": "Approver Registry",
+          "type": "array"
+        },
         "high_risk_approvals": {
           "default": 2,
           "maximum": 10,
@@ -63,6 +71,39 @@
         }
       },
       "title": "ApprovalPolicy",
+      "type": "object"
+    },
+    "ApproverIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "approver_group": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Approver Group",
+          "type": "string"
+        },
+        "approver_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Approver Id",
+          "type": "string"
+        },
+        "key_env": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Key Env",
+          "type": "string"
+        },
+        "key_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approver_id",
+        "approver_group",
+        "key_id",
+        "key_env"
+      ],
+      "title": "ApproverIdentity",
       "type": "object"
     },
     "InvestigationGate": {

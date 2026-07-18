@@ -299,7 +299,12 @@ def test_remediation_cli_end_to_end_with_scripted_investigation(
         == 0
     )
     approval_dir = tmp_path / "approval"
-    for identity, group in (("operator/one", "group/one"), ("operator/two", "group/two")):
+    monkeypatch.setenv("PAIC_APPROVER_ONCALL_PRIMARY_KEY", "p" * 64)  # type: ignore[attr-defined]
+    monkeypatch.setenv("PAIC_APPROVER_CHANGE_MANAGER_KEY", "m" * 64)  # type: ignore[attr-defined]
+    for identity, group in (
+        ("operator/oncall-primary", "operations/primary"),
+        ("operator/change-manager", "operations/change-management"),
+    ):
         decision = tmp_path / f"{identity.split('/')[-1]}.json"
         decision.write_text(
             json.dumps(

@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "AblationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_enabled": {
+          "default": true,
+          "title": "Abstention Enabled",
+          "type": "boolean"
+        },
+        "max_hypotheses": {
+          "default": 30,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Hypotheses",
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "default": 24,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "remove_contradictions": {
+          "default": false,
+          "title": "Remove Contradictions",
+          "type": "boolean"
+        },
+        "remove_history": {
+          "default": false,
+          "title": "Remove History",
+          "type": "boolean"
+        },
+        "remove_lineage": {
+          "default": false,
+          "title": "Remove Lineage",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AblationConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "ablation": {
+      "$ref": "#/$defs/AblationConfig"
+    },
+    "benchmark_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "provider_configuration": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "maxProperties": 100,
+      "title": "Provider Configuration",
+      "type": "object"
+    },
+    "provider_label": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Provider Label",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_id",
+    "benchmark_id",
+    "provider_label",
+    "seed"
+  ],
+  "title": "EvaluationConfig",
+  "type": "object"
+}

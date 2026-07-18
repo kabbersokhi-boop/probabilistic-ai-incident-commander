@@ -468,7 +468,7 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 
 The next major capabilities are:
 
-1. expanded hidden-incident evaluation, calibration, ablations, and security testing,
+1. expanded hidden-incident evaluation, calibration, ablations, and security testing (in progress),
 2. developer TUI and public web product,
 3. Docker, observability, hosted demonstration, and portfolio packaging.
 

@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "boundary": {
+      "default": "text",
+      "enum": [
+        "text",
+        "sql_policy",
+        "safe_path"
+      ],
+      "title": "Boundary",
+      "type": "string"
+    },
+    "case_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Case Id",
+      "type": "string"
+    },
+    "expected_reason": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Expected Reason",
+      "type": "string"
+    },
+    "input": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "title": "Input",
+      "type": "string"
+    },
+    "threat": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Threat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "threat",
+    "input",
+    "expected_reason"
+  ],
+  "title": "AdversarialCase",
+  "type": "object"
+}

@@ -1,5 +1,12 @@
 # Architecture
 
+## Expanded evaluation boundary
+
+Phase 10 keeps benchmark answer keys outside agent-visible inputs. Ordinary
+deterministic evaluator code computes ranking, Brier, calibration, abstention,
+evidence, and safety results. Evaluation artifacts bind benchmark and answer-key
+digests and replay without a provider.
+
 ## End-to-end control flow
 
 ```text

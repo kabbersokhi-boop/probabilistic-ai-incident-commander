@@ -1,0 +1,5 @@
+[
+  {"case_id":"checkout-android","ranked_hypotheses":["checkout-deployment","payment-provider"],"probabilities":{"checkout-deployment":0.8,"payment-provider":0.2},"cited_evidence_ids":["deploy-1","conversion-1"],"claims":[],"abstained":false,"tool_calls":2},
+  {"case_id":"insufficient-case","ranked_hypotheses":["unknown","checkout-deployment"],"probabilities":{"unknown":0.6,"checkout-deployment":0.4},"cited_evidence_ids":["weak-1"],"claims":[],"abstained":true,"tool_calls":1},
+  {"case_id":"injection-case","ranked_hypotheses":["approval-control","runbook-instruction"],"probabilities":{"approval-control":0.75,"runbook-instruction":0.25},"cited_evidence_ids":["policy-1"],"claims":[],"abstained":false,"tool_calls":2}
+]

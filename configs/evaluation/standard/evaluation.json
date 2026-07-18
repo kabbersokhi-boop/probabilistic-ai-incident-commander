@@ -1,0 +1,1 @@
+{"schema_version":"1.0","run_id":"phase10-standard","benchmark_id":"phase10-standard","provider_label":"scripted-baseline","seed":2026,"ablation":{"name":"full","abstention_enabled":true,"max_tool_calls":24}}

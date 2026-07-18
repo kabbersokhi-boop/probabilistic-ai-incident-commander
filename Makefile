@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -35,6 +35,10 @@ RECOVERY_REGRESSION_DIR ?= .artifacts/recovery-regression
 RECOVERY_STATE_STORE ?= .artifacts/recovery-state
 RECOVERY_CONFIG ?= configs/recovery/smoke.yaml
 SCHEMA_TMP ?= schemas-generated
+EVALUATION_SMOKE_DIR ?= .artifacts/evaluation-smoke
+EVALUATION_STANDARD_DIR ?= .artifacts/evaluation-standard
+EVALUATION_ABLATION_DIR ?= .artifacts/evaluation-standard-no-lineage
+EVALUATION_COMPARISON_DIR ?= .artifacts/evaluation-comparison
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -215,6 +219,36 @@ recovery-smoke: remediation-smoke recovery-source-smoke
 validate-recovery-smoke:
 	$(PYTHON) -m paic recovery validate --recovery-dir .artifacts/report-recovered --observations-dir .artifacts/obs-recovered --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
 	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE)
+
+evaluation-smoke:
+	rm -rf $(EVALUATION_SMOKE_DIR)
+	$(PYTHON) -m paic evaluation benchmark-validate --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers
+	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json --output-dir $(EVALUATION_SMOKE_DIR)
+
+evaluation-validate-smoke:
+	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_SMOKE_DIR)
+
+evaluation-replay-smoke:
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_SMOKE_DIR) --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json
+
+evaluation-standard:
+	rm -rf $(EVALUATION_STANDARD_DIR) $(EVALUATION_ABLATION_DIR) $(EVALUATION_COMPARISON_DIR)
+	$(PYTHON) -m paic evaluation benchmark-validate --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden
+	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions.json --config configs/evaluation/standard/evaluation.json --output-dir $(EVALUATION_STANDARD_DIR)
+	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions-no-lineage.json --config configs/evaluation/standard/evaluation-no-lineage.json --output-dir $(EVALUATION_ABLATION_DIR)
+	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_STANDARD_DIR)
+	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_ABLATION_DIR)
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_STANDARD_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions.json --config configs/evaluation/standard/evaluation.json
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions-no-lineage.json --config configs/evaluation/standard/evaluation-no-lineage.json
+
+evaluation-compare-smoke: evaluation-standard
+	$(PYTHON) -m paic evaluation compare --left-dir $(EVALUATION_STANDARD_DIR) --right-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --left-predictions configs/evaluation/standard/predictions.json --left-config configs/evaluation/standard/evaluation.json --right-predictions configs/evaluation/standard/predictions-no-lineage.json --right-config configs/evaluation/standard/evaluation-no-lineage.json --output-dir $(EVALUATION_COMPARISON_DIR)
+	$(PYTHON) -m paic evaluation compare-replay --comparison-dir $(EVALUATION_COMPARISON_DIR) --left-dir $(EVALUATION_STANDARD_DIR) --right-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --left-predictions configs/evaluation/standard/predictions.json --left-config configs/evaluation/standard/evaluation.json --right-predictions configs/evaluation/standard/predictions-no-lineage.json --right-config configs/evaluation/standard/evaluation-no-lineage.json
+
+evaluation-adversarial:
+	$(PYTHON) -m paic evaluation adversarial-suite --cases configs/evaluation/adversarial/cases.json
+	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_remediation_hardening.py -k "plan_semantic_tampering or token_verification_fails_closed or execution_rechecks_state_binding"
+	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_recovery_artifact.py -k "semantic_tamper_is_rejected_even_after_file_hash_refresh or wrong_execution_binding_is_rejected or authoritative_recovery_validation"
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

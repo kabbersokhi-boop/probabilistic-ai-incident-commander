@@ -1,5 +1,12 @@
 # Quality Gates
 
+## Phase 10 evaluation gates
+
+Evaluation smoke uses a fixed-seed scripted provider, separate hidden answer
+keys, deterministic scoring, adversarial boundary checks, generated schemas, and
+closed-world artifact replay. Comparison and ablation metadata are recorded in
+the resolved evaluation configuration. No model grades itself.
+
 A change is ready for review only when the applicable checks below pass.
 
 ## Repository checks

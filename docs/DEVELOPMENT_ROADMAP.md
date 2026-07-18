@@ -14,7 +14,7 @@ The roadmap is organised as capability milestones. Each milestone ends with work
 | Complete | Probabilistic agentic investigation | Provider-neutral routing, bounded tool loop, competing hypotheses, probability ranking, abstention, replay, and evaluation |
 | Complete | Approval and governed remediation | Trusted approver attestations, exact human approval, reversible simulated actions, risk policy, short-lived tokens, canonical local state lineage, and tamper-evident receipts |
 | Complete | Recovery verification and reopening | Guardrail metrics, statistical recovery, regression detection, immutable local lifecycle, replay, and automatic reopening |
-| Planned | Expanded evaluation and adversarial testing | Hidden benchmark, calibration, model comparisons, ablations, regression tests, and security attacks |
+| In progress | Expanded evaluation and adversarial testing | Hidden benchmark, calibration, model comparisons, ablations, regression tests, and security attacks |
 | Planned | TUI and web product | Developer TUI and public live-investigation dashboard |
 | Planned | Production and portfolio packaging | Docker, observability, hosted demo, deployment, video, and technical article |
 
@@ -24,4 +24,4 @@ A capability is complete only when its public interface works, deterministic che
 
 ## Next capability
 
-The next implementation unit is expanded evaluation and adversarial testing. Action completion alone must never declare recovery.
+The current implementation unit is expanded evaluation and adversarial testing. Action completion alone must never declare recovery.

@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "authoritative_control_exercised": {
+      "title": "Authoritative Control Exercised",
+      "type": "boolean"
+    },
+    "blocked": {
+      "title": "Blocked",
+      "type": "boolean"
+    },
+    "boundary": {
+      "enum": [
+        "text",
+        "sql_policy",
+        "safe_path"
+      ],
+      "title": "Boundary",
+      "type": "string"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Reason Codes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "case_id",
+    "boundary",
+    "blocked",
+    "authoritative_control_exercised",
+    "reason_codes"
+  ],
+  "title": "AdversarialResult",
+  "type": "object"
+}

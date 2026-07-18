@@ -81,6 +81,11 @@ def test_export_schemas_writes_thirty_documents(
         "recovery-lifecycle-event.schema.json",
         "recovery-artifact-manifest.schema.json",
         "recovery-observation-artifact-manifest.schema.json",
+        "evaluation-config.schema.json",
+        "evaluation-run.schema.json",
+        "evaluation-comparison.schema.json",
+        "evaluation-adversarial-result.schema.json",
+        "evaluation-adversarial-case.schema.json",
     }
 
 

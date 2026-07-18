@@ -1,0 +1,191 @@
+{
+  "$defs": {
+    "BootstrapInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence_level": {
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Confidence Level",
+          "type": "number"
+        },
+        "iterations": {
+          "minimum": 100,
+          "title": "Iterations",
+          "type": "integer"
+        },
+        "lower": {
+          "title": "Lower",
+          "type": "number"
+        },
+        "seed": {
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "upper": {
+          "title": "Upper",
+          "type": "number"
+        }
+      },
+      "required": [
+        "confidence_level",
+        "lower",
+        "upper",
+        "iterations",
+        "seed"
+      ],
+      "title": "BootstrapInterval",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abstention_delta": {
+      "title": "Abstention Delta",
+      "type": "number"
+    },
+    "answer_key_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Answer Key Manifest Sha256",
+      "type": "string"
+    },
+    "benchmark_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Benchmark Manifest Sha256",
+      "type": "string"
+    },
+    "brier_delta": {
+      "title": "Brier Delta",
+      "type": "number"
+    },
+    "brier_delta_interval": {
+      "$ref": "#/$defs/BootstrapInterval"
+    },
+    "calibration_error_delta": {
+      "title": "Calibration Error Delta",
+      "type": "number"
+    },
+    "case_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Case Ids Sha256",
+      "type": "string"
+    },
+    "coverage_delta": {
+      "title": "Coverage Delta",
+      "type": "number"
+    },
+    "left_effective_benchmark_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Left Effective Benchmark Sha256",
+      "type": "string"
+    },
+    "left_provider_config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Left Provider Config Sha256",
+      "type": "string"
+    },
+    "left_resolved_ablation_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Left Resolved Ablation Sha256",
+      "type": "string"
+    },
+    "left_run_id": {
+      "title": "Left Run Id",
+      "type": "string"
+    },
+    "left_tool_policy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Left Tool Policy Sha256",
+      "type": "string"
+    },
+    "log_loss_delta": {
+      "title": "Log Loss Delta",
+      "type": "number"
+    },
+    "paired_losses": {
+      "minimum": 0,
+      "title": "Paired Losses",
+      "type": "integer"
+    },
+    "paired_wins": {
+      "minimum": 0,
+      "title": "Paired Wins",
+      "type": "integer"
+    },
+    "primary_top1_delta": {
+      "title": "Primary Top1 Delta",
+      "type": "number"
+    },
+    "right_effective_benchmark_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Right Effective Benchmark Sha256",
+      "type": "string"
+    },
+    "right_provider_config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Right Provider Config Sha256",
+      "type": "string"
+    },
+    "right_resolved_ablation_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Right Resolved Ablation Sha256",
+      "type": "string"
+    },
+    "right_run_id": {
+      "title": "Right Run Id",
+      "type": "string"
+    },
+    "right_tool_policy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Right Tool Policy Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.1",
+      "default": "1.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_calls_delta": {
+      "title": "Tool Calls Delta",
+      "type": "number"
+    },
+    "top1_delta": {
+      "title": "Top1 Delta",
+      "type": "number"
+    },
+    "top1_delta_interval": {
+      "$ref": "#/$defs/BootstrapInterval"
+    }
+  },
+  "required": [
+    "left_run_id",
+    "right_run_id",
+    "benchmark_manifest_sha256",
+    "answer_key_manifest_sha256",
+    "case_ids_sha256",
+    "left_effective_benchmark_sha256",
+    "right_effective_benchmark_sha256",
+    "left_resolved_ablation_sha256",
+    "right_resolved_ablation_sha256",
+    "left_provider_config_sha256",
+    "right_provider_config_sha256",
+    "left_tool_policy_sha256",
+    "right_tool_policy_sha256",
+    "top1_delta",
+    "primary_top1_delta",
+    "brier_delta",
+    "log_loss_delta",
+    "calibration_error_delta",
+    "abstention_delta",
+    "coverage_delta",
+    "tool_calls_delta",
+    "paired_wins",
+    "paired_losses",
+    "top1_delta_interval",
+    "brier_delta_interval"
+  ],
+  "title": "ComparisonReport",
+  "type": "object"
+}

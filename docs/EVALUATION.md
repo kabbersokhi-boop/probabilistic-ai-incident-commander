@@ -22,7 +22,7 @@ Evaluation exports are closed-world, hash-bound, and replayable:
 paic evaluation benchmark-validate --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers
 paic evaluation run --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json --output-dir .artifacts/evaluation-smoke
 paic evaluation validate --run-dir .artifacts/evaluation-smoke
-paic evaluation replay --run-dir .artifacts/evaluation-smoke
+paic evaluation replay --run-dir .artifacts/evaluation-smoke --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json
 ```
 
 The fixtures are synthetic and prove evaluator integrity, not production model
@@ -34,3 +34,24 @@ latency, inventory, promotion, pipeline, regional, device, misleading-correlatio
 multiple-cause, insufficient-evidence, and no-action-safe families. The
 no-lineage ablation is executed against the same visible cases and deterministically
 loses access to lineage evidence; the comparison reports its safety impact.
+
+
+## Hardened semantic replay and paired ablations
+
+Evaluation artifacts include source-visible cases, effective ablated cases, evaluator-only
+answer keys, predictions, case results, aggregate metrics, calibration, and safety output.
+Hash validation is followed by deterministic rescoring. Authoritative replay, summary, and
+comparison require the original visible benchmark, answer-key directory, prediction file, and
+resolved configuration; a self-consistent substituted artifact is therefore rejected. The
+internal `artifact_only` API is diagnostic-only and must not be used as provenance validation.
+
+Comparisons require identical source benchmark lineage, answer-key lineage, and ordered case
+IDs. Effective benchmark and ablation hashes may differ and are recorded. The no-lineage run
+uses a distinct scripted prediction file so it changes behavior rather than only metadata.
+Deterministic paired bootstrap intervals are descriptive for this synthetic benchmark and do
+not establish production model quality.
+
+Text scanning is supplemental. Destructive SQL cases exercise the real parsed SQL policy;
+path cases exercise an authoritative safe-relative-path boundary. The security claim remains
+that deterministic controls prevent unsafe model output from becoming authoritative or
+executable, not that a model will never emit unsafe text.

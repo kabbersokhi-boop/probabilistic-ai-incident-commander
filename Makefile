@@ -38,6 +38,7 @@ SCHEMA_TMP ?= schemas-generated
 EVALUATION_SMOKE_DIR ?= .artifacts/evaluation-smoke
 EVALUATION_STANDARD_DIR ?= .artifacts/evaluation-standard
 EVALUATION_ABLATION_DIR ?= .artifacts/evaluation-standard-no-lineage
+EVALUATION_COMPARISON_DIR ?= .artifacts/evaluation-comparison
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -228,21 +229,26 @@ evaluation-validate-smoke:
 	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_SMOKE_DIR)
 
 evaluation-replay-smoke:
-	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_SMOKE_DIR)
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_SMOKE_DIR) --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json
 
 evaluation-standard:
-	rm -rf $(EVALUATION_STANDARD_DIR) $(EVALUATION_ABLATION_DIR)
+	rm -rf $(EVALUATION_STANDARD_DIR) $(EVALUATION_ABLATION_DIR) $(EVALUATION_COMPARISON_DIR)
 	$(PYTHON) -m paic evaluation benchmark-validate --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden
 	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions.json --config configs/evaluation/standard/evaluation.json --output-dir $(EVALUATION_STANDARD_DIR)
-	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions.json --config configs/evaluation/standard/evaluation-no-lineage.json --output-dir $(EVALUATION_ABLATION_DIR)
+	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions-no-lineage.json --config configs/evaluation/standard/evaluation-no-lineage.json --output-dir $(EVALUATION_ABLATION_DIR)
 	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_STANDARD_DIR)
 	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_ABLATION_DIR)
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_STANDARD_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions.json --config configs/evaluation/standard/evaluation.json
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --predictions configs/evaluation/standard/predictions-no-lineage.json --config configs/evaluation/standard/evaluation-no-lineage.json
 
 evaluation-compare-smoke: evaluation-standard
-	$(PYTHON) -m paic evaluation compare --left-dir $(EVALUATION_STANDARD_DIR) --right-dir $(EVALUATION_ABLATION_DIR)
+	$(PYTHON) -m paic evaluation compare --left-dir $(EVALUATION_STANDARD_DIR) --right-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --left-predictions configs/evaluation/standard/predictions.json --left-config configs/evaluation/standard/evaluation.json --right-predictions configs/evaluation/standard/predictions-no-lineage.json --right-config configs/evaluation/standard/evaluation-no-lineage.json --output-dir $(EVALUATION_COMPARISON_DIR)
+	$(PYTHON) -m paic evaluation compare-replay --comparison-dir $(EVALUATION_COMPARISON_DIR) --left-dir $(EVALUATION_STANDARD_DIR) --right-dir $(EVALUATION_ABLATION_DIR) --visible-dir configs/evaluation/standard --answers-dir configs/evaluation/standard-hidden --left-predictions configs/evaluation/standard/predictions.json --left-config configs/evaluation/standard/evaluation.json --right-predictions configs/evaluation/standard/predictions-no-lineage.json --right-config configs/evaluation/standard/evaluation-no-lineage.json
 
 evaluation-adversarial:
 	$(PYTHON) -m paic evaluation adversarial-suite --cases configs/evaluation/adversarial/cases.json
+	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_remediation_hardening.py -k "plan_semantic_tampering or token_verification_fails_closed or execution_rechecks_state_binding"
+	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_recovery_artifact.py -k "semantic_tamper_is_rejected_even_after_file_hash_refresh or wrong_execution_binding_is_rejected or authoritative_recovery_validation"
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

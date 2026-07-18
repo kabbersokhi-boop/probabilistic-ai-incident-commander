@@ -8,6 +8,13 @@
           "title": "Abstention Enabled",
           "type": "boolean"
         },
+        "max_hypotheses": {
+          "default": 30,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Hypotheses",
+          "type": "integer"
+        },
         "max_tool_calls": {
           "default": 24,
           "maximum": 100,
@@ -16,7 +23,7 @@
           "type": "integer"
         },
         "name": {
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Name",
           "type": "string"
         },
@@ -56,15 +63,43 @@
           "title": "Brier Score",
           "type": "number"
         },
-        "case_count": {
+        "calibration_case_count": {
           "minimum": 0,
+          "title": "Calibration Case Count",
+          "type": "integer"
+        },
+        "case_count": {
+          "minimum": 1,
           "title": "Case Count",
           "type": "integer"
+        },
+        "citation_validity_rate": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Citation Validity Rate",
+          "type": "number"
+        },
+        "clipped_log_loss": {
+          "minimum": 0.0,
+          "title": "Clipped Log Loss",
+          "type": "number"
+        },
+        "coverage": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Coverage",
+          "type": "number"
         },
         "expected_calibration_error": {
           "maximum": 1.0,
           "minimum": 0.0,
           "title": "Expected Calibration Error",
+          "type": "number"
+        },
+        "hypothesis_set_recall": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Hypothesis Set Recall",
           "type": "number"
         },
         "mean_reciprocal_rank": {
@@ -77,6 +112,62 @@
           "minimum": 0.0,
           "title": "Mean Tool Calls",
           "type": "number"
+        },
+        "model_claimed_recovery_authority_count": {
+          "minimum": 0,
+          "title": "Model Claimed Recovery Authority Count",
+          "type": "integer"
+        },
+        "primary_top1_accuracy": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Primary Top1 Accuracy",
+          "type": "number"
+        },
+        "prohibited_action_authorized_count": {
+          "minimum": 0,
+          "title": "Prohibited Action Authorized Count",
+          "type": "integer"
+        },
+        "prohibited_action_proposed_count": {
+          "minimum": 0,
+          "title": "Prohibited Action Proposed Count",
+          "type": "integer"
+        },
+        "recovery_accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Accuracy"
+        },
+        "reliability_bins": {
+          "items": {
+            "$ref": "#/$defs/ReliabilityBin"
+          },
+          "title": "Reliability Bins",
+          "type": "array"
+        },
+        "remediation_accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remediation Accuracy"
         },
         "required_evidence_coverage": {
           "maximum": 1.0,
@@ -93,6 +184,22 @@
           "minimum": 0.0,
           "title": "Selective Accuracy",
           "type": "number"
+        },
+        "selective_risk": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Selective Risk",
+          "type": "number"
+        },
+        "tool_budget_exceeded_count": {
+          "minimum": 0,
+          "title": "Tool Budget Exceeded Count",
+          "type": "integer"
+        },
+        "tool_failure_count": {
+          "minimum": 0,
+          "title": "Tool Failure Count",
+          "type": "integer"
         },
         "top1_accuracy": {
           "maximum": 1.0,
@@ -115,14 +222,27 @@
       "required": [
         "case_count",
         "top1_accuracy",
+        "primary_top1_accuracy",
         "top3_recall",
+        "hypothesis_set_recall",
         "mean_reciprocal_rank",
         "brier_score",
+        "clipped_log_loss",
         "expected_calibration_error",
+        "calibration_case_count",
+        "reliability_bins",
         "abstention_accuracy",
         "selective_accuracy",
+        "coverage",
+        "selective_risk",
         "required_evidence_coverage",
+        "citation_validity_rate",
         "unsupported_claim_count",
+        "tool_failure_count",
+        "tool_budget_exceeded_count",
+        "prohibited_action_proposed_count",
+        "prohibited_action_authorized_count",
+        "model_claimed_recovery_authority_count",
         "safety_passed",
         "mean_tool_calls"
       ],
@@ -132,6 +252,10 @@
     "CaseResult": {
       "additionalProperties": false,
       "properties": {
+        "abstained": {
+          "title": "Abstained",
+          "type": "boolean"
+        },
         "abstention_correct": {
           "title": "Abstention Correct",
           "type": "boolean"
@@ -142,11 +266,54 @@
           "type": "number"
         },
         "case_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Case Id",
           "type": "string"
         },
         "cited_evidence_valid": {
           "title": "Cited Evidence Valid",
+          "type": "boolean"
+        },
+        "clipped_log_loss": {
+          "minimum": 0.0,
+          "title": "Clipped Log Loss",
+          "type": "number"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "contradiction_handled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Contradiction Handled"
+        },
+        "hypothesis_set_recall": {
+          "title": "Hypothesis Set Recall",
+          "type": "boolean"
+        },
+        "model_claimed_recovery_authority": {
+          "title": "Model Claimed Recovery Authority",
+          "type": "boolean"
+        },
+        "primary_top1_correct": {
+          "title": "Primary Top1 Correct",
+          "type": "boolean"
+        },
+        "prohibited_action_authorized": {
+          "title": "Prohibited Action Authorized",
+          "type": "boolean"
+        },
+        "prohibited_action_proposed": {
+          "title": "Prohibited Action Proposed",
           "type": "boolean"
         },
         "reciprocal_rank": {
@@ -155,15 +322,46 @@
           "title": "Reciprocal Rank",
           "type": "number"
         },
+        "recovery_correct": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recovery Correct"
+        },
+        "remediation_correct": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remediation Correct"
+        },
         "required_evidence_coverage": {
           "maximum": 1.0,
           "minimum": 0.0,
           "title": "Required Evidence Coverage",
           "type": "number"
         },
+        "tool_budget_exceeded": {
+          "title": "Tool Budget Exceeded",
+          "type": "boolean"
+        },
         "tool_calls": {
           "minimum": 0,
           "title": "Tool Calls",
+          "type": "integer"
+        },
+        "tool_failures": {
+          "minimum": 0,
+          "title": "Tool Failures",
           "type": "integer"
         },
         "top1_correct": {
@@ -183,14 +381,27 @@
       "required": [
         "case_id",
         "top1_correct",
+        "primary_top1_correct",
         "top3_correct",
+        "hypothesis_set_recall",
         "reciprocal_rank",
         "brier_score",
+        "clipped_log_loss",
+        "confidence",
+        "abstained",
         "abstention_correct",
         "required_evidence_coverage",
         "unsupported_claim_count",
         "cited_evidence_valid",
-        "tool_calls"
+        "contradiction_handled",
+        "tool_calls",
+        "tool_failures",
+        "tool_budget_exceeded",
+        "prohibited_action_proposed",
+        "prohibited_action_authorized",
+        "remediation_correct",
+        "recovery_correct",
+        "model_claimed_recovery_authority"
       ],
       "title": "CaseResult",
       "type": "object"
@@ -207,6 +418,27 @@
           "title": "Benchmark Id",
           "type": "string"
         },
+        "provider_configuration": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "maxProperties": 100,
+          "title": "Provider Configuration",
+          "type": "object"
+        },
         "provider_label": {
           "maxLength": 200,
           "minLength": 1,
@@ -214,7 +446,7 @@
           "type": "string"
         },
         "run_id": {
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Run Id",
           "type": "string"
         },
@@ -238,6 +470,456 @@
       ],
       "title": "EvaluationConfig",
       "type": "object"
+    },
+    "HiddenAnswerKey": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptable_alternates": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Acceptable Alternates",
+          "type": "array"
+        },
+        "affected_cohort": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Affected Cohort",
+          "type": "array"
+        },
+        "allowed_remediation_classes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Allowed Remediation Classes",
+          "type": "array"
+        },
+        "case_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "contradiction_expected": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contradiction Expected"
+        },
+        "expected_recovery": {
+          "default": "recovered",
+          "enum": [
+            "recovered",
+            "recovering",
+            "failed",
+            "insufficient_data"
+          ],
+          "title": "Expected Recovery",
+          "type": "string"
+        },
+        "incident_family": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Incident Family"
+        },
+        "prohibited_claims": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Prohibited Claims",
+          "type": "array"
+        },
+        "prohibited_remediation_classes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Prohibited Remediation Classes",
+          "type": "array"
+        },
+        "required_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Required Evidence Ids",
+          "type": "array"
+        },
+        "root_cause_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Root Cause Id",
+          "type": "string"
+        },
+        "should_abstain": {
+          "default": false,
+          "title": "Should Abstain",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "root_cause_id"
+      ],
+      "title": "HiddenAnswerKey",
+      "type": "object"
+    },
+    "Prediction": {
+      "additionalProperties": false,
+      "properties": {
+        "abstained": {
+          "default": false,
+          "title": "Abstained",
+          "type": "boolean"
+        },
+        "authorized_remediation_class": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authorized Remediation Class"
+        },
+        "case_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "cited_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Cited Evidence Ids",
+          "type": "array"
+        },
+        "claimed_recovery_authority": {
+          "default": false,
+          "title": "Claimed Recovery Authority",
+          "type": "boolean"
+        },
+        "claims": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Claims",
+          "type": "array"
+        },
+        "contradiction_handled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contradiction Handled"
+        },
+        "predicted_recovery": {
+          "anyOf": [
+            {
+              "enum": [
+                "recovered",
+                "recovering",
+                "failed",
+                "insufficient_data"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicted Recovery"
+        },
+        "probabilities": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "maxProperties": 30,
+          "minProperties": 1,
+          "title": "Probabilities",
+          "type": "object"
+        },
+        "proposed_remediation_class": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposed Remediation Class"
+        },
+        "provider_usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "provider_usage_source": {
+          "anyOf": [
+            {
+              "const": "provider_response",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Usage Source"
+        },
+        "ranked_hypotheses": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Ranked Hypotheses",
+          "type": "array"
+        },
+        "tool_calls": {
+          "default": 0,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "tool_failures": {
+          "default": 0,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Tool Failures",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "case_id",
+        "ranked_hypotheses",
+        "probabilities"
+      ],
+      "title": "Prediction",
+      "type": "object"
+    },
+    "ProviderUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Tokens"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latency Ms"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Tokens"
+        },
+        "total_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Tokens"
+        }
+      },
+      "title": "ProviderUsage",
+      "type": "object"
+    },
+    "ReliabilityBin": {
+      "additionalProperties": false,
+      "properties": {
+        "accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy"
+        },
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "lower_bound": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Lower Bound",
+          "type": "number"
+        },
+        "mean_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean Confidence"
+        },
+        "upper_bound": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Upper Bound",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lower_bound",
+        "upper_bound",
+        "count"
+      ],
+      "title": "ReliabilityBin",
+      "type": "object"
+    },
+    "VisibleCase": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_tools": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Allowed Tools",
+          "type": "array"
+        },
+        "case_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": "medium",
+          "enum": [
+            "easy",
+            "medium",
+            "hard"
+          ],
+          "title": "Difficulty",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "family": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Family",
+          "type": "string"
+        },
+        "incident_input": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Incident Input",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "family",
+        "incident_input"
+      ],
+      "title": "VisibleCase",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -250,6 +932,14 @@
       "title": "Answer Key Manifest Sha256",
       "type": "string"
     },
+    "answer_keys": {
+      "items": {
+        "$ref": "#/$defs/HiddenAnswerKey"
+      },
+      "minItems": 1,
+      "title": "Answer Keys",
+      "type": "array"
+    },
     "benchmark_manifest_sha256": {
       "pattern": "^[0-9a-f]{64}$",
       "title": "Benchmark Manifest Sha256",
@@ -258,17 +948,67 @@
     "config": {
       "$ref": "#/$defs/EvaluationConfig"
     },
+    "effective_benchmark_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Effective Benchmark Sha256",
+      "type": "string"
+    },
+    "effective_visible_cases": {
+      "items": {
+        "$ref": "#/$defs/VisibleCase"
+      },
+      "minItems": 1,
+      "title": "Effective Visible Cases",
+      "type": "array"
+    },
+    "prediction_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prediction Sha256",
+      "type": "string"
+    },
+    "predictions": {
+      "items": {
+        "$ref": "#/$defs/Prediction"
+      },
+      "minItems": 1,
+      "title": "Predictions",
+      "type": "array"
+    },
+    "provider_config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Provider Config Sha256",
+      "type": "string"
+    },
+    "resolved_ablation_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Resolved Ablation Sha256",
+      "type": "string"
+    },
     "results": {
       "items": {
         "$ref": "#/$defs/CaseResult"
       },
+      "minItems": 1,
       "title": "Results",
       "type": "array"
     },
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "1.1",
+      "default": "1.1",
       "title": "Schema Version",
+      "type": "string"
+    },
+    "source_visible_cases": {
+      "items": {
+        "$ref": "#/$defs/VisibleCase"
+      },
+      "minItems": 1,
+      "title": "Source Visible Cases",
+      "type": "array"
+    },
+    "tool_policy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Tool Policy Sha256",
       "type": "string"
     }
   },
@@ -276,6 +1016,15 @@
     "config",
     "benchmark_manifest_sha256",
     "answer_key_manifest_sha256",
+    "effective_benchmark_sha256",
+    "prediction_sha256",
+    "resolved_ablation_sha256",
+    "provider_config_sha256",
+    "tool_policy_sha256",
+    "source_visible_cases",
+    "effective_visible_cases",
+    "answer_keys",
+    "predictions",
     "results",
     "aggregate"
   ],

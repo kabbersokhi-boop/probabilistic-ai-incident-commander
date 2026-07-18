@@ -1,6 +1,16 @@
 {
   "additionalProperties": false,
   "properties": {
+    "boundary": {
+      "default": "text",
+      "enum": [
+        "text",
+        "sql_policy",
+        "safe_path"
+      ],
+      "title": "Boundary",
+      "type": "string"
+    },
     "case_id": {
       "maxLength": 200,
       "minLength": 1,

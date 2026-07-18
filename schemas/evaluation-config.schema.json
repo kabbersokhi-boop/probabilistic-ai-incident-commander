@@ -8,6 +8,13 @@
           "title": "Abstention Enabled",
           "type": "boolean"
         },
+        "max_hypotheses": {
+          "default": 30,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Hypotheses",
+          "type": "integer"
+        },
         "max_tool_calls": {
           "default": 24,
           "maximum": 100,
@@ -16,7 +23,7 @@
           "type": "integer"
         },
         "name": {
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Name",
           "type": "string"
         },
@@ -54,6 +61,27 @@
       "title": "Benchmark Id",
       "type": "string"
     },
+    "provider_configuration": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "maxProperties": 100,
+      "title": "Provider Configuration",
+      "type": "object"
+    },
     "provider_label": {
       "maxLength": 200,
       "minLength": 1,
@@ -61,7 +89,7 @@
       "type": "string"
     },
     "run_id": {
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
       "title": "Run Id",
       "type": "string"
     },

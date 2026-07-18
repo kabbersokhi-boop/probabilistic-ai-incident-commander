@@ -470,6 +470,8 @@ def _build_evidence(
     impact_dir: Path | None,
 ) -> int:
     try:
+        if detection_dir is not None and analytics_dir is None:
+            raise EvidenceBuildError("--detection-dir requires --analytics-dir")
         config = load_evidence_config(config_path)
         result = build_evidence(
             dataset_dir,

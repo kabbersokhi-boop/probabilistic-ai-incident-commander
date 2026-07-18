@@ -85,6 +85,21 @@ def test_validation_detects_unsafe_manifest_path(tmp_path: Path, evidence_smoke_
     assert report.issues[0].code == "evidence.load"
 
 
+def test_validation_rejects_refreshed_detection_manifest_without_analytics(
+    tmp_path: Path, evidence_smoke_dir: Path
+) -> None:
+    copied = tmp_path / "detection-without-analytics"
+    shutil.copytree(evidence_smoke_dir, copied)
+
+    def transform(raw: dict[str, Any]) -> None:
+        raw["source_detection_manifest_sha256"] = "0" * 64
+
+    _rewrite_manifest(copied, transform)
+    report = validate_evidence_directory(copied)
+    assert not report.valid
+    assert "source.detection_binding" in {issue.code for issue in report.issues}
+
+
 def test_validation_rejects_refreshed_canonical_payload_drift(
     tmp_path: Path, evidence_smoke_dir: Path
 ) -> None:

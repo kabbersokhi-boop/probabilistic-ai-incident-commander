@@ -11,6 +11,7 @@ import pytest
 from paic.evidence.config import EvidenceConfig, ServiceDefinition
 from paic.evidence.engine import (
     EvidenceBuildError,
+    _build_deployment_evidence,
     _fulfilment_health,
     _lineage_has_cycle,
     _pipeline_health,
@@ -192,6 +193,68 @@ def test_rejects_optional_artifact_from_a_different_dataset(
             evidence_smoke_config,
             analytics_dir=analytics_smoke_dir,
         )
+
+
+def test_detection_source_requires_its_analytics_source(
+    detection_smoke_dir: Path,
+    evidence_smoke_config: EvidenceConfig,
+    impact_smoke_dataset_dir: Path,
+) -> None:
+    with pytest.raises(EvidenceBuildError, match="requires its analytics source"):
+        build_evidence(
+            impact_smoke_dataset_dir,
+            evidence_smoke_config,
+            detection_dir=detection_smoke_dir,
+        )
+
+
+def test_detection_rejects_analytics_from_another_dataset(
+    detection_smoke_dir: Path,
+    analytics_smoke_dir: Path,
+    evidence_smoke_config: EvidenceConfig,
+    impact_smoke_dataset_dir: Path,
+) -> None:
+    with pytest.raises(EvidenceBuildError, match="source analytics artifact is invalid"):
+        build_evidence(
+            impact_smoke_dataset_dir,
+            evidence_smoke_config,
+            analytics_dir=analytics_smoke_dir,
+            detection_dir=detection_smoke_dir,
+        )
+
+
+def test_deployment_roles_require_full_incident_relevance(
+    evidence_smoke_config: EvidenceConfig,
+) -> None:
+    base = {
+        "deployment_id": "DEP-1",
+        "service": evidence_smoke_config.incident.primary_service,
+        "version": "1.0.0",
+        "region_scope": "IN-SOUTH",
+        "deployed_at": evidence_smoke_config.incident.started_at,
+        "status": "succeeded",
+        "change_type": "application",
+        "rollback_available": True,
+    }
+    rows = [
+        base,
+        {
+            **base,
+            "deployment_id": "DEP-2",
+            "deployed_at": evidence_smoke_config.incident.started_at.replace(year=2025),
+        },
+        {**base, "deployment_id": "DEP-3", "status": "failed"},
+        {**base, "deployment_id": "DEP-4", "region_scope": "US-EAST"},
+        {**base, "deployment_id": "DEP-5", "service": "payment-service"},
+    ]
+    records = _build_deployment_evidence({"deployments": pl.DataFrame(rows)}, evidence_smoke_config)
+    assert [record["evidence_role"] for record in records] == [
+        "supporting",
+        "context",
+        "context",
+        "context",
+        "context",
+    ]
 
 
 def test_cycle_detection_and_missing_source_table(

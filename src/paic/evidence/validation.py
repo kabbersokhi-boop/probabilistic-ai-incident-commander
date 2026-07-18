@@ -190,6 +190,23 @@ def validate_evidence_directory(
             False, [EvidenceValidationIssue("evidence.load", str(exc))], {}
         )
     manifest = loaded.manifest
+    if (
+        manifest.source_detection_manifest_sha256 is not None
+        and manifest.source_analytics_manifest_sha256 is None
+    ):
+        issues.append(
+            EvidenceValidationIssue(
+                "source.detection_binding",
+                "detection source requires a corresponding analytics source",
+            )
+        )
+    if detection_dir is not None and analytics_dir is None:
+        issues.append(
+            EvidenceValidationIssue(
+                "source.detection_binding",
+                "detection validation requires --analytics-dir",
+            )
+        )
     table_map = {item.name: item for item in manifest.tables}
     if set(table_map) != set(EVIDENCE_TABLE_ORDER):
         issues.append(

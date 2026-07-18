@@ -521,9 +521,20 @@ def _build_deployment_evidence(
     tables: dict[str, pl.DataFrame], config: EvidenceConfig
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
+    window_start = config.incident.started_at - timedelta(
+        hours=config.incident.context_before_hours
+    )
+    window_end = config.incident.ended_at + timedelta(hours=config.incident.context_after_hours)
     for row in tables["deployments"].iter_rows(named=True):
         role: EvidenceRole = "context"
-        if row["service"] == config.incident.primary_service:
+        deployed_at = cast(datetime, row["deployed_at"])
+        region_matches = row["region_scope"] in {"all", "global", config.incident.region}
+        if (
+            row["service"] == config.incident.primary_service
+            and window_start <= deployed_at <= window_end
+            and region_matches
+            and str(row["status"]).lower() in {"applied", "succeeded", "success"}
+        ):
             role = "supporting"
         records.append(
             _record(
@@ -676,6 +687,8 @@ def _source_artifact_evidence(
             )
         )
     if detection_dir is not None:
+        if analytics_dir is None:
+            raise EvidenceBuildError("detection source requires its analytics source")
         detection_report = validate_detection_directory(detection_dir, analytics_dir=analytics_dir)
         if not detection_report.valid:
             raise EvidenceBuildError("source detection artifact is invalid")

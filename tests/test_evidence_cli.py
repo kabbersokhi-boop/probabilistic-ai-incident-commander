@@ -52,3 +52,35 @@ def test_evidence_cli_build_validate_and_summary(
     assert main(["evidence", "summary", "--evidence-dir", str(output)]) == 0
     summary = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
     assert summary["manifest"]["evidence_record_count"] > 100
+
+
+def test_evidence_cli_requires_analytics_for_detection(
+    tmp_path: Path,
+    repo_root: Path,
+    impact_smoke_dataset_dir: Path,
+    detection_smoke_dir: Path,
+    capsys: object,
+) -> None:
+    assert (
+        main(
+            [
+                "evidence",
+                "build",
+                "--dataset-dir",
+                str(impact_smoke_dataset_dir),
+                "--detection-dir",
+                str(detection_smoke_dir),
+                "--config",
+                str(repo_root / "configs" / "evidence" / "smoke.yaml"),
+                "--output-dir",
+                str(tmp_path / "evidence"),
+                "--format",
+                "json",
+            ]
+        )
+        == 2
+    )
+    assert json.loads(capsys.readouterr().out) == {
+        "success": False,
+        "error": "--detection-dir requires --analytics-dir",
+    }

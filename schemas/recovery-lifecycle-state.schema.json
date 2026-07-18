@@ -10,6 +10,11 @@
       "title": "Applied Report Sha256S",
       "type": "array"
     },
+    "config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
     "consecutive_failed_evaluations": {
       "default": 0,
       "minimum": 0,
@@ -20,6 +25,11 @@
       "default": false,
       "title": "Ever Recovered",
       "type": "boolean"
+    },
+    "execution_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Manifest Sha256",
+      "type": "string"
     },
     "execution_receipt_sha256": {
       "pattern": "^[a-f0-9]{64}$",
@@ -62,6 +72,11 @@
       "default": null,
       "title": "Last Report Sha256"
     },
+    "recovery_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
     "schema_version": {
       "const": "1.0",
       "default": "1.0",
@@ -80,8 +95,11 @@
     }
   },
   "required": [
+    "recovery_id",
     "incident_id",
     "execution_receipt_sha256",
+    "execution_manifest_sha256",
+    "config_sha256",
     "generation"
   ],
   "title": "RecoveryLifecycleState",

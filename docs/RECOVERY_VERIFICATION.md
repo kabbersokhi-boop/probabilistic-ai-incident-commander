@@ -45,6 +45,31 @@ recovery-report/
 
 Loading an artifact checks a closed-world layout, file hashes, success marker, source bindings, report hash, metric-table equality, and deterministic semantic replay.
 
+## Observation authority
+
+`paic recovery observations build` creates a separate closed-world observation
+artifact. Baseline rows are selected from a validated analytics artifact; post-action
+rows are generated deterministically from a strict evaluator scenario. They are
+explicitly synthetic evaluator evidence, not production telemetry. The artifact binds
+the analytics manifest and source lineage, execution receipt and manifest, incident,
+execution timestamp, and generator-configuration digest. `evaluate` accepts this
+validated directory rather than caller-authored rows or per-row hashes.
+
+The lifecycle's generation zero stores the resolved policy snapshot. Later immutable
+generations contain state, report, and event; event hashes bind both state hashes,
+the report, policy, transition, and previous event. Validation replays every
+transition against that stored policy. This is local-filesystem integrity, not
+distributed coordination or exactly-once delivery.
+
+The general one-day analytics smoke profile remains unchanged. Phase 9 uses a
+separate lightweight 14-day recovery source profile, so every recovery baseline is
+genuinely derived from validated analytics windows. Its public CLI lifecycle proves
+`insufficient_data`, `recovering`, sustained `recovered`, duplicate/stale rejection,
+consecutive reopening, and isolated immediate severe reopening without fabricating
+historical observations. The standard workflow uses the validated standard analytics
+artifact and continues to label post-remediation rows as evaluator-generated
+synthetic evidence rather than production telemetry.
+
 ## Trust and limitations
 
 - Observation producers remain part of the trusted data boundary.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -112,3 +113,40 @@ def test_artifact_rejects_metric_table_and_manifest_binding_tampering(tmp_path: 
     manifest_path.write_text(json.dumps(value) + "\n", encoding="utf-8")
     with pytest.raises(RecoveryArtifactError, match=r"metadata mismatch|success marker"):
         load_recovery(root)
+
+
+def test_artifact_overwrite_survives_post_commit_fsync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.recovery.artifact as artifact_module
+
+    root = tmp_path / "recovery"
+    original_report = build_artifact(root)
+    original_fsync = artifact_module._fsync_dir
+    calls = 0
+
+    def fail_only_parent(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("post-commit fsync unavailable")
+        original_fsync(path)
+
+    monkeypatch.setattr(artifact_module, "_fsync_dir", fail_only_parent)
+    manifest = export_recovery(config(), observations(), original_report, root, overwrite=True)
+    assert manifest.payload_sha256 == original_report.report_sha256
+    assert load_recovery(root).report == original_report
+
+
+def test_validate_recovery_checks_all_execution_identity_bindings(tmp_path: Path) -> None:
+    root = tmp_path / "recovery"
+    build_artifact(root)
+    assert validate_recovery(root, expected_execution_manifest_sha256=sha("other")) == [
+        "recovery artifact is bound to another execution manifest"
+    ]
+    assert validate_recovery(root, expected_incident_id="other-incident") == [
+        "recovery artifact is bound to another incident"
+    ]
+    assert validate_recovery(root, expected_executed_at=datetime(2026, 1, 2, tzinfo=UTC)) == [
+        "recovery artifact execution timestamp differs from receipt"
+    ]

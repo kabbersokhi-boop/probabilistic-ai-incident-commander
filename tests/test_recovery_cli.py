@@ -13,13 +13,19 @@ from test_recovery_unit import config, observations, sha
 def test_recovery_cli_evaluate_validate_summary_and_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    execution = SimpleNamespace(receipt=SimpleNamespace(receipt_sha256=sha("receipt")))
+    bound_observations = observations()
+    execution = SimpleNamespace(
+        receipt=SimpleNamespace(
+            receipt_sha256=sha("receipt"),
+            incident_id="incident-smoke",
+            executed_at=bound_observations.executed_at,
+        )
+    )
     monkeypatch.setattr(recovery_cli, "load_execution", lambda _: execution)
     monkeypatch.setattr(recovery_cli, "manifest_sha256", lambda _: sha("execution-manifest"))
+    monkeypatch.setattr(recovery_cli, "load_observations", lambda *_, **__: bound_observations)
     config_path = tmp_path / "config.json"
     config_path.write_text(config().model_dump_json(), encoding="utf-8")
-    observations_path = tmp_path / "observations.json"
-    observations_path.write_text(observations().model_dump_json(), encoding="utf-8")
     artifact = tmp_path / "recovery"
     state_store = tmp_path / "state"
 
@@ -28,7 +34,8 @@ def test_recovery_cli_evaluate_validate_summary_and_state(
             argparse.Namespace(
                 recovery_command="evaluate",
                 config=config_path,
-                observations=observations_path,
+                observations_dir=tmp_path / "observations",
+                analytics_dir=tmp_path / "analytics",
                 execution_dir=tmp_path / "execution",
                 output_dir=artifact,
                 overwrite=False,

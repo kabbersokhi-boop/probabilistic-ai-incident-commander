@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -33,12 +34,18 @@ class RecoveryObservation(StrictModel):
     observed_at: datetime
     value: float
     sample_size: int = Field(ge=1)
-    source_sha256: Sha256
 
     @field_validator("observed_at")
     @classmethod
     def aware_observed_at(cls, value: datetime) -> datetime:
         return require_aware(value)
+
+    @field_validator("value")
+    @classmethod
+    def finite_value(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("observation value must be finite")
+        return value
 
 
 class RecoveryObservationSet(StrictModel):
@@ -46,6 +53,11 @@ class RecoveryObservationSet(StrictModel):
     observation_set_id: Identifier
     incident_id: Identifier
     execution_receipt_sha256: Sha256
+    execution_manifest_sha256: Sha256
+    analytics_manifest_sha256: Sha256
+    source_simulation_id: Identifier
+    generator_config_sha256: Sha256
+    evaluator_generated: Literal[True] = True
     executed_at: datetime
     generated_at: datetime
     observations: list[RecoveryObservation] = Field(min_length=1, max_length=100_000)
@@ -66,6 +78,8 @@ class RecoveryObservationSet(StrictModel):
             raise ValueError("recovery observations require a pre-execution baseline")
         if not any(item.observed_at >= self.executed_at for item in self.observations):
             raise ValueError("recovery observations require post-execution values")
+        if any(item.observed_at > self.generated_at for item in self.observations):
+            raise ValueError("recovery observations cannot occur after generated_at")
         return self
 
 
@@ -139,8 +153,11 @@ class RecoveryReport(StrictModel):
 
 class RecoveryLifecycleState(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
+    recovery_id: Identifier
     incident_id: Identifier
     execution_receipt_sha256: Sha256
+    execution_manifest_sha256: Sha256
+    config_sha256: Sha256
     generation: int = Field(ge=0)
     status: LifecycleStatus = "monitoring"
     ever_recovered: bool = False
@@ -174,9 +191,13 @@ class RecoveryLifecycleState(StrictModel):
 
 class RecoveryLifecycleEvent(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
+    recovery_id: Identifier
     incident_id: Identifier
     generation: int = Field(ge=1)
     report_sha256: Sha256
+    config_sha256: Sha256
+    before_state_sha256: Sha256
+    after_state_sha256: Sha256
     previous_event_sha256: Sha256
     from_status: LifecycleStatus
     to_status: LifecycleStatus

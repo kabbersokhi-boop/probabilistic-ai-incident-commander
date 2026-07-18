@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "observation_set_id": "checkout-source-bound-smoke",
+  "generated_at_offset_hours": 6,
+  "post_interval_hours": 1,
+  "series": [
+    {
+      "metric_id": "checkout_conversion_rate",
+      "cohort": "overall",
+      "values": [0.72, 0.74, 0.76, 0.78],
+      "sample_size": 141
+    },
+    {
+      "metric_id": "payment_approval_rate",
+      "cohort": "overall",
+      "values": [0.86, 0.87, 0.88, 0.89],
+      "sample_size": 124
+    }
+  ]
+}

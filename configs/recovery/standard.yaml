@@ -1,13 +1,13 @@
 schema_version: "1.0"
 recovery_id: standard-commerce-recovery
-incident_id: checkout-address-validation-smoke
+incident_id: checkout-address-validation-outage
 alpha: 0.05
 scale_floor: 0.0001
 reopen_after_consecutive_failures: 2
 immediate_reopen_on_severe_guardrail: true
 metrics:
-  - metric_id: checkout_conversion
-    cohort: eu_android
+  - metric_id: checkout_conversion_rate
+    cohort: overall
     role: primary
     healthy_direction: higher_is_better
     baseline_lookback_periods: 24
@@ -20,8 +20,8 @@ metrics:
     minimum_within_band_fraction: 0.75
     minimum_improvement_fraction: 0.6
     severe_robust_z: 5.0
-  - metric_id: checkout_error_rate
-    cohort: eu_android
+  - metric_id: payment_decline_rate
+    cohort: overall
     role: primary
     healthy_direction: lower_is_better
     baseline_lookback_periods: 24
@@ -34,8 +34,8 @@ metrics:
     minimum_within_band_fraction: 0.75
     minimum_improvement_fraction: 0.6
     severe_robust_z: 5.0
-  - metric_id: payment_approval
-    cohort: eu_android
+  - metric_id: payment_approval_rate
+    cohort: overall
     role: guardrail
     healthy_direction: higher_is_better
     baseline_lookback_periods: 24
@@ -48,8 +48,8 @@ metrics:
     minimum_within_band_fraction: 0.75
     minimum_improvement_fraction: 0.5
     severe_robust_z: 4.0
-  - metric_id: checkout_latency_p95
-    cohort: eu_android
+  - metric_id: payment_latency_p95_ms
+    cohort: overall
     role: guardrail
     healthy_direction: lower_is_better
     baseline_lookback_periods: 24

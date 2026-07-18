@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-smoke validate-recovery-smoke test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -28,6 +28,8 @@ REMEDIATION_EXECUTION_DIR ?= .artifacts/remediation-execution
 REMEDIATION_STATE_AFTER_DIR ?= .artifacts/remediation-state-after
 REMEDIATION_STATE_STORE ?= .artifacts/remediation-state-store
 RECOVERY_INPUT_DIR ?= .artifacts/recovery-inputs
+RECOVERY_SOURCE_DIR ?= .artifacts/recovery-source
+RECOVERY_ANALYTICS_DIR ?= .artifacts/recovery-analytics
 RECOVERY_HEALTHY_DIR ?= .artifacts/recovery-healthy
 RECOVERY_REGRESSION_DIR ?= .artifacts/recovery-regression
 RECOVERY_STATE_STORE ?= .artifacts/recovery-state
@@ -181,19 +183,37 @@ validate-remediation-smoke:
 	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_AFTER_DIR)
 	$(PYTHON) -m paic remediate execution validate --execution-dir $(REMEDIATION_EXECUTION_DIR) --plan-dir $(REMEDIATION_PLAN_DIR) --before-state-dir $(REMEDIATION_STATE_DIR) --after-state-dir $(REMEDIATION_STATE_AFTER_DIR)
 
-recovery-smoke: remediation-smoke
-	@rm -rf $(RECOVERY_INPUT_DIR) $(RECOVERY_HEALTHY_DIR) $(RECOVERY_REGRESSION_DIR) $(RECOVERY_STATE_STORE); \
-	receipt_sha=$$($(PYTHON) -c 'import json; print(json.load(open("$(REMEDIATION_EXECUTION_DIR)/receipt.json"))["receipt_sha256"])'); \
-	$(PYTHON) examples/build_recovery_smoke_inputs.py --execution-receipt-sha256 "$$receipt_sha" --output-dir $(RECOVERY_INPUT_DIR); \
-	$(PYTHON) -m paic recovery evaluate --config $(RECOVERY_CONFIG) --observations $(RECOVERY_INPUT_DIR)/healthy.json --execution-dir $(REMEDIATION_EXECUTION_DIR) --output-dir $(RECOVERY_HEALTHY_DIR) --overwrite; \
-	$(PYTHON) -m paic recovery validate --recovery-dir $(RECOVERY_HEALTHY_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR); \
-	$(PYTHON) -m paic recovery state apply --recovery-dir $(RECOVERY_HEALTHY_DIR) --state-store $(RECOVERY_STATE_STORE); \
-	$(PYTHON) -m paic recovery evaluate --config $(RECOVERY_CONFIG) --observations $(RECOVERY_INPUT_DIR)/regression.json --execution-dir $(REMEDIATION_EXECUTION_DIR) --output-dir $(RECOVERY_REGRESSION_DIR) --overwrite || test $$? -eq 1; \
-	$(PYTHON) -m paic recovery state apply --recovery-dir $(RECOVERY_REGRESSION_DIR) --state-store $(RECOVERY_STATE_STORE) || test $$? -eq 1
+recovery-source-smoke:
+	$(PYTHON) -m paic simulate --config configs/simulation/recovery.yaml --output-dir $(RECOVERY_SOURCE_DIR) --overwrite
+	$(PYTHON) -m paic dataset validate --dataset-dir $(RECOVERY_SOURCE_DIR)
+	$(PYTHON) -m paic analytics build --dataset-dir $(RECOVERY_SOURCE_DIR) --config configs/analytics/recovery.yaml --output-dir $(RECOVERY_ANALYTICS_DIR) --overwrite
+	$(PYTHON) -m paic analytics validate --analytics-dir $(RECOVERY_ANALYTICS_DIR) --dataset-dir $(RECOVERY_SOURCE_DIR)
+
+recovery-smoke: remediation-smoke recovery-source-smoke
+	@rm -rf $(RECOVERY_INPUT_DIR) $(RECOVERY_HEALTHY_DIR) $(RECOVERY_REGRESSION_DIR) $(RECOVERY_STATE_STORE) .artifacts/recovery-state-severe; \
+	for name in insufficient recovering recovered regression-one regression-two severe; do \
+		$(PYTHON) -m paic recovery observations build --scenario configs/recovery/observation-$$name.json --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR) --output-dir .artifacts/obs-$$name --overwrite || exit $$?; \
+		$(PYTHON) -m paic recovery observations validate --observations-dir .artifacts/obs-$$name --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR) || exit $$?; \
+		$(PYTHON) -m paic recovery evaluate --config $(RECOVERY_CONFIG) --observations-dir .artifacts/obs-$$name --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR) --output-dir .artifacts/report-$$name --overwrite; code=$$?; \
+		case $$name in insufficient|recovering|regression-one|regression-two|severe) test $$code -eq 1;; recovered) test $$code -eq 0;; esac || exit $$?; \
+	 done; \
+	for name in insufficient recovering recovered; do \
+		$(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-$$name --state-store $(RECOVERY_STATE_STORE) || exit $$?; \
+		$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE) || exit $$?; \
+	 done; \
+	set +e; $(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-recovered --state-store $(RECOVERY_STATE_STORE); duplicate=$$?; \
+	$(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-insufficient --state-store $(RECOVERY_STATE_STORE); stale=$$?; set -e; \
+	test $$duplicate -eq 2 && test $$stale -eq 2; \
+	$(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-regression-one --state-store $(RECOVERY_STATE_STORE); \
+	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE); \
+	set +e; $(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-regression-two --state-store $(RECOVERY_STATE_STORE); reopened=$$?; set -e; test $$reopened -eq 1; \
+	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE); \
+	$(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-recovered --state-store .artifacts/recovery-state-severe; \
+	set +e; $(PYTHON) -m paic recovery state apply --recovery-dir .artifacts/report-severe --state-store .artifacts/recovery-state-severe; severe_reopened=$$?; set -e; test $$severe_reopened -eq 1; \
+	$(PYTHON) -m paic recovery state validate --state-store .artifacts/recovery-state-severe
 
 validate-recovery-smoke:
 	$(PYTHON) -m paic recovery validate --recovery-dir $(RECOVERY_HEALTHY_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
-	$(PYTHON) -m paic recovery validate --recovery-dir $(RECOVERY_REGRESSION_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
 	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE)
 
 test:

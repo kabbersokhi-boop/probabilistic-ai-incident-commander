@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Literal
@@ -23,7 +24,22 @@ class RecoveryEvaluationError(RuntimeError):
 
 
 def canonical(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
+    def normalize(item: Any) -> Any:
+        if isinstance(item, float):
+            if not math.isfinite(item):
+                raise RecoveryEvaluationError(
+                    "canonical recovery payload contains a non-finite value"
+                )
+            return 0.0 if item == 0.0 else item
+        if isinstance(item, dict):
+            return {str(key): normalize(nested) for key, nested in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [normalize(nested) for nested in item]
+        return item
+
+    return json.dumps(
+        normalize(value), sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str
+    )
 
 
 def digest(value: Any) -> str:
@@ -181,6 +197,8 @@ def evaluate_recovery(
         raise RecoveryEvaluationError(
             "recovery configuration and observations target different incidents"
         )
+    if execution_manifest_sha256 != observation_set.execution_manifest_sha256:
+        raise RecoveryEvaluationError("observations are bound to another execution manifest")
     at = evaluated_at or observation_set.generated_at
     if at.tzinfo is None or at.utcoffset() is None:
         raise RecoveryEvaluationError("evaluation time must include a timezone offset")

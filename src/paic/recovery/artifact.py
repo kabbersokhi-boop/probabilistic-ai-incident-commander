@@ -58,7 +58,10 @@ def manifest_sha256(path: str | Path) -> str:
 
 
 def _write(path: Path, content: str) -> RecoveryArtifactFile:
-    path.write_text(content, encoding="utf-8")
+    with path.open("x", encoding="utf-8") as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
     os.chmod(path, 0o600)
     return RecoveryArtifactFile(
         relative_path=path.name,
@@ -113,23 +116,47 @@ def export_recovery(
             files=sorted(files, key=lambda item: item.relative_path),
         )
         manifest_path = staged / "manifest.json"
-        manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        with manifest_path.open("x", encoding="utf-8") as handle:
+            handle.write(manifest.model_dump_json(indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.chmod(manifest_path, 0o600)
         marker = staged / "_SUCCESS"
-        marker.write_text(file_sha256(manifest_path) + "\n", encoding="utf-8")
+        with marker.open("x", encoding="utf-8") as handle:
+            handle.write(file_sha256(manifest_path) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.chmod(marker, 0o600)
         _fsync_dir(staged)
         load_recovery(staged)
         backup: Path | None = None
+        committed = False
         if exists:
-            backup = destination.with_name(f".{destination.name}.previous")
-            if backup.exists():
-                shutil.rmtree(backup)
+            backup = Path(
+                tempfile.mkdtemp(prefix=f".{destination.name}.backup-", dir=destination.parent)
+            )
+            backup.rmdir()
             os.replace(destination, backup)
-        os.replace(staged, destination)
-        _fsync_dir(destination.parent)
-        if backup is not None:
-            shutil.rmtree(backup)
+        try:
+            os.replace(staged, destination)
+            committed = True
+            try:
+                _fsync_dir(destination.parent)
+            except OSError:
+                # Visibility is the rename commit point.  A readable validated
+                # destination is authoritative even if a later durability hint fails.
+                load_recovery(destination)
+            if backup is not None:
+                shutil.rmtree(backup, ignore_errors=True)
+        except Exception:
+            if (
+                not committed
+                and backup is not None
+                and backup.exists()
+                and not destination.exists()
+            ):
+                os.replace(backup, destination)
+            raise
         return manifest
     except Exception:
         if staged.exists():
@@ -223,7 +250,12 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
 
 
 def validate_recovery(
-    path: str | Path, *, expected_execution_receipt_sha256: str | None = None
+    path: str | Path,
+    *,
+    expected_execution_receipt_sha256: str | None = None,
+    expected_execution_manifest_sha256: str | None = None,
+    expected_incident_id: str | None = None,
+    expected_executed_at: object | None = None,
 ) -> list[str]:
     try:
         loaded = load_recovery(path)
@@ -232,6 +264,20 @@ def validate_recovery(
             and loaded.report.execution_receipt_sha256 != expected_execution_receipt_sha256
         ):
             raise RecoveryArtifactError("recovery artifact is bound to another execution receipt")
+        if (
+            expected_execution_manifest_sha256 is not None
+            and loaded.report.execution_manifest_sha256 != expected_execution_manifest_sha256
+        ):
+            raise RecoveryArtifactError("recovery artifact is bound to another execution manifest")
+        if expected_incident_id is not None and loaded.report.incident_id != expected_incident_id:
+            raise RecoveryArtifactError("recovery artifact is bound to another incident")
+        if (
+            expected_executed_at is not None
+            and loaded.observations.executed_at != expected_executed_at
+        ):
+            raise RecoveryArtifactError(
+                "recovery artifact execution timestamp differs from receipt"
+            )
     except (RecoveryArtifactError, OSError, ValueError) as exc:
         return [str(exc)]
     return []

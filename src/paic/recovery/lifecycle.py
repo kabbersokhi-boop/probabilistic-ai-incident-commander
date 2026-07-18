@@ -56,6 +56,14 @@ def _fsync_dir(path: Path) -> None:
         os.close(descriptor)
 
 
+def _write_durable(path: Path, content: str) -> None:
+    with path.open("x", encoding="utf-8") as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(path, 0o600)
+
+
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
     staged = path.with_name(f".{path.name}.tmp")
     if staged.exists():
@@ -86,6 +94,15 @@ def transition_state(
         raise RecoveryStateStoreError("recovery report targets another incident")
     if report.execution_receipt_sha256 != previous.execution_receipt_sha256:
         raise RecoveryStateStoreError("recovery report targets another remediation execution")
+    if report.execution_manifest_sha256 != previous.execution_manifest_sha256:
+        raise RecoveryStateStoreError("recovery report targets another execution manifest")
+    if report.recovery_id != previous.recovery_id:
+        raise RecoveryStateStoreError("recovery report targets another recovery policy")
+    if (
+        report.config_sha256 != previous.config_sha256
+        or digest(config.model_dump(mode="json")) != previous.config_sha256
+    ):
+        raise RecoveryStateStoreError("recovery policy does not match lifecycle binding")
     if report.report_sha256 in previous.applied_report_sha256s:
         raise RecoveryStateStoreError("recovery report has already been applied")
     if previous.last_evaluated_at is not None and report.evaluated_at <= previous.last_evaluated_at:
@@ -117,8 +134,11 @@ def transition_state(
 
     return (
         RecoveryLifecycleState(
+            recovery_id=previous.recovery_id,
             incident_id=previous.incident_id,
             execution_receipt_sha256=previous.execution_receipt_sha256,
+            execution_manifest_sha256=previous.execution_manifest_sha256,
+            config_sha256=previous.config_sha256,
             generation=previous.generation + 1,
             status=status,
             ever_recovered=previous.ever_recovered or report.decision == "recovered",
@@ -145,22 +165,29 @@ class RecoveryStateStore:
         os.chmod(self.root, 0o700)
         self.generations.mkdir(exist_ok=True)
 
-    def initialize(self, incident_id: str, execution_receipt_sha256: str) -> RecoveryLifecycleState:
+    def initialize(
+        self, config: RecoveryConfig, execution_receipt_sha256: str, execution_manifest_sha256: str
+    ) -> RecoveryLifecycleState:
         self._ensure_root()
         with _lock(self.lock_path):
             if self.current_path.exists():
                 state, _, _ = self._current()
                 if (
-                    state.incident_id != incident_id
+                    state.incident_id != config.incident_id
                     or state.execution_receipt_sha256 != execution_receipt_sha256
+                    or state.execution_manifest_sha256 != execution_manifest_sha256
+                    or state.config_sha256 != digest(config.model_dump(mode="json"))
                 ):
                     raise RecoveryStateStoreError(
                         "recovery-state store is bound to another incident execution"
                     )
                 return state
             state = RecoveryLifecycleState(
-                incident_id=incident_id,
+                recovery_id=config.recovery_id,
+                incident_id=config.incident_id,
                 execution_receipt_sha256=execution_receipt_sha256,
+                execution_manifest_sha256=execution_manifest_sha256,
+                config_sha256=digest(config.model_dump(mode="json")),
                 generation=0,
             )
             destination = self.generations / "00000000000000000000"
@@ -170,8 +197,10 @@ class RecoveryStateStore:
                 )
             staged = Path(tempfile.mkdtemp(prefix=".prepare-", dir=self.root))
             try:
-                (staged / "state.json").write_text(
-                    state.model_dump_json(indent=2) + "\n", encoding="utf-8"
+                _write_durable(staged / "state.json", state.model_dump_json(indent=2) + "\n")
+                _write_durable(
+                    staged / "recovery.config.resolved.json",
+                    config.model_dump_json(indent=2) + "\n",
                 )
                 os.replace(staged, destination)
                 _fsync_dir(self.generations)
@@ -252,9 +281,13 @@ class RecoveryStateStore:
             previous_hash = previous_event.event_sha256 if previous_event is not None else ZERO_HASH
             event_payload = {
                 "schema_version": "1.0",
+                "recovery_id": state.recovery_id,
                 "incident_id": state.incident_id,
                 "generation": state.generation,
                 "report_sha256": report.report_sha256,
+                "config_sha256": state.config_sha256,
+                "before_state_sha256": digest(previous.model_dump(mode="json")),
+                "after_state_sha256": digest(state.model_dump(mode="json")),
                 "previous_event_sha256": previous_hash,
                 "from_status": previous.status,
                 "to_status": state.status,
@@ -280,12 +313,9 @@ class RecoveryStateStore:
                     raise RecoveryStateStoreError("target recovery-state generation already exists")
             staged = Path(tempfile.mkdtemp(prefix=".prepare-", dir=self.root))
             try:
-                (staged / "state.json").write_text(
-                    state.model_dump_json(indent=2) + "\n", encoding="utf-8"
-                )
-                (staged / "event.json").write_text(
-                    event.model_dump_json(indent=2) + "\n", encoding="utf-8"
-                )
+                _write_durable(staged / "state.json", state.model_dump_json(indent=2) + "\n")
+                _write_durable(staged / "report.json", report.model_dump_json(indent=2) + "\n")
+                _write_durable(staged / "event.json", event.model_dump_json(indent=2) + "\n")
                 os.replace(staged, destination)
                 _fsync_dir(self.generations)
                 _atomic_json(
@@ -337,19 +367,47 @@ class RecoveryStateStore:
                     raise RecoveryStateStoreError("recovery-state generations are not contiguous")
                 previous_event_hash = ZERO_HASH
                 previous_state: RecoveryLifecycleState | None = None
+                stored_config: RecoveryConfig | None = None
                 for generation in range(current.generation + 1):
                     root = committed[generation]
+                    expected_files = (
+                        {"state.json", "recovery.config.resolved.json"}
+                        if generation == 0
+                        else {"state.json", "event.json", "report.json"}
+                    )
+                    entries = list(root.iterdir())
+                    if {entry.name for entry in entries} != expected_files or any(
+                        entry.is_symlink() or not entry.is_file() for entry in entries
+                    ):
+                        raise RecoveryStateStoreError(
+                            "recovery-state generation contains missing or undeclared paths"
+                        )
                     state = RecoveryLifecycleState.model_validate_json(
                         (root / "state.json").read_text(encoding="utf-8")
                     )
                     if state.generation != generation:
                         raise RecoveryStateStoreError("stored recovery generation is inconsistent")
                     if generation == 0:
-                        if (root / "event.json").exists():
+                        stored_config = RecoveryConfig.model_validate_json(
+                            (root / "recovery.config.resolved.json").read_text(encoding="utf-8")
+                        )
+                        if (
+                            digest(stored_config.model_dump(mode="json")) != state.config_sha256
+                            or stored_config.recovery_id != state.recovery_id
+                            or stored_config.incident_id != state.incident_id
+                        ):
                             raise RecoveryStateStoreError(
-                                "initial recovery generation must not contain an event"
+                                "initial recovery policy binding is inconsistent"
                             )
                     else:
+                        if previous_state is None or stored_config is None:
+                            raise RecoveryStateStoreError(
+                                "recovery lifecycle has no initial policy"
+                            )
+                        report = RecoveryReport.model_validate_json(
+                            (root / "report.json").read_text(encoding="utf-8")
+                        )
+                        verify_report(report)
                         event = RecoveryLifecycleEvent.model_validate_json(
                             (root / "event.json").read_text(encoding="utf-8")
                         )
@@ -362,12 +420,30 @@ class RecoveryStateStore:
                                 "recovery lifecycle event chain is broken"
                             )
                         if (
-                            previous_state is None
-                            or event.from_status != previous_state.status
+                            event.from_status != previous_state.status
                             or event.to_status != state.status
                         ):
                             raise RecoveryStateStoreError(
                                 "recovery lifecycle event transition is inconsistent"
+                            )
+                        if (
+                            event.recovery_id != state.recovery_id
+                            or event.incident_id != state.incident_id
+                            or event.config_sha256 != state.config_sha256
+                            or event.report_sha256 != report.report_sha256
+                            or event.before_state_sha256
+                            != digest(previous_state.model_dump(mode="json"))
+                            or event.after_state_sha256 != digest(state.model_dump(mode="json"))
+                        ):
+                            raise RecoveryStateStoreError(
+                                "recovery lifecycle event bindings are inconsistent"
+                            )
+                        recomputed, trigger = transition_state(
+                            previous_state, report, stored_config
+                        )
+                        if recomputed != state or trigger != event.trigger:
+                            raise RecoveryStateStoreError(
+                                "recovery lifecycle transition does not match semantic replay"
                             )
                         previous_event_hash = event.event_sha256
                     previous_state = state

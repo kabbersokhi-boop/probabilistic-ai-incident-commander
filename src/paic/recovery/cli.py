@@ -16,19 +16,34 @@ from paic.recovery.artifact import (
 from paic.recovery.config import RecoveryConfigError, load_recovery_config
 from paic.recovery.engine import RecoveryEvaluationError, evaluate_recovery
 from paic.recovery.lifecycle import RecoveryStateStore, RecoveryStateStoreError
-from paic.recovery.models import RecoveryObservationSet
+from paic.recovery.observations import (
+    ObservationError,
+    ObservationScenario,
+    build_observations,
+    load_observations,
+    validate_observations,
+)
 from paic.remediation.artifact import load_execution, manifest_sha256
 
 
 def _evaluate(args: argparse.Namespace) -> int:
     try:
         config = load_recovery_config(args.config)
-        observations = RecoveryObservationSet.model_validate_json(
-            args.observations.read_text(encoding="utf-8")
+        observations = load_observations(
+            args.observations_dir,
+            analytics_dir=args.analytics_dir,
+            execution_dir=args.execution_dir,
         )
         execution = load_execution(args.execution_dir)
         if observations.execution_receipt_sha256 != execution.receipt.receipt_sha256:
             raise RecoveryEvaluationError("observations are bound to another execution receipt")
+        if observations.execution_manifest_sha256 != manifest_sha256(args.execution_dir):
+            raise RecoveryEvaluationError("observations are bound to another execution manifest")
+        if (
+            observations.incident_id != execution.receipt.incident_id
+            or observations.executed_at != execution.receipt.executed_at
+        ):
+            raise RecoveryEvaluationError("observations are bound to another execution identity")
         report = evaluate_recovery(
             config,
             observations,
@@ -69,15 +84,25 @@ def _evaluate(args: argparse.Namespace) -> int:
 
 def _validate(args: argparse.Namespace) -> int:
     expected = None
+    expected_manifest = None
+    expected_incident = None
+    expected_executed_at = None
     if args.execution_dir is not None:
         try:
-            expected = load_execution(args.execution_dir).receipt.receipt_sha256
+            execution = load_execution(args.execution_dir)
+            expected = execution.receipt.receipt_sha256
+            expected_manifest = manifest_sha256(args.execution_dir)
+            expected_incident = execution.receipt.incident_id
+            expected_executed_at = execution.receipt.executed_at
         except Exception as exc:
             print(json.dumps({"valid": False, "issues": [str(exc)]}, indent=2))
             return 2
     issues = validate_recovery(
         args.recovery_dir,
         expected_execution_receipt_sha256=expected,
+        expected_execution_manifest_sha256=expected_manifest,
+        expected_incident_id=expected_incident,
+        expected_executed_at=expected_executed_at,
     )
     print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
     return 1 if issues else 0
@@ -93,11 +118,51 @@ def _summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _observations_build(args: argparse.Namespace) -> int:
+    try:
+        scenario = ObservationScenario.model_validate_json(
+            args.scenario.read_text(encoding="utf-8")
+        )
+        observations = build_observations(
+            scenario,
+            args.analytics_dir,
+            args.execution_dir,
+            args.output_dir,
+            overwrite=args.overwrite,
+        )
+    except (OSError, ValueError, ObservationError) as exc:
+        print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        return 2
+    print(
+        json.dumps(
+            {
+                "success": True,
+                "observation_set_id": observations.observation_set_id,
+                "evaluator_generated": True,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _observations_validate(args: argparse.Namespace) -> int:
+    issues = validate_observations(
+        args.observations_dir, analytics_dir=args.analytics_dir, execution_dir=args.execution_dir
+    )
+    print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
+    return 1 if issues else 0
+
+
 def _state_apply(args: argparse.Namespace) -> int:
     try:
         loaded = load_recovery(args.recovery_dir)
         store = RecoveryStateStore(args.state_store)
-        store.initialize(loaded.report.incident_id, loaded.report.execution_receipt_sha256)
+        store.initialize(
+            loaded.config,
+            loaded.report.execution_receipt_sha256,
+            loaded.report.execution_manifest_sha256,
+        )
         state, event = store.apply(loaded.report, loaded.config)
     except (RecoveryArtifactError, RecoveryStateStoreError, ValueError, OSError) as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2))
@@ -140,11 +205,28 @@ def register_recovery_parser(subparsers: Any) -> None:
         help="Verify sustained statistical recovery and reopen regressed incidents.",
     )
     commands = parser.add_subparsers(dest="recovery_command", required=True)
+    observations = commands.add_parser(
+        "observations", help="Build or validate source-bound evaluator observations."
+    )
+    observation_commands = observations.add_subparsers(
+        dest="recovery_observations_command", required=True
+    )
+    observation_build = observation_commands.add_parser("build")
+    observation_build.add_argument("--scenario", type=Path, required=True)
+    observation_build.add_argument("--analytics-dir", type=Path, required=True)
+    observation_build.add_argument("--execution-dir", type=Path, required=True)
+    observation_build.add_argument("--output-dir", type=Path, required=True)
+    observation_build.add_argument("--overwrite", action="store_true")
+    observation_validate = observation_commands.add_parser("validate")
+    observation_validate.add_argument("--observations-dir", type=Path, required=True)
+    observation_validate.add_argument("--analytics-dir", type=Path)
+    observation_validate.add_argument("--execution-dir", type=Path)
     evaluate = commands.add_parser(
         "evaluate", help="Evaluate primary and guardrail recovery windows."
     )
     evaluate.add_argument("--config", type=Path, required=True)
-    evaluate.add_argument("--observations", type=Path, required=True)
+    evaluate.add_argument("--observations-dir", type=Path, required=True)
+    evaluate.add_argument("--analytics-dir", type=Path, required=True)
     evaluate.add_argument("--execution-dir", type=Path, required=True)
     evaluate.add_argument("--output-dir", type=Path, required=True)
     evaluate.add_argument("--overwrite", action="store_true")
@@ -169,6 +251,10 @@ def register_recovery_parser(subparsers: Any) -> None:
 
 
 def dispatch_recovery(args: argparse.Namespace) -> int:
+    if args.recovery_command == "observations" and args.recovery_observations_command == "build":
+        return _observations_build(args)
+    if args.recovery_command == "observations" and args.recovery_observations_command == "validate":
+        return _observations_validate(args)
     if args.recovery_command == "evaluate":
         return _evaluate(args)
     if args.recovery_command == "validate":

@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from paic.recovery.config import RecoveryConfig, RecoveryConfigError, load_recovery_config
-from paic.recovery.engine import RecoveryEvaluationError, _adverse, evaluate_recovery, verify_report
+from paic.recovery.engine import (
+    RecoveryEvaluationError,
+    _adverse,
+    canonical,
+    evaluate_recovery,
+    verify_report,
+)
 from paic.recovery.models import RecoveryObservationSet, RecoveryReport
 from paic.recovery.statistics import robust_center_scale, welch_tost
 
@@ -90,7 +96,6 @@ def observations(
                     "observed_at": executed - timedelta(hours=len(values) - index),
                     "value": value,
                     "sample_size": 100,
-                    "source_sha256": sha(f"base-{metric}-{index}"),
                 }
             )
     for metric, values in (("conversion", post_conversion), ("payment-approval", post_payment)):
@@ -104,7 +109,6 @@ def observations(
                     "observed_at": executed + timedelta(hours=index + 1),
                     "value": value,
                     "sample_size": 100,
-                    "source_sha256": sha(f"post-{metric}-{index}-{healthy}"),
                 }
             )
     return RecoveryObservationSet.model_validate(
@@ -112,6 +116,10 @@ def observations(
             "observation_set_id": f"set-{'healthy' if healthy else 'regression'}-{generated_hours}",
             "incident_id": "incident-smoke",
             "execution_receipt_sha256": sha("receipt"),
+            "execution_manifest_sha256": sha("execution-manifest"),
+            "analytics_manifest_sha256": sha("analytics-manifest"),
+            "source_simulation_id": "simulation-smoke",
+            "generator_config_sha256": sha("observation-scenario"),
             "executed_at": executed,
             "generated_at": executed + timedelta(hours=generated_hours),
             "observations": rows,
@@ -134,6 +142,10 @@ def test_robust_statistics_and_equivalence() -> None:
     result = welch_tost([1.0, 1.01, 0.99, 1.0], [1.0, 1.0, 1.01, 0.99], margin=0.05, alpha=0.05)
     assert result.equivalent
     assert result.pvalue < 0.05
+
+
+def test_canonical_recovery_payload_normalizes_negative_zero() -> None:
+    assert canonical({"slope": -0.0}) == canonical({"slope": 0.0})
 
 
 def test_healthy_windows_are_recovered() -> None:
@@ -174,7 +186,6 @@ def test_undeclared_series_is_rejected() -> None:
     value = observations().model_dump(mode="json")
     extra = dict(value["observations"][0])
     extra["metric_id"] = "undeclared"
-    extra["source_sha256"] = sha("extra")
     value["observations"].append(extra)
     with pytest.raises(RecoveryEvaluationError, match="undeclared"):
         evaluate_recovery(

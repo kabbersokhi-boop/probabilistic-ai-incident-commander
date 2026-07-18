@@ -6,17 +6,30 @@ from pathlib import Path
 import pytest
 
 from paic.recovery.lifecycle import RecoveryStateStore, RecoveryStateStoreError, transition_state
+from paic.recovery.models import RecoveryLifecycleState
 from test_recovery_unit import config, report, sha
 
 
-def test_recovered_then_severe_regression_reopens() -> None:
-    from paic.recovery.models import RecoveryLifecycleState
-
-    initial = RecoveryLifecycleState(
+def initial_state() -> RecoveryLifecycleState:
+    return RecoveryLifecycleState(
+        recovery_id=config().recovery_id,
         incident_id="incident-smoke",
         execution_receipt_sha256=sha("receipt"),
+        execution_manifest_sha256=sha("execution-manifest"),
+        config_sha256=sha_config(),
         generation=0,
     )
+
+
+def sha_config() -> str:
+    from paic.recovery.engine import digest
+
+    return digest(config().model_dump(mode="json"))
+
+
+def test_recovered_then_severe_regression_reopens() -> None:
+
+    initial = initial_state()
     recovered, trigger = transition_state(initial, report(True, 6), config())
     assert recovered.status == "recovered"
     assert trigger == "recovery_verified"
@@ -26,13 +39,8 @@ def test_recovered_then_severe_regression_reopens() -> None:
 
 
 def test_two_nonsevere_failures_after_recovery_reopen() -> None:
-    from paic.recovery.models import RecoveryLifecycleState
 
-    initial = RecoveryLifecycleState(
-        incident_id="incident-smoke",
-        execution_receipt_sha256=sha("receipt"),
-        generation=0,
-    )
+    initial = initial_state()
     recovered, _ = transition_state(initial, report(True, 6), config(reopen=2))
     value = report(False, 12).model_copy(update={"severe_guardrail_breach": False})
     # Keep the guardrail evaluation non-severe as well, then recompute through model construction.
@@ -60,7 +68,7 @@ def test_two_nonsevere_failures_after_recovery_reopen() -> None:
 
 def test_store_is_exactly_once_and_validates_chain(tmp_path: Path) -> None:
     store = RecoveryStateStore(tmp_path / "store")
-    store.initialize("incident-smoke", sha("receipt"))
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
     state, event = store.apply(report(True, 6), config())
     assert state.generation == 1
     assert event.to_status == "recovered"
@@ -71,7 +79,7 @@ def test_store_is_exactly_once_and_validates_chain(tmp_path: Path) -> None:
 
 def test_concurrent_apply_has_one_winner(tmp_path: Path) -> None:
     store = RecoveryStateStore(tmp_path / "store")
-    store.initialize("incident-smoke", sha("receipt"))
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
     candidate = report(True, 6)
 
     def apply_once() -> str:
@@ -90,7 +98,7 @@ def test_concurrent_apply_has_one_winner(tmp_path: Path) -> None:
 
 def test_orphan_prepared_generation_is_inert(tmp_path: Path) -> None:
     store = RecoveryStateStore(tmp_path / "store")
-    store.initialize("incident-smoke", sha("receipt"))
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
     orphan = store.generations / ".prepare-crash"
     orphan.mkdir()
     (orphan / "garbage").write_text("partial", encoding="utf-8")
@@ -104,7 +112,7 @@ def test_pointer_failure_leaves_inert_generation_and_retry_succeeds(
     import paic.recovery.lifecycle as lifecycle
 
     store = RecoveryStateStore(tmp_path / "store")
-    store.initialize("incident-smoke", sha("receipt"))
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
     original = lifecycle._atomic_json
     calls = 0
 
@@ -129,9 +137,13 @@ def test_lifecycle_rejects_uninitialized_mismatches_and_stale_reports(tmp_path: 
     with pytest.raises(RecoveryStateStoreError, match="not initialized"):
         store.current()
     assert store.validate() == ["recovery-state store is not initialized"]
-    store.initialize("incident-smoke", sha("receipt"))
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
     with pytest.raises(RecoveryStateStoreError, match="another incident execution"):
-        store.initialize("other-incident", sha("other-receipt"))
+        store.initialize(
+            config().model_copy(update={"incident_id": "other-incident"}),
+            sha("other-receipt"),
+            sha("execution-manifest"),
+        )
     candidate = report(True, 6)
     with pytest.raises(RecoveryStateStoreError, match="another incident"):
         transition_state(
@@ -154,8 +166,11 @@ def test_reopened_lifecycle_remains_reopened(tmp_path: Path) -> None:
     from paic.recovery.models import RecoveryLifecycleState
 
     previous = RecoveryLifecycleState(
+        recovery_id=config().recovery_id,
         incident_id="incident-smoke",
         execution_receipt_sha256=sha("receipt"),
+        execution_manifest_sha256=sha("execution-manifest"),
+        config_sha256=sha_config(),
         generation=1,
         status="reopened",
         ever_recovered=True,
@@ -163,3 +178,50 @@ def test_reopened_lifecycle_remains_reopened(tmp_path: Path) -> None:
     next_state, trigger = transition_state(previous, report(True, 6), config())
     assert next_state.status == "reopened"
     assert trigger == "incident_already_reopened"
+
+
+def test_policy_substitution_and_generation_tampering_are_rejected(tmp_path: Path) -> None:
+    import json
+
+    store = RecoveryStateStore(tmp_path / "store")
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
+    state, _ = store.apply(report(True, 6), config())
+    changed = config().model_copy(update={"reopen_after_consecutive_failures": 3})
+    with pytest.raises(RecoveryStateStoreError, match="policy"):
+        store.apply(report(False, 12), changed)
+    event_path = next(store.generations.glob(f"{state.generation:020d}-*/event.json"))
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    event["trigger"] = "tampered-trigger"
+    event_path.write_text(json.dumps(event), encoding="utf-8")
+    assert store.validate() != []
+
+
+def test_transition_rejects_manifest_policy_and_stale_bindings() -> None:
+    candidate = report(True, 6)
+    with pytest.raises(RecoveryStateStoreError, match="execution manifest"):
+        transition_state(
+            initial_state().model_copy(update={"execution_manifest_sha256": sha("other")}),
+            candidate,
+            config(),
+        )
+    with pytest.raises(RecoveryStateStoreError, match="recovery policy"):
+        transition_state(
+            initial_state().model_copy(update={"recovery_id": "other-recovery"}),
+            candidate,
+            config(),
+        )
+    recovered, _ = transition_state(initial_state(), candidate, config())
+    with pytest.raises(RecoveryStateStoreError, match="evaluation-time order"):
+        transition_state(recovered, report(False, 6), config())
+
+
+def test_pointer_post_commit_fsync_is_nonfatal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.recovery.lifecycle as lifecycle
+
+    pointer = tmp_path / "current.json"
+    pointer.with_name(".current.json.tmp").write_text("obsolete", encoding="utf-8")
+    monkeypatch.setattr(lifecycle, "_fsync_dir", lambda _: (_ for _ in ()).throw(OSError("fsync")))
+    lifecycle._atomic_json(pointer, {"generation": 0})
+    assert pointer.read_text(encoding="utf-8")

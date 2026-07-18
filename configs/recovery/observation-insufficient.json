@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "observation_set_id": "checkout-recovery-insufficient",
+  "generated_at_offset_hours": 6,
+  "post_interval_hours": 1,
+  "series": [
+    {"metric_id": "checkout_conversion_rate", "cohort": "overall", "values": [0.70], "sample_size": 141},
+    {"metric_id": "payment_approval_rate", "cohort": "overall", "values": [0.80], "sample_size": 124}
+  ]
+}

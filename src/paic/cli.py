@@ -48,7 +48,7 @@ from paic.detection.validation import (
     detection_report_to_json,
     validate_detection_directory,
 )
-from paic.evaluation.adversarial import AdversarialResult
+from paic.evaluation.adversarial import AdversarialCase, AdversarialResult
 from paic.evaluation.cli import dispatch_evaluation, register_evaluation_parser
 from paic.evaluation.comparison import ComparisonReport
 from paic.evaluation.models import EvaluationConfig, EvaluationRun
@@ -229,6 +229,7 @@ def _export_schemas(output_dir: Path) -> int:
         "evaluation-run.schema.json": EvaluationRun,
         "evaluation-comparison.schema.json": ComparisonReport,
         "evaluation-adversarial-result.schema.json": AdversarialResult,
+        "evaluation-adversarial-case.schema.json": AdversarialCase,
     }
     for filename, model in models.items():
         path = output_dir / filename

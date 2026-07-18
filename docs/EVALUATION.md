@@ -10,10 +10,11 @@ The initial offline runner reports Top-1 accuracy, Top-3 recall, reciprocal
 rank, Brier score, expected calibration error, abstention accuracy, selective
 accuracy, required-evidence coverage, unsupported-claim counts, and tool-call
 usage. Configuration records provider labels, a fixed seed, and ablation switches
-without requiring a live provider. The initial adversarial boundary treats
-unsupported claims, invalid evidence citations, and hidden-answer substitution
-as failures; later cases extend this corpus to prompt injection, path traversal,
-symlinks, stale approvals, token replay, and forged recovery evidence.
+without requiring a live provider. The adversarial suite covers prompt injection
+in runbooks/history/provider text, fake operational instructions, destructive SQL,
+path traversal, unsafe mutation authority, recovery-claim attempts, and compound
+attacks. Artifact-level substitution and replay controls remain delegated to the
+existing governed artifact and remediation/recovery validators.
 
 Evaluation exports are closed-world, hash-bound, and replayable:
 

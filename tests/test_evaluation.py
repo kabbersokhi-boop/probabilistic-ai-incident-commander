@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from paic.evaluation.adversarial import check_adversarial_text
+from paic.evaluation.adversarial import (
+    AdversarialCase,
+    check_adversarial_text,
+    evaluate_adversarial_suite,
+)
 from paic.evaluation.artifact import EvaluationArtifactError, export_evaluation, replay_evaluation
 from paic.evaluation.benchmark import BenchmarkError, load_benchmark, load_predictions
 from paic.evaluation.cli import dispatch_evaluation
@@ -183,3 +187,41 @@ def test_prediction_validation_rejects_duplicate_or_mismatched_probability_keys(
         Prediction(case_id="x", ranked_hypotheses=["a", "a"], probabilities={"a": 1.0})
     with pytest.raises(ValidationError):
         Prediction(case_id="x", ranked_hypotheses=["a", "b"], probabilities={"a": 1.0})
+
+
+def test_adversarial_fixture_suite_is_complete() -> None:
+    cases = [
+        AdversarialCase.model_validate(item)
+        for item in json.loads((ROOT / "configs/evaluation/adversarial/cases.json").read_text())
+    ]
+    results = evaluate_adversarial_suite(cases)
+    assert len(results) == 12
+    assert all(result.blocked for result in results)
+
+
+def test_adversarial_suite_rejects_unblocked_expectation_and_cli_runs_fixture(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from argparse import Namespace
+
+    with pytest.raises(ValueError, match="not blocked"):
+        evaluate_adversarial_suite(
+            [
+                AdversarialCase(
+                    case_id="safe",
+                    threat="none",
+                    input="read-only summary",
+                    expected_reason="prompt_injection",
+                )
+            ]
+        )
+    assert (
+        dispatch_evaluation(
+            Namespace(
+                evaluation_command="adversarial-suite",
+                cases=ROOT / "configs/evaluation/adversarial/cases.json",
+            )
+        )
+        == 0
+    )
+    assert '"case_count": 12' in capsys.readouterr().out

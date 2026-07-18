@@ -85,6 +85,7 @@ def test_export_schemas_writes_thirty_documents(
         "evaluation-run.schema.json",
         "evaluation-comparison.schema.json",
         "evaluation-adversarial-result.schema.json",
+        "evaluation-adversarial-case.schema.json",
     }
 
 

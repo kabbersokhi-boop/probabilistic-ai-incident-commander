@@ -7,7 +7,11 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
-from paic.evaluation.adversarial import check_adversarial_text
+from paic.evaluation.adversarial import (
+    AdversarialCase,
+    check_adversarial_text,
+    evaluate_adversarial_suite,
+)
 from paic.evaluation.artifact import EvaluationArtifactError, export_evaluation, replay_evaluation
 from paic.evaluation.benchmark import BenchmarkError, load_benchmark, load_predictions
 from paic.evaluation.comparison import compare_runs
@@ -44,6 +48,8 @@ def register_evaluation_parser(subparsers: Any) -> None:
     )
     adversarial.add_argument("--case-id", required=True)
     adversarial.add_argument("--input", required=True)
+    suite = commands.add_parser("adversarial-suite", help="Run the declared adversarial corpus.")
+    suite.add_argument("--cases", type=Path, required=True)
 
 
 def dispatch_evaluation(args: Namespace) -> int:
@@ -123,6 +129,22 @@ def dispatch_evaluation(args: Namespace) -> int:
             result = check_adversarial_text(args.case_id, args.input)
             print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
             return 0 if result.blocked else 1
+        if command == "adversarial-suite":
+            cases = [
+                AdversarialCase.model_validate(item) for item in json.loads(args.cases.read_text())
+            ]
+            adversarial_results = evaluate_adversarial_suite(cases)
+            print(
+                json.dumps(
+                    {
+                        "valid": True,
+                        "case_count": len(adversarial_results),
+                        "results": [item.model_dump(mode="json") for item in adversarial_results],
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0
         run = replay_evaluation(args.run_dir)
         print(json.dumps(run.aggregate.model_dump(mode="json"), indent=2, sort_keys=True))
         return 0

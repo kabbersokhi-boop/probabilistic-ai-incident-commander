@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -20,6 +20,13 @@ INVESTIGATION_REQUEST ?= .artifacts/investigation-request.json
 INVESTIGATION_SCRIPT ?= .artifacts/investigation-provider-script.json
 INVESTIGATION_AUDIT_DIR ?= .artifacts/investigation-tool-audit
 INVESTIGATION_SMOKE_DIR ?= .artifacts/investigation-smoke
+REMEDIATION_CONFIG ?= configs/remediation/smoke.yaml
+REMEDIATION_STATE_DIR ?= .artifacts/remediation-state
+REMEDIATION_PLAN_DIR ?= .artifacts/remediation-plan
+REMEDIATION_APPROVAL_DIR ?= .artifacts/remediation-approval
+REMEDIATION_EXECUTION_DIR ?= .artifacts/remediation-execution
+REMEDIATION_STATE_AFTER_DIR ?= .artifacts/remediation-state-after
+REMEDIATION_TEST_SECRET ?= ci-only-remediation-secret-0123456789abcdef0123456789abcdef
 SCHEMA_TMP ?= schemas-generated
 
 install:
@@ -154,6 +161,24 @@ validate-investigation-smoke:
 replay-investigation-smoke:
 	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR)
 
+remediation-smoke: investigation-smoke
+	rm -rf $(REMEDIATION_STATE_DIR) $(REMEDIATION_PLAN_DIR) $(REMEDIATION_APPROVAL_DIR) $(REMEDIATION_EXECUTION_DIR) $(REMEDIATION_STATE_AFTER_DIR) .artifacts/remediation-approval.token
+	$(PYTHON) examples/build_remediation_smoke_inputs.py --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-input .artifacts/remediation-state-input.json --proposal .artifacts/remediation-proposal.json
+	$(PYTHON) -m paic remediate state build --input .artifacts/remediation-state-input.json --output-dir $(REMEDIATION_STATE_DIR) --overwrite
+	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
+	$(PYTHON) examples/build_remediation_smoke_inputs.py --plan-dir $(REMEDIATION_PLAN_DIR) --decision-one .artifacts/remediation-decision-one.json --decision-two .artifacts/remediation-decision-two.json --execution-request .artifacts/remediation-execution-request.json
+	$(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-one.json
+	$(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-two.json
+	env PAIC_APPROVAL_SECRET=$(REMEDIATION_TEST_SECRET) $(PYTHON) -m paic remediate token issue --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --at 2026-07-18T00:07:00+00:00 --output .artifacts/remediation-approval.token
+	env PAIC_APPROVAL_SECRET=$(REMEDIATION_TEST_SECRET) $(PYTHON) -m paic remediate execute --plan-dir $(REMEDIATION_PLAN_DIR) --state-dir $(REMEDIATION_STATE_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --token-file .artifacts/remediation-approval.token --request .artifacts/remediation-execution-request.json --output-state-dir $(REMEDIATION_STATE_AFTER_DIR) --output-dir $(REMEDIATION_EXECUTION_DIR) --overwrite
+	rm -f .artifacts/remediation-approval.token
+
+validate-remediation-smoke:
+	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_DIR)
+	$(PYTHON) -m paic remediate plan validate --plan-dir $(REMEDIATION_PLAN_DIR) --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR)
+	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_AFTER_DIR)
+	$(PYTHON) -m paic remediate execution validate --execution-dir $(REMEDIATION_EXECUTION_DIR) --plan-dir $(REMEDIATION_PLAN_DIR) --before-state-dir $(REMEDIATION_STATE_DIR) --after-state-dir $(REMEDIATION_STATE_AFTER_DIR)
+
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q
 
@@ -174,7 +199,7 @@ typecheck:
 
 check: validate format-check lint typecheck coverage schema-check
 
-verify: check detection-smoke validate-detection-smoke impact-smoke validate-impact-smoke evidence-smoke validate-evidence-smoke tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke
+verify: check detection-smoke validate-detection-smoke impact-smoke validate-impact-smoke evidence-smoke validate-evidence-smoke tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke
 
 clean:
 	rm -rf .artifacts .coverage .mypy_cache .pytest_cache .ruff_cache build dist htmlcov schemas-generated

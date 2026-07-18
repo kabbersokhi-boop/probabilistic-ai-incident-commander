@@ -1,0 +1,386 @@
+{
+  "$defs": {
+    "ActionExecutionReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "enum": [
+            "deployment.rollback",
+            "feature_flag.set",
+            "configuration.restore"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "after_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "After Sha256",
+          "type": "string"
+        },
+        "before_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Before Sha256",
+          "type": "string"
+        },
+        "inverse_action": {
+          "discriminator": {
+            "mapping": {
+              "configuration.restore": "#/$defs/RestoreConfigurationAction",
+              "deployment.rollback": "#/$defs/RollbackDeploymentAction",
+              "feature_flag.set": "#/$defs/SetFeatureFlagAction"
+            },
+            "propertyName": "action_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RollbackDeploymentAction"
+            },
+            {
+              "$ref": "#/$defs/SetFeatureFlagAction"
+            },
+            {
+              "$ref": "#/$defs/RestoreConfigurationAction"
+            }
+          ],
+          "title": "Inverse Action"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "status": {
+          "const": "executed",
+          "default": "executed",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_type",
+        "resource_id",
+        "before_sha256",
+        "after_sha256",
+        "inverse_action"
+      ],
+      "title": "ActionExecutionReceipt",
+      "type": "object"
+    },
+    "RestoreConfigurationAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "configuration.restore",
+          "default": "configuration.restore",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_current_version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Expected Current Version",
+          "type": "string"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "target_version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_current_version",
+        "target_version"
+      ],
+      "title": "RestoreConfigurationAction",
+      "type": "object"
+    },
+    "RollbackDeploymentAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "deployment.rollback",
+          "default": "deployment.rollback",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_current_revision": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Expected Current Revision",
+          "type": "string"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "target_revision": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_current_revision",
+        "target_revision"
+      ],
+      "title": "RollbackDeploymentAction",
+      "type": "object"
+    },
+    "SetFeatureFlagAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "feature_flag.set",
+          "default": "feature_flag.set",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "desired_enabled": {
+          "title": "Desired Enabled",
+          "type": "boolean"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_enabled": {
+          "title": "Expected Enabled",
+          "type": "boolean"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_enabled",
+        "desired_enabled"
+      ],
+      "title": "SetFeatureFlagAction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_receipts": {
+      "items": {
+        "$ref": "#/$defs/ActionExecutionReceipt"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Action Receipts",
+      "type": "array"
+    },
+    "after_state_payload_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "After State Payload Sha256",
+      "type": "string"
+    },
+    "approval_snapshot_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Approval Snapshot Sha256",
+      "type": "string"
+    },
+    "before_state_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Before State Manifest Sha256",
+      "type": "string"
+    },
+    "executed_at": {
+      "format": "date-time",
+      "title": "Executed At",
+      "type": "string"
+    },
+    "executed_by": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Executed By",
+      "type": "string"
+    },
+    "execution_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "plan_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Plan Sha256",
+      "type": "string"
+    },
+    "receipt_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Receipt Sha256",
+      "type": "string"
+    },
+    "remediation_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Remediation Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "const": "executed",
+      "default": "executed",
+      "title": "Status",
+      "type": "string"
+    },
+    "token_nonce_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Token Nonce Sha256",
+      "type": "string"
+    },
+    "token_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Token Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_id",
+    "remediation_id",
+    "incident_id",
+    "executed_by",
+    "executed_at",
+    "plan_sha256",
+    "approval_snapshot_sha256",
+    "token_sha256",
+    "token_nonce_sha256",
+    "before_state_manifest_sha256",
+    "after_state_payload_sha256",
+    "action_receipts",
+    "receipt_sha256"
+  ],
+  "title": "ExecutionReceipt",
+  "type": "object"
+}

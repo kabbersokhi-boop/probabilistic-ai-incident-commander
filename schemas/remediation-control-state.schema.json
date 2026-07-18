@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "ConfigurationResource": {
+      "additionalProperties": false,
+      "properties": {
+        "available_versions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Available Versions",
+          "type": "array"
+        },
+        "current_version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Current Version",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_type": {
+          "const": "configuration",
+          "default": "configuration",
+          "title": "Resource Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "current_version",
+        "available_versions"
+      ],
+      "title": "ConfigurationResource",
+      "type": "object"
+    },
+    "DeploymentResource": {
+      "additionalProperties": false,
+      "properties": {
+        "available_revisions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Available Revisions",
+          "type": "array"
+        },
+        "current_revision": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Current Revision",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_type": {
+          "const": "deployment",
+          "default": "deployment",
+          "title": "Resource Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "current_revision",
+        "available_revisions"
+      ],
+      "title": "DeploymentResource",
+      "type": "object"
+    },
+    "FeatureFlagResource": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_type": {
+          "const": "feature_flag",
+          "default": "feature_flag",
+          "title": "Resource Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "enabled"
+      ],
+      "title": "FeatureFlagResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "consumed_token_nonce_hashes": {
+      "items": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "title": "Consumed Token Nonce Hashes",
+      "type": "array"
+    },
+    "executed_plan_hashes": {
+      "items": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "title": "Executed Plan Hashes",
+      "type": "array"
+    },
+    "generation": {
+      "minimum": 0,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "resources": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "configuration": "#/$defs/ConfigurationResource",
+            "deployment": "#/$defs/DeploymentResource",
+            "feature_flag": "#/$defs/FeatureFlagResource"
+          },
+          "propertyName": "resource_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/DeploymentResource"
+          },
+          {
+            "$ref": "#/$defs/FeatureFlagResource"
+          },
+          {
+            "$ref": "#/$defs/ConfigurationResource"
+          }
+        ]
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Resources",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "state_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "State Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "state_id",
+    "incident_id",
+    "generation",
+    "resources"
+  ],
+  "title": "ControlState",
+  "type": "object"
+}

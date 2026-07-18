@@ -1,0 +1,26 @@
+schema_version: "1.0"
+policy_id: governed-remediation-smoke
+investigation_gate:
+  minimum_confidence: 0.80
+  minimum_selected_posterior: 0.75
+  minimum_posterior_margin: 0.20
+  maximum_normalized_entropy: 0.65
+  minimum_supporting_evidence: 2
+remediation:
+  allowed_action_types:
+    - deployment.rollback
+    - feature_flag.set
+    - configuration.restore
+  maximum_blast_radius: multi_service
+  maximum_actions: 3
+  deny_critical_risk: true
+approval:
+  plan_ttl_minutes: 30
+  token_ttl_minutes: 10
+  secret_env: PAIC_APPROVAL_SECRET
+  minimum_secret_bytes: 32
+  allow_requester_approval: false
+  require_distinct_groups_for_high_risk: true
+  low_risk_approvals: 1
+  medium_risk_approvals: 1
+  high_risk_approvals: 2

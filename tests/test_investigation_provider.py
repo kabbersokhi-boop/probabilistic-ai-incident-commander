@@ -7,6 +7,7 @@ from urllib.request import Request
 
 import pytest
 
+from paic import __version__
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.models import ChatMessage
 from paic.investigation.provider import GroqProvider, NvidiaNIMProvider, ProviderError
@@ -123,7 +124,7 @@ def test_groq_request_shape_is_explicit_and_does_not_use_nim_fields(
     assert captured["stream"] is False
     assert "max_tokens" not in captured
     assert "chat_template_kwargs" not in captured
-    assert captured["user_agent"] == "paic/0.8.0"
+    assert captured["user_agent"] == f"paic/{__version__}"
     messages = captured["messages"]
     assert isinstance(messages, list)
     assert all(isinstance(message, dict) and "name" not in message for message in messages)

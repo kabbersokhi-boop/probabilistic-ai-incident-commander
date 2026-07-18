@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "ArtifactFileManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "byte_size",
+        "sha256"
+      ],
+      "title": "ArtifactFileManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "artifact_type": {
+      "enum": [
+        "control_state",
+        "remediation_plan",
+        "execution_receipt"
+      ],
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "bindings": {
+      "additionalProperties": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "title": "Bindings",
+      "type": "object"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ArtifactFileManifest"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "incident_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "payload_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_type",
+    "artifact_id",
+    "incident_id",
+    "generator_version",
+    "status",
+    "payload_sha256",
+    "bindings",
+    "files"
+  ],
+  "title": "RemediationArtifactManifest",
+  "type": "object"
+}

@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "executed_at": {
+      "format": "date-time",
+      "title": "Executed At",
+      "type": "string"
+    },
+    "executed_by": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Executed By",
+      "type": "string"
+    },
+    "execution_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_id",
+    "executed_by",
+    "executed_at"
+  ],
+  "title": "ExecutionRequest",
+  "type": "object"
+}

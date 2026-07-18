@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides eight working capabilities.
+The repository currently provides nine working capabilities.
 
 ### Executable product and evaluation contracts
 
@@ -128,6 +128,17 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 - Deterministic posterior ranking, entropy, confidence, and abstention outside the language model
 - Source-bound reports, hash-chained transcripts, validation, replay, and benchmark metrics
 - Fully offline scripted-provider CI; live API access is optional and uses an environment-only key
+
+### Governed remediation and human approval
+
+- Strict reversible action proposals bound to a validated, concluded investigation
+- Deterministic confidence, evidence, state-precondition, blast-radius, and risk policy
+- Immutable source-bound remediation plans and closed-world artifact validation
+- Append-only human approval decisions with requester separation and rejection vetoes
+- Short-lived HMAC approval tokens bound to the exact approval snapshot and action set
+- Atomic simulated deployment rollback, feature-flag, and configuration execution
+- One-time token and plan replay protection plus fresh inverse rollback proposals
+- No production infrastructure mutation; recovery verification remains a separate capability
 
 ## Quick start
 

@@ -42,3 +42,16 @@ Tool output and retrieved text are untrusted data. Prompt-like instructions insi
 Provider free-form content and any reasoning trace are runtime-only. Investigation exports record only bounded operational metadata and a SHA-256 receipt for that content; they never serialize the prose itself.
 
 Thinking content is not persisted. The system records structured tool calls, bounded tool results, model route attempts, accepted proposals, deterministic probability outputs, and integrity hashes rather than hidden model reasoning.
+
+
+## Governed remediation controls
+
+- Only three reversible simulated action types are registered.
+- Every plan is bound to the exact investigation report, selected hypothesis, source manifests, and control-state manifest.
+- Abstained, failed, low-confidence, high-entropy, weakly supported, stale, unsupported, excessive-blast-radius, and critical-risk proposals are denied.
+- Natural language never constitutes approval. Decisions use strict schemas and an append-only hash chain.
+- The requester cannot approve the same plan; rejections veto execution; high-risk approvals require independent groups.
+- `PAIC_APPROVAL_SECRET` is environment-only. Tokens are short lived and are not persisted in exported artifacts.
+- Execution records only token and nonce hashes, rejects replay, preserves the source state, and writes a new state generation.
+- Rollback actions are recorded, but rollback requires a new plan and new approval.
+- The reference executor cannot access cloud, deployment, shell, filesystem paths outside its artifacts, or production credentials.

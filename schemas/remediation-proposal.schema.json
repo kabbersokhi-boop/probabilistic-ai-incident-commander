@@ -1,0 +1,311 @@
+{
+  "$defs": {
+    "RestoreConfigurationAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "configuration.restore",
+          "default": "configuration.restore",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_current_version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Expected Current Version",
+          "type": "string"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "target_version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_current_version",
+        "target_version"
+      ],
+      "title": "RestoreConfigurationAction",
+      "type": "object"
+    },
+    "RollbackDeploymentAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "deployment.rollback",
+          "default": "deployment.rollback",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_current_revision": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Expected Current Revision",
+          "type": "string"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "target_revision": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_current_revision",
+        "target_revision"
+      ],
+      "title": "RollbackDeploymentAction",
+      "type": "object"
+    },
+    "SetFeatureFlagAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "const": "feature_flag.set",
+          "default": "feature_flag.set",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "blast_radius": {
+          "enum": [
+            "single_instance",
+            "single_service",
+            "multi_service",
+            "region",
+            "global"
+          ],
+          "title": "Blast Radius",
+          "type": "string"
+        },
+        "desired_enabled": {
+          "title": "Desired Enabled",
+          "type": "boolean"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9]+(?:[._/-][A-Za-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_enabled": {
+          "title": "Expected Enabled",
+          "type": "boolean"
+        },
+        "justification": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Resource Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "blast_radius",
+        "evidence_ids",
+        "justification",
+        "resource_id",
+        "expected_enabled",
+        "desired_enabled"
+      ],
+      "title": "SetFeatureFlagAction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actions": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "configuration.restore": "#/$defs/RestoreConfigurationAction",
+            "deployment.rollback": "#/$defs/RollbackDeploymentAction",
+            "feature_flag.set": "#/$defs/SetFeatureFlagAction"
+          },
+          "propertyName": "action_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/RollbackDeploymentAction"
+          },
+          {
+            "$ref": "#/$defs/SetFeatureFlagAction"
+          },
+          {
+            "$ref": "#/$defs/RestoreConfigurationAction"
+          }
+        ]
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Actions",
+      "type": "array"
+    },
+    "expected_outcome": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Expected Outcome",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "investigation_report_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Investigation Report Sha256",
+      "type": "string"
+    },
+    "remediation_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Remediation Id",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "requested_by": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Requested By",
+      "type": "string"
+    },
+    "rollback_trigger": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Rollback Trigger",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_hypothesis_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Selected Hypothesis Id",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "remediation_id",
+    "incident_id",
+    "investigation_report_sha256",
+    "selected_hypothesis_id",
+    "requested_by",
+    "requested_at",
+    "summary",
+    "expected_outcome",
+    "rollback_trigger",
+    "actions"
+  ],
+  "title": "RemediationProposal",
+  "type": "object"
+}

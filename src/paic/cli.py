@@ -48,6 +48,12 @@ from paic.detection.validation import (
     detection_report_to_json,
     validate_detection_directory,
 )
+from paic.evidence.config import EvidenceConfig, EvidenceConfigError, load_evidence_config
+from paic.evidence.engine import EvidenceBuildError, build_evidence
+from paic.evidence.io import EvidenceIOError, export_evidence, load_evidence
+from paic.evidence.manifest import EvidenceManifest
+from paic.evidence.summary import build_evidence_summary
+from paic.evidence.validation import evidence_report_to_json, validate_evidence_directory
 from paic.impact.config import ImpactConfig, ImpactConfigError, load_impact_config
 from paic.impact.engine import ImpactBuildError, build_impact
 from paic.impact.io import ImpactIOError, export_impact, load_impact
@@ -151,6 +157,8 @@ def _export_schemas(output_dir: Path) -> int:
         "detection-manifest.schema.json": DetectionManifest,
         "impact-config.schema.json": ImpactConfig,
         "impact-manifest.schema.json": ImpactManifest,
+        "evidence-config.schema.json": EvidenceConfig,
+        "evidence-manifest.schema.json": EvidenceManifest,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -451,6 +459,96 @@ def _impact_summary(impact_dir: Path) -> int:
     return 0
 
 
+def _build_evidence(
+    dataset_dir: Path,
+    config_path: Path,
+    output_dir: Path,
+    overwrite: bool,
+    output_format: str,
+    analytics_dir: Path | None,
+    detection_dir: Path | None,
+    impact_dir: Path | None,
+) -> int:
+    try:
+        if detection_dir is not None and analytics_dir is None:
+            raise EvidenceBuildError("--detection-dir requires --analytics-dir")
+        config = load_evidence_config(config_path)
+        result = build_evidence(
+            dataset_dir,
+            config,
+            analytics_dir=analytics_dir,
+            detection_dir=detection_dir,
+            impact_dir=impact_dir,
+        )
+        manifest = export_evidence(result, output_dir, overwrite=overwrite)
+        summary = build_evidence_summary(load_evidence(output_dir))
+    except (
+        EvidenceConfigError,
+        EvidenceBuildError,
+        EvidenceIOError,
+        DatasetIOError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        else:
+            print(f"EVIDENCE ERROR: {exc}", file=sys.stderr)
+        return 2
+    payload = {
+        "success": True,
+        "evidence_id": config.evidence_id,
+        "output_dir": str(output_dir.resolve()),
+        "manifest": manifest.model_dump(mode="json"),
+        "summary": summary,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    else:
+        print(f"Built {config.evidence_id} in {output_dir.resolve()}")
+        print(f"Evidence records: {manifest.evidence_record_count:,}")
+        print(f"Timeline events: {manifest.timeline_event_count:,}")
+        print(f"Lineage: {manifest.lineage_node_count} nodes, {manifest.lineage_edge_count} edges")
+        print("Evidence quality: passed")
+    return 0
+
+
+def _validate_evidence(
+    evidence_dir: Path,
+    dataset_dir: Path | None,
+    analytics_dir: Path | None,
+    detection_dir: Path | None,
+    impact_dir: Path | None,
+    output_format: str,
+) -> int:
+    report = validate_evidence_directory(
+        evidence_dir,
+        dataset_dir=dataset_dir,
+        analytics_dir=analytics_dir,
+        detection_dir=detection_dir,
+        impact_dir=impact_dir,
+    )
+    if output_format == "json":
+        print(evidence_report_to_json(report))
+    else:
+        for issue in report.issues:
+            print(f"{issue.severity.upper():7} {issue.code:34} {issue.message}")
+        print("Evidence validation: " + ("passed" if report.valid else "failed"))
+        if report.summary:
+            print(json.dumps(report.summary, indent=2, sort_keys=True))
+    return 0 if report.valid else 1
+
+
+def _evidence_summary(evidence_dir: Path) -> int:
+    try:
+        loaded = load_evidence(evidence_dir)
+    except EvidenceIOError as exc:
+        print(f"EVIDENCE ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(build_evidence_summary(loaded), indent=2, sort_keys=True, default=str))
+    return 0
+
+
 def _print_dataset_report(report: DatasetValidationReport) -> None:
     for issue in report.issues:
         print(f"{issue.severity.upper():7} {issue.code:36} {issue.table or '-'}: {issue.message}")
@@ -566,6 +664,35 @@ def build_parser() -> argparse.ArgumentParser:
         "summary", help="Print impact, causal, survival-model, and financial summaries."
     )
     impact_summary.add_argument("--impact-dir", type=Path, required=True)
+
+    evidence_parser = subparsers.add_parser(
+        "evidence", help="Build and inspect operational evidence and lineage artifacts."
+    )
+    evidence_subparsers = evidence_parser.add_subparsers(dest="evidence_command", required=True)
+    evidence_build = evidence_subparsers.add_parser(
+        "build", help="Build structured operational evidence, lineage, and an incident timeline."
+    )
+    evidence_build.add_argument("--dataset-dir", type=Path, required=True)
+    evidence_build.add_argument("--analytics-dir", type=Path)
+    evidence_build.add_argument("--detection-dir", type=Path)
+    evidence_build.add_argument("--impact-dir", type=Path)
+    evidence_build.add_argument("--config", type=Path, required=True)
+    evidence_build.add_argument("--output-dir", type=Path, required=True)
+    evidence_build.add_argument("--overwrite", action="store_true")
+    evidence_build.add_argument("--format", choices=("text", "json"), default="text")
+    evidence_validate = evidence_subparsers.add_parser(
+        "validate", help="Validate an exported operational evidence artifact."
+    )
+    evidence_validate.add_argument("--evidence-dir", type=Path, required=True)
+    evidence_validate.add_argument("--dataset-dir", type=Path)
+    evidence_validate.add_argument("--analytics-dir", type=Path)
+    evidence_validate.add_argument("--detection-dir", type=Path)
+    evidence_validate.add_argument("--impact-dir", type=Path)
+    evidence_validate.add_argument("--format", choices=("text", "json"), default="text")
+    evidence_summary = evidence_subparsers.add_parser(
+        "summary", help="Print evidence, lineage, health, timeline, and quality summaries."
+    )
+    evidence_summary.add_argument("--evidence-dir", type=Path, required=True)
     return parser
 
 
@@ -615,6 +742,28 @@ def main(argv: list[str] | None = None) -> int:
         return _validate_impact(args.impact_dir, args.dataset_dir, args.format)
     if args.command == "impact" and args.impact_command == "summary":
         return _impact_summary(args.impact_dir)
+    if args.command == "evidence" and args.evidence_command == "build":
+        return _build_evidence(
+            args.dataset_dir,
+            args.config,
+            args.output_dir,
+            args.overwrite,
+            args.format,
+            args.analytics_dir,
+            args.detection_dir,
+            args.impact_dir,
+        )
+    if args.command == "evidence" and args.evidence_command == "validate":
+        return _validate_evidence(
+            args.evidence_dir,
+            args.dataset_dir,
+            args.analytics_dir,
+            args.detection_dir,
+            args.impact_dir,
+            args.format,
+        )
+    if args.command == "evidence" and args.evidence_command == "summary":
+        return _evidence_summary(args.evidence_dir)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

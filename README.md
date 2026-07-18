@@ -435,3 +435,14 @@ Issues and pull requests are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) 
 ## License
 
 This project is available under the [MIT License](LICENSE).
+
+### Operational Evidence And Lineage
+
+The operational evidence package binds structured service health, deployment, configuration, feature-flag, lineage, runbook, and historical-incident records to the exact source dataset. It emits canonical payload hashes, explicit supporting, contradictory, and contextual roles, plus a deterministic incident timeline. No LLM is used.
+
+```bash
+paic evidence build --dataset-dir data/generated/impact-source-smoke --impact-dir data/generated/impact-smoke --config configs/evidence/smoke.yaml --output-dir data/generated/evidence-smoke
+paic evidence validate --evidence-dir data/generated/evidence-smoke --dataset-dir data/generated/impact-source-smoke --impact-dir data/generated/impact-smoke
+```
+
+See [`docs/OPERATIONAL_EVIDENCE.md`](docs/OPERATIONAL_EVIDENCE.md).

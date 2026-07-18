@@ -85,6 +85,17 @@ jobs:
           python -m paic impact validate \
             --impact-dir .artifacts/impact-smoke \
             --dataset-dir .artifacts/impact-source-smoke
+      - name: Build and validate operational evidence smoke artifact
+        run: |
+          python -m paic evidence build \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --impact-dir .artifacts/impact-smoke \
+            --config configs/evidence/smoke.yaml \
+            --output-dir .artifacts/evidence-smoke
+          python -m paic evidence validate \
+            --evidence-dir .artifacts/evidence-smoke \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --impact-dir .artifacts/impact-smoke
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |
@@ -125,6 +136,21 @@ jobs:
           python -m paic impact summary \
             --impact-dir .artifacts/impact-standard \
             > .artifacts/impact-standard-summary.json
+      - name: Build and validate operational evidence standard artifact
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m paic evidence build \
+            --dataset-dir .artifacts/impact-source-standard \
+            --impact-dir .artifacts/impact-standard \
+            --config configs/evidence/standard.yaml \
+            --output-dir .artifacts/evidence-standard
+          python -m paic evidence validate \
+            --evidence-dir .artifacts/evidence-standard \
+            --dataset-dir .artifacts/impact-source-standard \
+            --impact-dir .artifacts/impact-standard
+          python -m paic evidence summary \
+            --evidence-dir .artifacts/evidence-standard \
+            > .artifacts/evidence-standard-summary.json
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build

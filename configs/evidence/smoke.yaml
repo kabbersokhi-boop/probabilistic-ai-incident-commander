@@ -1,0 +1,153 @@
+schema_version: "1.0"
+evidence_id: checkout-evidence-smoke
+incident:
+  incident_id: checkout-address-validation-smoke
+  family: checkout_failure
+  started_at: "2026-01-16T00:00:00Z"
+  ended_at: "2026-01-17T00:00:00Z"
+  primary_service: checkout-service
+  region: IN-SOUTH
+  context_before_hours: 24
+  context_after_hours: 24
+services:
+  - service: checkout-service
+    component: checkout-api
+    owner: commerce-platform
+    source_table: checkout_sessions
+    health_kind: checkout
+    criticality: critical
+  - service: payment-service
+    component: payment-orchestrator
+    owner: payments
+    source_table: payment_attempts
+    health_kind: payments
+    criticality: critical
+  - service: data-platform
+    component: commerce-events-pipeline
+    owner: data-platform
+    source_table: pipeline_runs
+    health_kind: pipeline
+    criticality: high
+config_changes:
+  - change_id: address-validation-strict-mode
+    service: checkout-service
+    key: address_validation.strict_mode
+    old_value: "false"
+    new_value: "true"
+    changed_at: "2026-01-15T23:40:00Z"
+    actor: deploy-bot
+    change_type: configuration
+    region_scope: IN-SOUTH
+    approved: true
+    rollback_available: true
+    role: supporting
+    description: Enabled stricter address validation for the affected region shortly before the incident.
+  - change_id: payment-retry-timeout
+    service: payment-service
+    key: payment.retry_timeout_ms
+    old_value: "1200"
+    new_value: "1300"
+    changed_at: "2026-01-15T18:00:00Z"
+    actor: payments-team
+    change_type: configuration
+    region_scope: global
+    approved: true
+    rollback_available: true
+    role: contradictory
+    description: Small retry-timeout adjustment did not align with the affected checkout stage or cohort.
+feature_flags:
+  - transition_id: strict-address-south-on
+    flag_key: strict_address_validation
+    service: checkout-service
+    value: "enabled"
+    valid_from: "2026-01-15T23:40:00Z"
+    valid_to: "2026-01-17T00:30:00Z"
+    changed_by: deploy-bot
+    region_scope: IN-SOUTH
+    role: supporting
+    description: Regional rollout window for strict address validation.
+runbooks:
+  - runbook_id: checkout-conversion-drop
+    title: Checkout conversion degradation
+    service: checkout-service
+    trigger: Conversion or address-stage completion falls outside its expected range.
+    diagnostic_steps:
+      - Compare funnel stages by region, device, and application version.
+      - Review deployments, configuration changes, and feature-flag exposure.
+      - Verify payment approval remains healthy to reject downstream explanations.
+    remediation_steps:
+      - Disable the implicated feature flag for the affected cohort.
+      - Re-run synthetic checkout probes and monitor conversion recovery.
+    rollback_steps:
+      - Restore the prior address-validation configuration.
+    owner: commerce-platform
+    version: "1.0"
+historical_incidents:
+  - historical_incident_id: historical-address-regex
+    family: checkout_failure
+    service: checkout-service
+    started_at: "2025-09-12T08:00:00Z"
+    ended_at: "2025-09-12T09:20:00Z"
+    root_cause: A region-specific address regex rejected valid apartment formats.
+    symptoms:
+      - Address-stage completion dropped while payment approval stayed normal.
+      - Impact concentrated in one region and mobile clients.
+    remediation: Reverted the validator rules and added region-specific contract tests.
+    recovery_minutes: 80
+    tags: [checkout, address-validation, regional]
+lineage_nodes:
+  - node_id: checkout-events
+    node_type: source
+    name: Checkout sessions
+    domain: commerce
+    owner: commerce-platform
+    system: checkout-service
+    description: Canonical checkout interaction events.
+  - node_id: checkout-metrics
+    node_type: metric
+    name: Checkout conversion metrics
+    domain: analytics
+    owner: data-platform
+    system: analytics
+    description: Funnel and conversion observations derived from checkout events.
+  - node_id: anomaly-detector
+    node_type: model
+    name: Statistical anomaly detector
+    domain: detection
+    owner: reliability
+    system: detection
+    description: Robust seasonal and cohort-aware statistical detector.
+  - node_id: incident-evidence
+    node_type: report
+    name: Incident evidence artifact
+    domain: operations
+    owner: reliability
+    system: evidence
+    description: Structured operational evidence and incident timeline.
+lineage_edges:
+  - edge_id: checkout-to-metrics
+    upstream_node_id: checkout-events
+    downstream_node_id: checkout-metrics
+    edge_type: derives
+    transform_name: checkout-funnel-metrics
+    criticality: critical
+    valid_from: "2026-01-01T00:00:00Z"
+  - edge_id: metrics-to-detector
+    upstream_node_id: checkout-metrics
+    downstream_node_id: anomaly-detector
+    edge_type: serves
+    transform_name: detector-input-selection
+    criticality: critical
+    valid_from: "2026-01-01T00:00:00Z"
+  - edge_id: detector-to-evidence
+    upstream_node_id: anomaly-detector
+    downstream_node_id: incident-evidence
+    edge_type: serves
+    transform_name: evidence-assembly
+    criticality: high
+    valid_from: "2026-01-01T00:00:00Z"
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 5000
+  include_statistics: true

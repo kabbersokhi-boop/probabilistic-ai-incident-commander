@@ -1,0 +1,692 @@
+{
+  "$defs": {
+    "ConfigChange": {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "approved": {
+          "default": true,
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "change_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Change Id",
+          "type": "string"
+        },
+        "change_type": {
+          "enum": [
+            "deployment",
+            "configuration",
+            "schema",
+            "routing",
+            "policy"
+          ],
+          "title": "Change Type",
+          "type": "string"
+        },
+        "changed_at": {
+          "format": "date-time",
+          "title": "Changed At",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "new_value": {
+          "title": "New Value",
+          "type": "string"
+        },
+        "old_value": {
+          "title": "Old Value",
+          "type": "string"
+        },
+        "region_scope": {
+          "default": "global",
+          "minLength": 1,
+          "title": "Region Scope",
+          "type": "string"
+        },
+        "role": {
+          "default": "context",
+          "enum": [
+            "supporting",
+            "contradictory",
+            "context"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "rollback_available": {
+          "default": true,
+          "title": "Rollback Available",
+          "type": "boolean"
+        },
+        "service": {
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "service",
+        "key",
+        "old_value",
+        "new_value",
+        "changed_at",
+        "actor",
+        "change_type",
+        "description"
+      ],
+      "title": "ConfigChange",
+      "type": "object"
+    },
+    "FeatureFlagTransition": {
+      "additionalProperties": false,
+      "properties": {
+        "changed_by": {
+          "minLength": 1,
+          "title": "Changed By",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "flag_key": {
+          "minLength": 1,
+          "title": "Flag Key",
+          "type": "string"
+        },
+        "region_scope": {
+          "default": "global",
+          "minLength": 1,
+          "title": "Region Scope",
+          "type": "string"
+        },
+        "role": {
+          "default": "context",
+          "enum": [
+            "supporting",
+            "contradictory",
+            "context"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "service": {
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        },
+        "transition_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Transition Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "format": "date-time",
+          "title": "Valid From",
+          "type": "string"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transition_id",
+        "flag_key",
+        "service",
+        "value",
+        "valid_from",
+        "changed_by",
+        "description"
+      ],
+      "title": "FeatureFlagTransition",
+      "type": "object"
+    },
+    "HistoricalIncident": {
+      "additionalProperties": false,
+      "properties": {
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "family": {
+          "minLength": 1,
+          "title": "Family",
+          "type": "string"
+        },
+        "historical_incident_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Historical Incident Id",
+          "type": "string"
+        },
+        "recovery_minutes": {
+          "minimum": 0,
+          "title": "Recovery Minutes",
+          "type": "integer"
+        },
+        "remediation": {
+          "minLength": 1,
+          "title": "Remediation",
+          "type": "string"
+        },
+        "root_cause": {
+          "minLength": 1,
+          "title": "Root Cause",
+          "type": "string"
+        },
+        "service": {
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "symptoms": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Symptoms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "historical_incident_id",
+        "family",
+        "started_at",
+        "ended_at",
+        "root_cause",
+        "symptoms",
+        "remediation",
+        "recovery_minutes",
+        "service"
+      ],
+      "title": "HistoricalIncident",
+      "type": "object"
+    },
+    "IncidentContext": {
+      "additionalProperties": false,
+      "properties": {
+        "context_after_hours": {
+          "default": 24,
+          "maximum": 720,
+          "minimum": 1,
+          "title": "Context After Hours",
+          "type": "integer"
+        },
+        "context_before_hours": {
+          "default": 24,
+          "maximum": 720,
+          "minimum": 1,
+          "title": "Context Before Hours",
+          "type": "integer"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "family": {
+          "minLength": 1,
+          "title": "Family",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "primary_service": {
+          "minLength": 1,
+          "title": "Primary Service",
+          "type": "string"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "family",
+        "started_at",
+        "ended_at",
+        "primary_service"
+      ],
+      "title": "IncidentContext",
+      "type": "object"
+    },
+    "LineageEdgeDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "criticality": {
+          "default": "high",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Criticality",
+          "type": "string"
+        },
+        "downstream_node_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Downstream Node Id",
+          "type": "string"
+        },
+        "edge_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "enum": [
+            "reads",
+            "writes",
+            "derives",
+            "serves",
+            "controls",
+            "validates"
+          ],
+          "title": "Edge Type",
+          "type": "string"
+        },
+        "transform_name": {
+          "minLength": 1,
+          "title": "Transform Name",
+          "type": "string"
+        },
+        "upstream_node_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Upstream Node Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "format": "date-time",
+          "title": "Valid From",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "upstream_node_id",
+        "downstream_node_id",
+        "edge_type",
+        "transform_name",
+        "valid_from"
+      ],
+      "title": "LineageEdgeDefinition",
+      "type": "object"
+    },
+    "LineageNodeDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "domain": {
+          "minLength": 1,
+          "title": "Domain",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "node_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "node_type": {
+          "enum": [
+            "source",
+            "service",
+            "dataset",
+            "metric",
+            "model",
+            "report",
+            "control"
+          ],
+          "title": "Node Type",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "system": {
+          "minLength": 1,
+          "title": "System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "node_type",
+        "name",
+        "domain",
+        "owner",
+        "system",
+        "description"
+      ],
+      "title": "LineageNodeDefinition",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "compression": {
+          "default": "zstd",
+          "enum": [
+            "zstd",
+            "snappy",
+            "gzip",
+            "lz4",
+            "uncompressed"
+          ],
+          "title": "Compression",
+          "type": "string"
+        },
+        "compression_level": {
+          "anyOf": [
+            {
+              "maximum": 22,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 6,
+          "title": "Compression Level"
+        },
+        "include_statistics": {
+          "default": true,
+          "title": "Include Statistics",
+          "type": "boolean"
+        },
+        "row_group_size": {
+          "default": 25000,
+          "minimum": 100,
+          "title": "Row Group Size",
+          "type": "integer"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    },
+    "Runbook": {
+      "additionalProperties": false,
+      "properties": {
+        "diagnostic_steps": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Diagnostic Steps",
+          "type": "array"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "remediation_steps": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Remediation Steps",
+          "type": "array"
+        },
+        "rollback_steps": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Rollback Steps",
+          "type": "array"
+        },
+        "runbook_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Runbook Id",
+          "type": "string"
+        },
+        "service": {
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "trigger": {
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "runbook_id",
+        "title",
+        "service",
+        "trigger",
+        "diagnostic_steps",
+        "remediation_steps",
+        "rollback_steps",
+        "owner",
+        "version"
+      ],
+      "title": "Runbook",
+      "type": "object"
+    },
+    "ServiceDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "minLength": 1,
+          "title": "Component",
+          "type": "string"
+        },
+        "criticality": {
+          "default": "high",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Criticality",
+          "type": "string"
+        },
+        "health_kind": {
+          "enum": [
+            "checkout",
+            "payments",
+            "pipeline",
+            "fulfilment",
+            "seller_feed"
+          ],
+          "title": "Health Kind",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "service": {
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        },
+        "source_table": {
+          "minLength": 1,
+          "title": "Source Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "component",
+        "owner",
+        "source_table",
+        "health_kind"
+      ],
+      "title": "ServiceDefinition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "config_changes": {
+      "items": {
+        "$ref": "#/$defs/ConfigChange"
+      },
+      "title": "Config Changes",
+      "type": "array"
+    },
+    "evidence_id": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "feature_flags": {
+      "items": {
+        "$ref": "#/$defs/FeatureFlagTransition"
+      },
+      "title": "Feature Flags",
+      "type": "array"
+    },
+    "historical_incidents": {
+      "items": {
+        "$ref": "#/$defs/HistoricalIncident"
+      },
+      "title": "Historical Incidents",
+      "type": "array"
+    },
+    "incident": {
+      "$ref": "#/$defs/IncidentContext"
+    },
+    "lineage_edges": {
+      "items": {
+        "$ref": "#/$defs/LineageEdgeDefinition"
+      },
+      "title": "Lineage Edges",
+      "type": "array"
+    },
+    "lineage_nodes": {
+      "items": {
+        "$ref": "#/$defs/LineageNodeDefinition"
+      },
+      "title": "Lineage Nodes",
+      "type": "array"
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "runbooks": {
+      "items": {
+        "$ref": "#/$defs/Runbook"
+      },
+      "title": "Runbooks",
+      "type": "array"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "services": {
+      "items": {
+        "$ref": "#/$defs/ServiceDefinition"
+      },
+      "title": "Services",
+      "type": "array"
+    },
+    "timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "incident",
+    "services"
+  ],
+  "title": "EvidenceConfig",
+  "type": "object"
+}

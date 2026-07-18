@@ -30,6 +30,13 @@ Investigative SQL will use a read-only role, approved schemas, parsed statement 
 Every state transition, tool call, SQL decision, evidence record, approval decision, remediation attempt, and recovery decision must be traceable.
 
 The executable safety contract is already validated. SQL enforcement, tool authorization, approval tokens, and remediation controls are introduced with their corresponding runtime components and adversarial tests.
-# Governed Tool Gateway controls
 
-Gateway roles are explicit and deny by default. All roles are read-only. Source manifests are validated and cross-bound to one dataset before registration. SQL accepts exactly one parsed read-only query, blocks external table functions, path and network reads, system schemas, extensions, unknown tables and columns, and applies result limits. Audit records are canonical JSONL with a SHA-256 chain and are validated before trust.
+## Agentic investigation controls
+
+The investigation model receives no unrestricted filesystem, network, shell, database, or remediation capability. Every call is translated into a strict Governed Tool Gateway request, bound to validated source manifests, authorized by role, and recorded in the invocation ledger.
+
+Tool output and retrieved text are untrusted data. Prompt-like instructions inside evidence cannot grant a new tool, role, table, argument, or permission. Unsupported evidence identifiers are rejected before report creation. The model cannot directly set the accepted posterior ranking, confidence, entropy, abstention decision, source hashes, or report hash.
+
+`NVIDIA_API_KEY` is read at request time from the process environment. It is excluded from provider payloads, errors, request receipts, transcripts, gateway ledgers, test fixtures, and generated artifacts. CI and ordinary tests use an offline scripted provider and must never require a live key.
+
+Thinking content is not persisted. The system records structured tool calls, bounded tool results, model route attempts, accepted proposals, deterministic probability outputs, and integrity hashes rather than hidden model reasoning.

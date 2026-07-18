@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Case Id",
+      "type": "string"
+    },
+    "report_path": {
+      "minLength": 1,
+      "title": "Report Path",
+      "type": "string"
+    },
+    "should_abstain": {
+      "default": false,
+      "title": "Should Abstain",
+      "type": "boolean"
+    },
+    "true_hypothesis_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "True Hypothesis Id"
+    }
+  },
+  "required": [
+    "case_id",
+    "report_path"
+  ],
+  "title": "EvaluationCase",
+  "type": "object"
+}

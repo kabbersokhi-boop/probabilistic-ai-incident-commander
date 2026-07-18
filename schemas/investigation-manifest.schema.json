@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "InvestigationFileManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "byte_size",
+        "sha256"
+      ],
+      "title": "InvestigationFileManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "files": {
+      "items": {
+        "$ref": "#/$defs/InvestigationFileManifest"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "investigation_id": {
+      "title": "Investigation Id",
+      "type": "string"
+    },
+    "model_attempt_count": {
+      "minimum": 0,
+      "title": "Model Attempt Count",
+      "type": "integer"
+    },
+    "report_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Report Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_hypothesis_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Hypothesis Id"
+    },
+    "source_manifest_hashes": {
+      "additionalProperties": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "title": "Source Manifest Hashes",
+      "type": "object"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "tool_call_count": {
+      "minimum": 0,
+      "title": "Tool Call Count",
+      "type": "integer"
+    },
+    "transcript_event_count": {
+      "minimum": 0,
+      "title": "Transcript Event Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "investigation_id",
+    "incident_id",
+    "generator_version",
+    "status",
+    "selected_hypothesis_id",
+    "report_sha256",
+    "source_manifest_hashes",
+    "model_attempt_count",
+    "tool_call_count",
+    "transcript_event_count",
+    "files"
+  ],
+  "title": "InvestigationManifest",
+  "type": "object"
+}

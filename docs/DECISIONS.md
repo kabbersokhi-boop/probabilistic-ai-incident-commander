@@ -97,3 +97,11 @@ The impact layer derives exposure from actual synthetic customer interactions an
 ## Survival and causal estimators remain deterministic
 
 Kaplan–Meier, Cox proportional hazards, propensity matching, stabilized inverse-probability weighting, difference-in-differences, placebo checks, balance diagnostics, and bootstrap intervals are implemented as ordinary statistical code. A language model may later interpret these outputs, but it cannot calculate or override them.
+
+## Structured evidence before agent integration
+
+Operational evidence is represented as typed, source-bound tables before any agent is introduced. This keeps provenance, trust level, contradiction labels, lineage, and chronology deterministic and independently testable. Safe tool access and model orchestration remain separate layers.
+
+## Language models propose; deterministic code decides
+
+The first model integration uses NVIDIA NIM through a small OpenAI-compatible adapter rather than coupling the system to an agent framework. The model selects read-only tools and proposes competing hypotheses. It cannot publish probabilities directly: ordinary code validates observed evidence, bounds likelihood ratios, normalizes posteriors, calculates uncertainty, and decides whether to abstain. This keeps model replacement, replay, evaluation, and safety boundaries explicit.

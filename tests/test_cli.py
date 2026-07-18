@@ -36,7 +36,7 @@ def test_summary_command_lists_incident_families(
     assert "payment_configuration" in payload["incident_families"]
 
 
-def test_export_schemas_writes_evidence_documents(
+def test_export_schemas_writes_twenty_two_documents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     output_dir = tmp_path / "schemas"
@@ -61,6 +61,11 @@ def test_export_schemas_writes_evidence_documents(
         "tool-request.schema.json",
         "tool-response.schema.json",
         "tool-error.schema.json",
+        "investigation-config.schema.json",
+        "investigation-request.schema.json",
+        "investigation-report.schema.json",
+        "investigation-manifest.schema.json",
+        "investigation-evaluation-case.schema.json",
     }
 
 

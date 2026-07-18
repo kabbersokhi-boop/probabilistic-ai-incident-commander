@@ -146,6 +146,30 @@ The resulting wheel must install in a clean Python 3.11 or 3.12 environment. The
 - Financial components exactly reconstruct total impact.
 - Repeated builds are deterministic within the same runtime.
 - Manifest, source binding, configuration, marker, schema, row count, and table hashes are validated.
-# Governed Tool Gateway quality gates
 
-Gateway changes require contract validation, strict schema regeneration, formatting, linting, mypy, the complete coverage suite, adversarial SQL and authorization tests, artifact source-binding tests, audit-ledger tamper tests, and smoke execution on Python 3.11 and 3.12.
+## Operational evidence gates
+
+- Every evidence payload hash reconstructs exactly.
+- Domain tables reference valid catalog records.
+- Service-health arithmetic reconciles.
+- Lineage references are complete and the graph is acyclic.
+- Timeline sequence and chronology are deterministic.
+- Source manifests match the bound dataset and optional analytical artifacts.
+- Semantic tampering is rejected by deterministic reconstruction.
+
+## Probabilistic agentic investigation quality gates
+
+Investigation changes require:
+
+- strict config, request, report, manifest, and evaluation schemas,
+- no-key offline provider execution in CI,
+- live-provider payload tests that prove NIM-specific fields are correctly serialized and the key is excluded,
+- ordered fallback and sticky healthy-route tests,
+- bounded rounds, tool calls, provider failures, tokens, result bytes, and timeouts,
+- unsupported evidence and malformed proposal rejection,
+- exact posterior, entropy, confidence, abstention, and report-hash reconstruction,
+- prompt-injection boundary tests,
+- transcript and artifact tamper detection,
+- deterministic replay without an API call,
+- benchmark outputs for Top-1, Top-3, Brier score, abstention, citation coverage, and unsupported evidence,
+- full Python 3.11 and 3.12 tests, schemas, smoke workflows, wheel/sdist builds, and clean-install checks.

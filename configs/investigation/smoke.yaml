@@ -1,0 +1,46 @@
+schema_version: "1.0"
+investigation_id: checkout-investigation-smoke
+provider:
+  kind: nvidia_nim
+  base_url: https://integrate.api.nvidia.com/v1
+  api_key_env: NVIDIA_API_KEY
+  timeout_seconds: 30
+  models:
+    - model: nvidia/nemotron-3-super-120b-a12b
+      temperature: 1.0
+      top_p: 0.95
+      max_tokens: 4096
+      enable_thinking: false
+    - model: qwen/qwen3.5-122b-a10b
+      temperature: 0.6
+      top_p: 0.95
+      max_tokens: 4096
+      enable_thinking: false
+    - model: nvidia/nemotron-3-nano-30b-a3b
+      temperature: 1.0
+      top_p: 0.95
+      max_tokens: 4096
+      enable_thinking: false
+budget:
+  max_rounds: 10
+  max_tool_calls: 20
+  max_provider_failures: 6
+  max_total_tokens: 40000
+  max_tool_result_bytes: 100000
+decision:
+  minimum_top_posterior: 0.55
+  minimum_margin: 0.15
+  minimum_distinct_evidence: 2
+  maximum_normalized_entropy: 0.85
+  likelihood_ratio_min: 0.05
+  likelihood_ratio_max: 20.0
+allowed_tools:
+  - artifacts.summary
+  - anomalies.list
+  - evidence.search
+  - changes.list
+  - lineage.trace
+  - runbook.get
+  - historical_incidents.search
+  - impact.summary
+  - sql.query

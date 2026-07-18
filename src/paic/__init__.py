@@ -14,6 +14,6 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 # Keep source-tree execution authoritative when an older editable distribution
 # happens to remain installed in the developer environment.
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 
 __all__ = ["__version__"]

@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blocked": {
+      "title": "Blocked",
+      "type": "boolean"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Reason Codes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "case_id",
+    "blocked",
+    "reason_codes"
+  ],
+  "title": "AdversarialResult",
+  "type": "object"
+}

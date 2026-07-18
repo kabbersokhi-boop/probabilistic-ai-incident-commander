@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -35,6 +35,7 @@ RECOVERY_REGRESSION_DIR ?= .artifacts/recovery-regression
 RECOVERY_STATE_STORE ?= .artifacts/recovery-state
 RECOVERY_CONFIG ?= configs/recovery/smoke.yaml
 SCHEMA_TMP ?= schemas-generated
+EVALUATION_SMOKE_DIR ?= .artifacts/evaluation-smoke
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -215,6 +216,17 @@ recovery-smoke: remediation-smoke recovery-source-smoke
 validate-recovery-smoke:
 	$(PYTHON) -m paic recovery validate --recovery-dir .artifacts/report-recovered --observations-dir .artifacts/obs-recovered --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
 	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE)
+
+evaluation-smoke:
+	rm -rf $(EVALUATION_SMOKE_DIR)
+	$(PYTHON) -m paic evaluation benchmark-validate --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers
+	$(PYTHON) -m paic evaluation run --visible-dir configs/evaluation/smoke --answers-dir configs/evaluation/answers --predictions configs/evaluation/smoke/predictions.json --config configs/evaluation/smoke/evaluation.json --output-dir $(EVALUATION_SMOKE_DIR)
+
+evaluation-validate-smoke:
+	$(PYTHON) -m paic evaluation validate --run-dir $(EVALUATION_SMOKE_DIR)
+
+evaluation-replay-smoke:
+	$(PYTHON) -m paic evaluation replay --run-dir $(EVALUATION_SMOKE_DIR)
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

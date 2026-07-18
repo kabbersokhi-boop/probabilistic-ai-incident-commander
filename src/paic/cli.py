@@ -48,6 +48,10 @@ from paic.detection.validation import (
     detection_report_to_json,
     validate_detection_directory,
 )
+from paic.evaluation.adversarial import AdversarialResult
+from paic.evaluation.cli import dispatch_evaluation, register_evaluation_parser
+from paic.evaluation.comparison import ComparisonReport
+from paic.evaluation.models import EvaluationConfig, EvaluationRun
 from paic.evidence.config import EvidenceConfig, EvidenceConfigError, load_evidence_config
 from paic.evidence.engine import EvidenceBuildError, build_evidence
 from paic.evidence.io import EvidenceIOError, export_evidence, load_evidence
@@ -221,6 +225,10 @@ def _export_schemas(output_dir: Path) -> int:
         "recovery-lifecycle-event.schema.json": RecoveryLifecycleEvent,
         "recovery-artifact-manifest.schema.json": RecoveryArtifactManifest,
         "recovery-observation-artifact-manifest.schema.json": ObservationArtifactManifest,
+        "evaluation-config.schema.json": EvaluationConfig,
+        "evaluation-run.schema.json": EvaluationRun,
+        "evaluation-comparison.schema.json": ComparisonReport,
+        "evaluation-adversarial-result.schema.json": AdversarialResult,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -952,6 +960,7 @@ def build_parser() -> argparse.ArgumentParser:
     investigate_replay.add_argument("--investigation-dir", type=Path, required=True)
     register_remediation_parser(subparsers)
     register_recovery_parser(subparsers)
+    register_evaluation_parser(subparsers)
     return parser
 
 
@@ -1056,6 +1065,8 @@ def main(argv: list[str] | None = None) -> int:
         return dispatch_remediation(args)
     if args.command == "recovery":
         return dispatch_recovery(args)
+    if args.command == "evaluation":
+        return dispatch_evaluation(args)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

@@ -1,0 +1,1 @@
+{"schema_version":"1.0","run_id":"phase10-smoke","benchmark_id":"phase10-smoke","provider_label":"scripted-baseline","seed":9,"ablation":{"name":"full","abstention_enabled":true,"max_tool_calls":24}}

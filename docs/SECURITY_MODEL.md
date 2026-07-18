@@ -29,7 +29,7 @@ Investigative SQL will use a read-only role, approved schemas, parsed statement 
 
 Every state transition, tool call, SQL decision, evidence record, approval decision, remediation attempt, and recovery decision must be traceable.
 
-The executable safety contract is already validated. SQL enforcement, tool authorization, approval tokens, and remediation controls are introduced with their corresponding runtime components and adversarial tests.
+The executable safety contract is already validated. SQL enforcement, tool authorization, approval tokens, and remediation controls are introduced with their corresponding runtime components and adversarial tests. Phase 10 evaluation treats answer keys as hidden evaluator input and deterministically flags unsupported claims, invalid evidence citations, prompt-injection markers, destructive SQL, traversal, and unsafe authority requests. These checks measure control behavior; they do not claim that a model never proposes unsafe content.
 
 ## Agentic investigation controls
 

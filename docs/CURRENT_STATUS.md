@@ -1,5 +1,11 @@
 # Current Status
 
+Phase 10 expanded evaluation and adversarial testing is in progress. The initial
+offline benchmark runner separates visible cases from hidden answer keys,
+computes deterministic diagnosis, calibration, abstention, and safety metrics,
+and exports closed-world replayable artifacts. Live provider evaluation is not
+part of credential-free CI.
+
 The repository provides deterministic contracts, synthetic commerce data, analytics, statistical anomaly detection, customer-impact modelling, operational evidence and lineage, a read-only Governed Tool Gateway, probabilistic agentic investigation, governed simulated remediation, and deterministic recovery verification with automatic reopening.
 
 The investigation runtime uses provider-neutral OpenAI-compatible adapters, calls only governed read-only tools, proposes competing hypotheses, and produces a source-bound report. Probability, confidence, entropy, abstention, validation, and replay remain deterministic.

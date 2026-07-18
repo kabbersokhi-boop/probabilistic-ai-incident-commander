@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "abstention_delta": {
+      "title": "Abstention Delta",
+      "type": "number"
+    },
+    "brier_delta": {
+      "title": "Brier Delta",
+      "type": "number"
+    },
+    "calibration_error_delta": {
+      "title": "Calibration Error Delta",
+      "type": "number"
+    },
+    "left_run_id": {
+      "title": "Left Run Id",
+      "type": "string"
+    },
+    "paired_losses": {
+      "minimum": 0,
+      "title": "Paired Losses",
+      "type": "integer"
+    },
+    "paired_wins": {
+      "minimum": 0,
+      "title": "Paired Wins",
+      "type": "integer"
+    },
+    "right_run_id": {
+      "title": "Right Run Id",
+      "type": "string"
+    },
+    "tool_calls_delta": {
+      "title": "Tool Calls Delta",
+      "type": "number"
+    },
+    "top1_delta": {
+      "title": "Top1 Delta",
+      "type": "number"
+    }
+  },
+  "required": [
+    "left_run_id",
+    "right_run_id",
+    "top1_delta",
+    "brier_delta",
+    "calibration_error_delta",
+    "abstention_delta",
+    "tool_calls_delta",
+    "paired_wins",
+    "paired_losses"
+  ],
+  "title": "ComparisonReport",
+  "type": "object"
+}

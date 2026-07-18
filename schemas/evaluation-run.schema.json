@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "AblationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_enabled": {
+          "default": true,
+          "title": "Abstention Enabled",
+          "type": "boolean"
+        },
+        "max_tool_calls": {
+          "default": 24,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "remove_contradictions": {
+          "default": false,
+          "title": "Remove Contradictions",
+          "type": "boolean"
+        },
+        "remove_history": {
+          "default": false,
+          "title": "Remove History",
+          "type": "boolean"
+        },
+        "remove_lineage": {
+          "default": false,
+          "title": "Remove Lineage",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AblationConfig",
+      "type": "object"
+    },
+    "AggregateMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_accuracy": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Abstention Accuracy",
+          "type": "number"
+        },
+        "brier_score": {
+          "minimum": 0.0,
+          "title": "Brier Score",
+          "type": "number"
+        },
+        "case_count": {
+          "minimum": 0,
+          "title": "Case Count",
+          "type": "integer"
+        },
+        "expected_calibration_error": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Expected Calibration Error",
+          "type": "number"
+        },
+        "mean_reciprocal_rank": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Mean Reciprocal Rank",
+          "type": "number"
+        },
+        "mean_tool_calls": {
+          "minimum": 0.0,
+          "title": "Mean Tool Calls",
+          "type": "number"
+        },
+        "required_evidence_coverage": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Required Evidence Coverage",
+          "type": "number"
+        },
+        "safety_passed": {
+          "title": "Safety Passed",
+          "type": "boolean"
+        },
+        "selective_accuracy": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Selective Accuracy",
+          "type": "number"
+        },
+        "top1_accuracy": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Top1 Accuracy",
+          "type": "number"
+        },
+        "top3_recall": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Top3 Recall",
+          "type": "number"
+        },
+        "unsupported_claim_count": {
+          "minimum": 0,
+          "title": "Unsupported Claim Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "case_count",
+        "top1_accuracy",
+        "top3_recall",
+        "mean_reciprocal_rank",
+        "brier_score",
+        "expected_calibration_error",
+        "abstention_accuracy",
+        "selective_accuracy",
+        "required_evidence_coverage",
+        "unsupported_claim_count",
+        "safety_passed",
+        "mean_tool_calls"
+      ],
+      "title": "AggregateMetrics",
+      "type": "object"
+    },
+    "CaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_correct": {
+          "title": "Abstention Correct",
+          "type": "boolean"
+        },
+        "brier_score": {
+          "minimum": 0.0,
+          "title": "Brier Score",
+          "type": "number"
+        },
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "cited_evidence_valid": {
+          "title": "Cited Evidence Valid",
+          "type": "boolean"
+        },
+        "reciprocal_rank": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Reciprocal Rank",
+          "type": "number"
+        },
+        "required_evidence_coverage": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Required Evidence Coverage",
+          "type": "number"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "top1_correct": {
+          "title": "Top1 Correct",
+          "type": "boolean"
+        },
+        "top3_correct": {
+          "title": "Top3 Correct",
+          "type": "boolean"
+        },
+        "unsupported_claim_count": {
+          "minimum": 0,
+          "title": "Unsupported Claim Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "case_id",
+        "top1_correct",
+        "top3_correct",
+        "reciprocal_rank",
+        "brier_score",
+        "abstention_correct",
+        "required_evidence_coverage",
+        "unsupported_claim_count",
+        "cited_evidence_valid",
+        "tool_calls"
+      ],
+      "title": "CaseResult",
+      "type": "object"
+    },
+    "EvaluationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "ablation": {
+          "$ref": "#/$defs/AblationConfig"
+        },
+        "benchmark_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Benchmark Id",
+          "type": "string"
+        },
+        "provider_label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Provider Label",
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "seed": {
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "benchmark_id",
+        "provider_label",
+        "seed"
+      ],
+      "title": "EvaluationConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "aggregate": {
+      "$ref": "#/$defs/AggregateMetrics"
+    },
+    "answer_key_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Answer Key Manifest Sha256",
+      "type": "string"
+    },
+    "benchmark_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Benchmark Manifest Sha256",
+      "type": "string"
+    },
+    "config": {
+      "$ref": "#/$defs/EvaluationConfig"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/CaseResult"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "config",
+    "benchmark_manifest_sha256",
+    "answer_key_manifest_sha256",
+    "results",
+    "aggregate"
+  ],
+  "title": "EvaluationRun",
+  "type": "object"
+}

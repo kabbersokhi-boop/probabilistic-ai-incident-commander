@@ -1,0 +1,156 @@
+schema_version: '1.0'
+simulation_id: commerce-impact-standard
+seed: 2026071701
+start_at: '2026-01-01T00:00:00Z'
+duration_days: 130
+timezone: UTC
+scale:
+  customers: 3000
+  sellers: 60
+  products: 600
+  warehouses: 8
+  promotions: 16
+  base_sessions_per_hour: 10
+behavior:
+  address_attempt_rate: 0.985
+  address_success_rate: 0.965
+  inventory_success_rate: 0.985
+  payment_attempt_rate: 0.955
+  base_payment_approval_rate: 0.93
+  base_return_rate: 0.1
+  base_late_delivery_rate: 0.08
+  refund_completion_rate: 0.95
+  promotion_session_share: 0.22
+  returning_customer_share: 0.72
+  preferred_device_adherence: 0.78
+  preferred_payment_adherence: 0.82
+  average_items_per_order: 1.45
+regions:
+- code: IN-NORTH
+  market: India North
+  weight: 0.28
+  currency: INR
+  tax_rate: 0.18
+  conversion_multiplier: 1.0
+  payment_approval_multiplier: 1.0
+  delivery_days: 3
+- code: IN-SOUTH
+  market: India South
+  weight: 0.3
+  currency: INR
+  tax_rate: 0.18
+  conversion_multiplier: 1.03
+  payment_approval_multiplier: 1.01
+  delivery_days: 2
+- code: IN-WEST
+  market: India West
+  weight: 0.27
+  currency: INR
+  tax_rate: 0.18
+  conversion_multiplier: 1.02
+  payment_approval_multiplier: 1.0
+  delivery_days: 2
+- code: IN-EAST
+  market: India East
+  weight: 0.15
+  currency: INR
+  tax_rate: 0.18
+  conversion_multiplier: 0.95
+  payment_approval_multiplier: 0.98
+  delivery_days: 4
+devices:
+- value: android
+  weight: 0.56
+- value: ios
+  weight: 0.22
+- value: web
+  weight: 0.22
+channels:
+- value: organic
+  weight: 0.28
+- value: direct
+  weight: 0.12
+- value: paid_search
+  weight: 0.18
+- value: affiliate
+  weight: 0.11
+- value: email
+  weight: 0.14
+- value: app_push
+  weight: 0.17
+payment_methods:
+- value: card
+  weight: 0.48
+- value: wallet
+  weight: 0.24
+- value: bank_transfer
+  weight: 0.12
+- value: buy_now_pay_later
+  weight: 0.08
+- value: cash_on_delivery
+  weight: 0.08
+issuers:
+- value: BANK-A
+  weight: 0.29
+- value: BANK-B
+  weight: 0.24
+- value: BANK-C
+  weight: 0.2
+- value: BANK-D
+  weight: 0.17
+- value: WALLET-NETWORK
+  weight: 0.1
+categories:
+- value: consumer-electronics
+  weight: 0.18
+- value: home
+  weight: 0.17
+- value: apparel
+  weight: 0.19
+- value: beauty
+  weight: 0.1
+- value: grocery
+  weight: 0.13
+- value: sports
+  weight: 0.08
+- value: books
+  weight: 0.08
+- value: toys
+  weight: 0.07
+carriers:
+- value: delhivery-sim
+  weight: 0.36
+- value: bluedart-sim
+  weight: 0.24
+- value: ecom-sim
+  weight: 0.22
+- value: india-post-sim
+  weight: 0.18
+acquisition_channels:
+- value: organic
+  weight: 0.34
+- value: paid_search
+  weight: 0.25
+- value: referral
+  weight: 0.16
+- value: affiliate
+  weight: 0.12
+- value: offline
+  weight: 0.13
+services:
+- checkout-service
+- payment-service
+- inventory-service
+- fulfilment-service
+- seller-feed-service
+- returns-service
+pipelines:
+- commerce_events_ingestion
+- orders_fact_build
+- inventory_snapshot_build
+- customer_daily_features
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 25000
+  include_statistics: true

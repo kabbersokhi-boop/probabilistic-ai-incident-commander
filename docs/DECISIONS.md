@@ -89,3 +89,11 @@
 **Decision:** Ground-truth detector scenarios are applied to selected metric observations after analytics export. The source dataset and analytical artifact remain immutable.
 **Reason:** This isolates detector evaluation, preserves a clean false-positive baseline, and prevents evaluator labels from leaking into operational data.
 **Status:** Accepted.
+
+## Customer impact uses explicit potential-outcomes benchmarking
+
+The impact layer derives exposure from actual synthetic customer interactions and computes all pre-incident features from source data. For estimator evaluation, it creates deterministic treated and control potential outcomes for exposed customers without modifying source commerce tables. This permits exact recovery checks while keeping production-facing causal limitations explicit.
+
+## Survival and causal estimators remain deterministic
+
+Kaplan–Meier, Cox proportional hazards, propensity matching, stabilized inverse-probability weighting, difference-in-differences, placebo checks, balance diagnostics, and bootstrap intervals are implemented as ordinary statistical code. A language model may later interpret these outputs, but it cannot calculate or override them.

@@ -45,13 +45,25 @@
 - Reference standard benchmark: 100% scenario recall, 81.25% precision, 0.24% false-positive rate, and 1.2-period mean delay
 - Source-bound, self-validating Parquet artifacts and detector CLI commands
 
+### Customer impact, survival, and causal analysis
+
+- Incident-linked exposure cohorts derived from actual customer interactions
+- Configurable churn horizon, pre-incident feature window, and forward value horizon
+- Customer-level RFM, tenure, spend, discount, category, checkout, payment, fulfilment, return, and refund features
+- Kaplan–Meier curves with Greenwood intervals and regularized Cox proportional-hazards estimates
+- Propensity-score matching, stabilized inverse-probability weighting, difference-in-differences, and shifted-window placebo analysis
+- Bootstrap confidence intervals, covariate-balance diagnostics, concordance, and Brier scoring
+- Immediate revenue loss, support and recovery cost, incremental churn, future revenue, contribution margin, and total financial impact
+- Evaluator-only potential-outcomes benchmark with exact synthetic ATT
+- Source-bound, self-validating Parquet artifacts and impact CLI commands
+- Reference impact benchmark: 3,000 customers, 103 exposed, synthetic ATT 0.2427, stabilized-IPW estimate 0.1829 with a 95% bootstrap interval of 0.0696 to 0.2945, Cox concordance 0.6362, Brier score 0.1152, weighted maximum absolute SMD 0.2478, placebo magnitude 0.0466, and zero quality failures
+
 ## Explicit limitations
 
 - The simulator produces healthy baseline data only; raw-event incident injection is not yet implemented. Detector benchmarks currently use evaluator-only metric perturbations.
-- Churn, survival, causal impact, and revenue-at-risk models are not yet implemented.
 - No language model, agent framework, database service, frontend, Docker service, or cloud resource is required yet.
 - Generated data and analytical outputs are development benchmarks, not production forecasts.
 
 ## Next capability
 
-The next implementation adds customer churn, survival analysis, incident-exposure modelling, causal-impact evaluation, calibration, and revenue-at-risk estimation.
+The next implementation adds operational evidence, lineage, historical incident retrieval, and safe read-only tool access.

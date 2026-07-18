@@ -132,3 +132,17 @@ python -m build
 ```
 
 The resulting wheel must install in a clean Python 3.11 or 3.12 environment. The installed `paic` CLI must validate contracts, generate and validate the smoke dataset, build and validate its analytical artifact, and build and validate the smoke detector.
+
+## Customer-impact quality gates
+
+- Source dataset validation passes and covers the complete pre-incident and follow-up windows.
+- Exposed and control cohorts are both non-empty; the standard benchmark has at least 20 customers in each.
+- Survival and propensity optimizers converge.
+- Durations, outcomes, monetary fields, and primary keys are valid.
+- Weighted covariate balance is reported and the maximum absolute standardized mean difference is no greater than 0.25 for the standard benchmark.
+- The main estimate lies inside its bootstrap interval.
+- The known synthetic ATT lies inside the evaluated interval.
+- The shifted-window placebo effect is smaller than the main effect.
+- Financial components exactly reconstruct total impact.
+- Repeated builds are deterministic within the same runtime.
+- Manifest, source binding, configuration, marker, schema, row count, and table hashes are validated.

@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides four working foundations.
+The repository currently provides five working foundations.
 
 ### Executable product and evaluation contracts
 
@@ -91,6 +91,19 @@ The repository currently provides four working foundations.
 - Self-validating Parquet artifacts bound to the exact source analytics manifest and detector configuration
 
 The simulator intentionally generates a **healthy, incident-free baseline**. Detector evaluation applies evaluator-only perturbations to selected metric observations, leaving the source dataset unchanged and preserving a clean false-positive benchmark.
+
+### Customer impact, survival, and causal analysis
+
+- Incident-linked exposure cohorts derived from customer interactions, region, device, and operational outcome
+- Pre-incident RFM, tenure, spend, discount, category, checkout, payment, fulfilment, return, and refund features
+- Kaplan–Meier survival curves with confidence intervals and a regularized Cox proportional-hazards model
+- Propensity-score matching, stabilized inverse-probability weighting, difference-in-differences, placebo checks, and covariate-balance diagnostics
+- Bootstrap uncertainty for incremental churn and total financial impact
+- Immediate failed-interaction loss, support and recovery cost, future revenue at risk, and contribution margin at risk
+- A deterministic synthetic potential-outcomes benchmark used to evaluate estimator recovery without mutating source commerce data
+- Self-validating Parquet artifacts bound to the exact source dataset and resolved impact configuration
+
+The standard reference build analyses 3,000 customers, identifies 103 incident-exposed customers, recovers a positive synthetic churn effect with its bootstrap interval covering the known benchmark effect, and produces fully reconciled financial-impact components. These are synthetic evaluation results, not production claims.
 
 ## Quick start
 
@@ -208,6 +221,28 @@ paic detection validate \
   --detection-dir data/generated/detection-standard \
   --analytics-dir data/generated/analytics-standard
 ```
+
+### Build and validate customer impact
+
+```bash
+paic simulate \
+  --config configs/simulation/impact-smoke.yaml \
+  --output-dir data/generated/impact-source-smoke
+
+paic impact build \
+  --dataset-dir data/generated/impact-source-smoke \
+  --config configs/impact/smoke.yaml \
+  --output-dir data/generated/impact-smoke
+
+paic impact validate \
+  --impact-dir data/generated/impact-smoke \
+  --dataset-dir data/generated/impact-source-smoke
+
+paic impact summary \
+  --impact-dir data/generated/impact-smoke
+```
+
+The impact artifact contains customer features, survival curves, Cox coefficients, propensity scores, causal estimates, segment impact, financial impact, model metrics, quality evidence, hashes, and source lineage. See [`docs/CUSTOMER_IMPACT.md`](docs/CUSTOMER_IMPACT.md).
 
 ### Validate the project contracts
 
@@ -368,16 +403,17 @@ No README or résumé result should be published until a reproducible benchmark 
 ## Repository map
 
 ```text
-configs/                Reproducible simulation, analytics, and detection configurations
+configs/                Reproducible simulation, analytics, detection, and impact configurations
 specs/                  Product, evaluation, safety, and incident contracts
 src/paic/contracts/     Contract models, loaders, and cross-contract validation
 src/paic/simulator/     Synthetic commerce generation, schemas, export, and validation
 src/paic/analytics/     Semantic metrics, cohorts, funnels, contributions, and quality checks
 src/paic/detection/     Statistical baselines, predictive tests, FDR, change detection, and benchmarks
+src/paic/impact/        Customer features, survival, causal estimates, and financial impact
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
 tests/                  Unit, invariant, CLI, reconciliation, and integrity tests
-docs/                   Architecture, data, analytics, detection, evaluation, security, and decisions
+docs/                   Architecture, data, analytics, detection, impact, evaluation, security, and decisions
 .github/                 Continuous integration and contribution templates
 ```
 
@@ -385,11 +421,10 @@ docs/                   Architecture, data, analytics, detection, evaluation, se
 
 The next major capabilities are:
 
-1. customer churn, survival, causal impact, and revenue-at-risk modelling,
-2. operational evidence, lineage, and safe tool access,
-3. probabilistic agentic investigation,
-4. governed remediation and recovery verification,
-5. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
+1. operational evidence, lineage, and safe tool access,
+2. probabilistic agentic investigation,
+3. governed remediation and recovery verification,
+4. adversarial evaluation, TUI, web product, Docker, and hosted demonstration.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

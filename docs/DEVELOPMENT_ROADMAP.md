@@ -8,8 +8,8 @@ The roadmap is organised as capability milestones. Each milestone must end with 
 | Complete | Synthetic commerce environment | Reproducible customers, catalogue, checkout, payments, orders, inventory, fulfilment, and operations data |
 | Complete | Analytics and metric layer | Funnels, cohorts, contribution analysis, metric definitions, and data quality |
 | Complete | Advanced anomaly detection | Seasonal baselines, distribution-aware tests, change points, sequential evidence, and false-discovery control |
-| Next | Churn and customer impact | Survival models, calibration, incident exposure, causal impact, and revenue risk |
-| Planned | Evidence and lineage | Deployments, logs, pipeline records, graph relationships, and incident retrieval |
+| Complete | Churn and customer impact | Survival models, calibration, incident exposure, causal impact, and revenue risk |
+| Next | Evidence and lineage | Deployments, logs, pipeline records, graph relationships, and incident retrieval |
 | Planned | Safe tool gateway | Read-only SQL, policies, MCP tools, timeouts, and audit logs |
 | Planned | Probabilistic agentic investigation | State machine, tool selection, hypotheses, contradiction search, and probability ranking |
 | Planned | Approval, remediation, and recovery | Human approval, reversible actions, guardrails, and automatic reopening |

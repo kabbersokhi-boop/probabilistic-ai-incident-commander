@@ -96,6 +96,20 @@ Metric observations retain the value, numerator, denominator, sample size, and q
 
 Benchmark perturbations are evaluator-only copies of metric observations. They do not modify the source dataset or analytical artifact.
 
+### Customer-impact layer
+
+`src/paic/impact/` consumes a validated source dataset and a bounded incident definition to produce:
+
+- pre-incident customer features and interaction-derived exposure,
+- Kaplan–Meier survival curves and Cox proportional-hazards coefficients,
+- propensity scores, stabilized weights, matched pairs, and causal estimates,
+- placebo, balance, calibration, and benchmark-recovery evidence,
+- segment-level churn and revenue risk,
+- immediate and forward financial impact with bootstrap uncertainty,
+- source-bound Parquet artifacts with configuration and table hashes.
+
+The synthetic potential-outcomes perturbation exists only in the impact analysis copy. Source commerce tables remain immutable.
+
 ### Command-line interface
 
 `src/paic/cli.py` exposes:
@@ -103,7 +117,8 @@ Benchmark perturbations are evaluator-only copies of metric observations. They d
 - contract validation and schema export,
 - dataset generation, validation, and summaries,
 - analytical build, validation, and summaries,
-- detector build, validation, benchmark, and summaries.
+- detector build, validation, benchmark, and summaries,
+- customer-impact build, validation, and summaries.
 
 The simulator and analytical layer are usable without a language model, database service, or web interface.
 
@@ -138,9 +153,12 @@ Both artifact types reject unsafe relative paths and can detect configuration, m
 
 Every exported detection artifact contains scored observations, anomaly and change-point events, benchmark truth and results, detector-quality evidence, the resolved detector configuration, source-analytics hashes, runtime metadata, table schemas, row counts, timestamp bounds, file hashes, and a manifest-bound success marker.
 
+### Customer-impact artifact
+
+Every exported impact artifact contains customer features, survival curves, Cox coefficients, propensity scores, causal estimates, segment impact, financial impact, model metrics, quality evidence, the resolved impact configuration, source-dataset identity, table hashes, and a manifest-bound success marker.
+
 ## Planned component boundaries
 
-- `customer_impact`: churn, survival, causal studies, revenue impact
 - `evidence`: logs, deployments, configuration, lineage, retrieval
 - `tools`: scoped interfaces and SQL gateway
 - `agent`: controlled state machine and investigation policy

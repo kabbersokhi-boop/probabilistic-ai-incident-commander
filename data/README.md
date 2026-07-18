@@ -59,3 +59,26 @@ paic detection validate \
   --detection-dir data/generated/detection-standard \
   --analytics-dir data/generated/analytics-standard
 ```
+
+## Customer-impact artifacts
+
+Customer-impact builds should also remain under `data/generated/` and are ignored by Git. A typical artifact contains:
+
+```text
+customer-impact/
+├── _SUCCESS
+├── impact.config.resolved.json
+├── manifest.json
+└── tables/
+    ├── customer_features.parquet
+    ├── survival_curves.parquet
+    ├── cox_coefficients.parquet
+    ├── propensity_scores.parquet
+    ├── causal_estimates.parquet
+    ├── segment_impact.parquet
+    ├── financial_impact.parquet
+    ├── model_metrics.parquet
+    └── impact_quality_results.parquet
+```
+
+These artifacts are synthetic evaluation outputs. They must not be described as production customer forecasts.

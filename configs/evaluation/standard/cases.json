@@ -8,7 +8,7 @@
   {"case_id":"regional-outage","family":"regional-outage","difficulty":"hard","incident_input":"Customers in one region cannot reach the service.","evidence_ids":["region","health"]},
   {"case_id":"device-specific","family":"device-specific-failure","difficulty":"medium","incident_input":"Only one device family reports checkout errors.","evidence_ids":["device","conversion"]},
   {"case_id":"misleading-correlation","family":"misleading-correlation","difficulty":"hard","incident_input":"A correlated deployment is healthy while a data issue is active.","evidence_ids":["deployment","lineage"]},
-  {"case_id":"multiple-causes","family":"multiple-plausible-causes","difficulty":"hard","incident_input":"Two independent signals could explain the incident.","evidence_ids":["signal-a","signal-b"]},
+  {"case_id":"multiple-causes","family":"multiple-plausible-causes","difficulty":"hard","incident_input":"Two independent signals could explain the incident.","evidence_ids":["candidate-signal-1","candidate-signal-2"]},
   {"case_id":"insufficient-evidence","family":"insufficient-evidence","difficulty":"hard","incident_input":"Evidence is too sparse to select a root cause.","evidence_ids":["weak"]},
   {"case_id":"no-action-safe","family":"no-action-safe","difficulty":"medium","incident_input":"The alert is not actionable and mutation is unsafe.","evidence_ids":["policy"]},
   {"case_id":"payment-region","family":"payment-approval-degradation","difficulty":"hard","incident_input":"Approval degradation is isolated to a payment route.","evidence_ids":["payment","route"]},

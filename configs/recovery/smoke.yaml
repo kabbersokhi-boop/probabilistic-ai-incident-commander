@@ -1,0 +1,36 @@
+schema_version: "1.0"
+recovery_id: checkout-address-validation-recovery
+incident_id: checkout-address-validation-smoke
+alpha: 0.05
+scale_floor: 0.0001
+reopen_after_consecutive_failures: 2
+immediate_reopen_on_severe_guardrail: true
+metrics:
+  - metric_id: checkout_conversion_rate
+    cohort: overall
+    role: primary
+    healthy_direction: higher_is_better
+    baseline_lookback_periods: 12
+    minimum_baseline_periods: 8
+    minimum_post_periods: 4
+    sustain_periods: 3
+    minimum_sample_size: 100
+    equivalence_margin_relative: 0.05
+    equivalence_margin_absolute: 0.015
+    minimum_within_band_fraction: 0.66
+    minimum_improvement_fraction: 0.5
+    severe_robust_z: 5.0
+  - metric_id: payment_approval_rate
+    cohort: overall
+    role: guardrail
+    healthy_direction: higher_is_better
+    baseline_lookback_periods: 12
+    minimum_baseline_periods: 8
+    minimum_post_periods: 4
+    sustain_periods: 3
+    minimum_sample_size: 100
+    equivalence_margin_relative: 0.03
+    equivalence_margin_absolute: 0.01
+    minimum_within_band_fraction: 0.66
+    minimum_improvement_fraction: 0.4
+    severe_robust_z: 4.0

@@ -194,6 +194,8 @@ jobs:
           python -m paic remediate execution validate \
             --execution-dir .artifacts/remediation-execution
           rm -f .artifacts/remediation-approval.token
+      - name: Recovery verification and reopening smoke
+        run: make recovery-smoke
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |

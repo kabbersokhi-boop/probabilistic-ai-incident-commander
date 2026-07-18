@@ -76,6 +76,15 @@ from paic.investigation.manifest import InvestigationManifest
 from paic.investigation.models import InvestigationReport, InvestigationRequest, ProviderResponse
 from paic.investigation.orchestrator import InvestigationError, Investigator, scripted_factory
 from paic.investigation.provider import ScriptedProvider
+from paic.recovery.cli import dispatch_recovery, register_recovery_parser
+from paic.recovery.config import RecoveryConfig
+from paic.recovery.manifest import ObservationArtifactManifest, RecoveryArtifactManifest
+from paic.recovery.models import (
+    RecoveryLifecycleEvent,
+    RecoveryLifecycleState,
+    RecoveryObservationSet,
+    RecoveryReport,
+)
 from paic.remediation.cli import dispatch_remediation, register_remediation_parser
 from paic.remediation.config import RemediationConfig
 from paic.remediation.manifest import RemediationArtifactManifest
@@ -205,6 +214,13 @@ def _export_schemas(output_dir: Path) -> int:
         "remediation-execution-request.schema.json": ExecutionRequest,
         "remediation-execution-receipt.schema.json": ExecutionReceipt,
         "remediation-artifact-manifest.schema.json": RemediationArtifactManifest,
+        "recovery-config.schema.json": RecoveryConfig,
+        "recovery-observation-set.schema.json": RecoveryObservationSet,
+        "recovery-report.schema.json": RecoveryReport,
+        "recovery-lifecycle-state.schema.json": RecoveryLifecycleState,
+        "recovery-lifecycle-event.schema.json": RecoveryLifecycleEvent,
+        "recovery-artifact-manifest.schema.json": RecoveryArtifactManifest,
+        "recovery-observation-artifact-manifest.schema.json": ObservationArtifactManifest,
     }
     for filename, model in models.items():
         path = output_dir / filename
@@ -935,6 +951,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     investigate_replay.add_argument("--investigation-dir", type=Path, required=True)
     register_remediation_parser(subparsers)
+    register_recovery_parser(subparsers)
     return parser
 
 
@@ -1037,6 +1054,8 @@ def main(argv: list[str] | None = None) -> int:
         return _investigate_replay(args.investigation_dir)
     if args.command == "remediate":
         return dispatch_remediation(args)
+    if args.command == "recovery":
+        return dispatch_recovery(args)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

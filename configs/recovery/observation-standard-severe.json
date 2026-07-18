@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "observation_set_id": "standard-commerce-recovery-severe",
+  "generated_at_offset_hours": 16,
+  "post_interval_hours": 1,
+  "series": [
+    {"metric_id": "checkout_conversion_rate", "cohort": "overall", "values": [0.80, 0.80, 0.80, 0.80, 0.80, 0.80], "sample_size": 500},
+    {"metric_id": "payment_decline_rate", "cohort": "overall", "values": [0.11, 0.11, 0.11, 0.11, 0.11, 0.11], "sample_size": 500},
+    {"metric_id": "payment_approval_rate", "cohort": "overall", "values": [0.40, 0.40, 0.40, 0.40, 0.40, 0.40], "sample_size": 500},
+    {"metric_id": "payment_latency_p95_ms", "cohort": "overall", "values": [1400.0, 1400.0, 1400.0, 1400.0, 1400.0, 1400.0], "sample_size": 500}
+  ]
+}

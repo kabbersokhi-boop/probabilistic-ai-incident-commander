@@ -14,6 +14,7 @@ Synthetic commerce environment
         -> action policy and human approval
         -> simulated remediation
         -> deterministic recovery verification
+        -> immutable recovery lifecycle and automatic reopening
         -> evidence-backed report and evaluator
 ```
 
@@ -164,7 +165,7 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 - `evidence`: logs, deployments, configuration, lineage, retrieval
 - `tools`: scoped interfaces and SQL gateway
 - `agent`: controlled state machine and investigation policy
-- `recovery`: statistical verification and reopening
+- `recovery`: statistical verification, source-bound artifacts, immutable local lifecycle, and reopening
 - `evaluation`: ground truth, baselines, ablations, and adversarial tests
 - `api`, `web`, and `tui`: product interfaces over the same core services
 

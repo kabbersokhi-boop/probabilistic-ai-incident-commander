@@ -190,3 +190,7 @@ Remediation changes require:
 - no secret or raw token persistence in manifests, receipts, logs, fixtures, or committed artifacts;
 - smoke plan, two-person approval, token issuance, execution, state validation, receipt validation, and token cleanup on Python 3.11 and 3.12;
 - recovery remaining separate: an executed receipt must never be interpreted as proof of business recovery.
+
+## Recovery verification quality gates
+
+Recovery changes require deterministic statistical gates, strict generated schemas, source-bound closed-world artifacts with semantic replay, immutable local lifecycle generations, duplicate/stale/out-of-order rejection, and offline smoke evidence for insufficient/recovering/recovered/failed states followed by automatic reopening. Execution success must remain separate from recovery, and synthetic-data and local-filesystem limitations must remain documented.

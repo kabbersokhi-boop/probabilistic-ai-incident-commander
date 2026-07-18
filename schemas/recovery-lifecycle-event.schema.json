@@ -1,0 +1,101 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "after_state_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "After State Sha256",
+      "type": "string"
+    },
+    "before_state_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Before State Sha256",
+      "type": "string"
+    },
+    "config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "evaluated_at": {
+      "format": "date-time",
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "event_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Event Sha256",
+      "type": "string"
+    },
+    "from_status": {
+      "enum": [
+        "monitoring",
+        "recovered",
+        "reopened"
+      ],
+      "title": "From Status",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "previous_event_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Previous Event Sha256",
+      "type": "string"
+    },
+    "recovery_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "report_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Report Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "to_status": {
+      "enum": [
+        "monitoring",
+        "recovered",
+        "reopened"
+      ],
+      "title": "To Status",
+      "type": "string"
+    },
+    "trigger": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Trigger",
+      "type": "string"
+    }
+  },
+  "required": [
+    "recovery_id",
+    "incident_id",
+    "generation",
+    "report_sha256",
+    "config_sha256",
+    "before_state_sha256",
+    "after_state_sha256",
+    "previous_event_sha256",
+    "from_status",
+    "to_status",
+    "trigger",
+    "evaluated_at",
+    "event_sha256"
+  ],
+  "title": "RecoveryLifecycleEvent",
+  "type": "object"
+}

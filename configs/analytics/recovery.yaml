@@ -1,0 +1,41 @@
+schema_version: "1.0"
+analytics_id: commerce-analytics-recovery
+timezone: UTC
+time_grains:
+  - day
+minimum_denominator: 5
+metrics:
+  - "*"
+cohorts:
+  - name: overall
+    dimensions: []
+  - name: region
+    dimensions: [region]
+  - name: device
+    dimensions: [device]
+  - name: issuer
+    dimensions: [issuer]
+  - name: payment-method
+    dimensions: [payment_method]
+  - name: pipeline-name
+    dimensions: [pipeline_name]
+  - name: service
+    dimensions: [service]
+funnel_cohorts:
+  - overall
+  - region
+  - device
+contributions:
+  - name: checkout-conversion-by-region
+    metric: checkout_conversion_rate
+    dimension: region
+    time_grain: day
+  - name: payment-approval-by-issuer
+    metric: payment_approval_rate
+    dimension: issuer
+    time_grain: day
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 50000
+  include_statistics: true

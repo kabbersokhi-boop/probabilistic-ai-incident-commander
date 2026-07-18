@@ -1,0 +1,107 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "applied_report_sha256s": {
+      "items": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "title": "Applied Report Sha256S",
+      "type": "array"
+    },
+    "config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "consecutive_failed_evaluations": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Consecutive Failed Evaluations",
+      "type": "integer"
+    },
+    "ever_recovered": {
+      "default": false,
+      "title": "Ever Recovered",
+      "type": "boolean"
+    },
+    "execution_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Manifest Sha256",
+      "type": "string"
+    },
+    "execution_receipt_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Receipt Sha256",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 0,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "last_evaluated_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Evaluated At"
+    },
+    "last_report_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Report Sha256"
+    },
+    "recovery_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "monitoring",
+      "enum": [
+        "monitoring",
+        "recovered",
+        "reopened"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "recovery_id",
+    "incident_id",
+    "execution_receipt_sha256",
+    "execution_manifest_sha256",
+    "config_sha256",
+    "generation"
+  ],
+  "title": "RecoveryLifecycleState",
+  "type": "object"
+}

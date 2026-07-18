@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "ObservationArtifactFile": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "relative_path": {
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "byte_size",
+        "sha256"
+      ],
+      "title": "ObservationArtifactFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analytics_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Analytics Manifest Sha256",
+      "type": "string"
+    },
+    "artifact_type": {
+      "const": "recovery_observation_set",
+      "default": "recovery_observation_set",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "evaluator_generated": {
+      "const": true,
+      "default": true,
+      "title": "Evaluator Generated",
+      "type": "boolean"
+    },
+    "execution_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Manifest Sha256",
+      "type": "string"
+    },
+    "execution_receipt_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Execution Receipt Sha256",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ObservationArtifactFile"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Files",
+      "type": "array"
+    },
+    "generator_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Generator Config Sha256",
+      "type": "string"
+    },
+    "generator_version": {
+      "minLength": 1,
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "observation_set_id": {
+      "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+      "title": "Observation Set Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "observation_set_id",
+    "incident_id",
+    "generator_version",
+    "analytics_manifest_sha256",
+    "execution_manifest_sha256",
+    "execution_receipt_sha256",
+    "generator_config_sha256",
+    "files"
+  ],
+  "title": "ObservationArtifactManifest",
+  "type": "object"
+}

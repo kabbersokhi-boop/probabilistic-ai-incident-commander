@@ -73,6 +73,45 @@ The analytical artifact must:
 
 The standard configuration must also be run before merging changes that affect generation, joins, metric definitions, contribution analysis, or artifact export.
 
+## End-to-end statistical detection check
+
+```bash
+rm -rf .artifacts/detection-smoke
+python -m paic detection build \
+  --analytics-dir .artifacts/analytics-smoke \
+  --config configs/detection/smoke.yaml \
+  --output-dir .artifacts/detection-smoke
+python -m paic detection validate \
+  --detection-dir .artifacts/detection-smoke \
+  --analytics-dir .artifacts/analytics-smoke
+python -m paic detection summary \
+  --detection-dir .artifacts/detection-smoke
+```
+
+The detector must:
+
+- use only observations earlier than the point being scored,
+- preserve expected values, uncertainty intervals, p-values, q-values, change scores, and eligibility evidence,
+- choose a distribution-aware predictive test from metric semantics,
+- apply monotone Benjamini-Hochberg correction with `q >= p`,
+- block alerts with inadequate history, samples, effect size, or detector support,
+- keep a no-anomaly smoke build free of alerts,
+- detect all ten standard evaluator scenarios,
+- retain standard benchmark precision of at least 0.80 and false-positive rate below 0.005,
+- reproduce identical logical tables and hashes from identical inputs in the same runtime,
+- detect source-lineage, configuration, manifest, marker, schema, path, and table tampering.
+
+## Independent detection audit
+
+Review must independently:
+
+- verify a ratio score against the beta-binomial predictive calculation,
+- verify an overdispersed count selects the negative-binomial model,
+- confirm small-cohort beta-binomial results are less overconfident than a fixed-probability binomial test,
+- recompute one Benjamini-Hochberg family and confirm monotonic q-values,
+- mutate a current or future observation and prove it does not affect an earlier baseline,
+- run the standard benchmark twice and compare outputs.
+
 ## Independent analytical audit
 
 At least representative metrics must be recomputed directly from source tables rather than validated only through the analytical engine. The review set currently includes:
@@ -92,4 +131,4 @@ For cohort changes, the review must verify that cohort numerators and denominato
 python -m build
 ```
 
-The resulting wheel must install in a clean Python 3.11 or 3.12 environment. The installed `paic` CLI must validate contracts, generate and validate the smoke dataset, and build and validate its analytical artifact.
+The resulting wheel must install in a clean Python 3.11 or 3.12 environment. The installed `paic` CLI must validate contracts, generate and validate the smoke dataset, build and validate its analytical artifact, and build and validate the smoke detector.

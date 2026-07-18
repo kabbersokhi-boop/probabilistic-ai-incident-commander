@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -6,6 +6,8 @@ SMOKE_DIR ?= .artifacts/smoke
 STANDARD_DIR ?= .artifacts/standard
 ANALYTICS_SMOKE_DIR ?= .artifacts/analytics-smoke
 ANALYTICS_STANDARD_DIR ?= .artifacts/analytics-standard
+DETECTION_SMOKE_DIR ?= .artifacts/detection-smoke
+DETECTION_STANDARD_DIR ?= .artifacts/detection-standard
 SCHEMA_TMP ?= schemas-generated
 
 install:
@@ -62,6 +64,24 @@ validate-analytics-standard:
 summarize-analytics-standard:
 	$(PYTHON) -m paic analytics summary --analytics-dir $(ANALYTICS_STANDARD_DIR)
 
+detection-smoke: analytics-smoke
+	$(PYTHON) -m paic detection build --analytics-dir $(ANALYTICS_SMOKE_DIR) --config configs/detection/smoke.yaml --output-dir $(DETECTION_SMOKE_DIR) --overwrite
+
+validate-detection-smoke:
+	$(PYTHON) -m paic detection validate --detection-dir $(DETECTION_SMOKE_DIR) --analytics-dir $(ANALYTICS_SMOKE_DIR)
+
+summarize-detection-smoke:
+	$(PYTHON) -m paic detection summary --detection-dir $(DETECTION_SMOKE_DIR)
+
+detection-standard: analytics-standard
+	$(PYTHON) -m paic detection build --analytics-dir $(ANALYTICS_STANDARD_DIR) --config configs/detection/standard.yaml --output-dir $(DETECTION_STANDARD_DIR) --overwrite
+
+validate-detection-standard:
+	$(PYTHON) -m paic detection validate --detection-dir $(DETECTION_STANDARD_DIR) --analytics-dir $(ANALYTICS_STANDARD_DIR)
+
+summarize-detection-standard:
+	$(PYTHON) -m paic detection summary --detection-dir $(DETECTION_STANDARD_DIR)
+
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q
 
@@ -82,7 +102,7 @@ typecheck:
 
 check: validate format-check lint typecheck coverage schema-check
 
-verify: check analytics-smoke validate-analytics-smoke
+verify: check detection-smoke validate-detection-smoke
 
 clean:
 	rm -rf .artifacts .coverage .mypy_cache .pytest_cache .ruff_cache build dist htmlcov schemas-generated

@@ -31,14 +31,27 @@
 - Self-validating analytical artifacts containing Parquet tables, resolved configuration, metric catalog, manifest, hashes, and runtime metadata
 - CLI commands for analytical build, validation, and summary
 
+### Statistical anomaly detection
+
+- Rolling and seasonal no-lookahead baselines with robust median/MAD estimates
+- Empirical beta-binomial predictive tests for ratio metrics
+- Poisson and negative-binomial predictive tests for counts
+- Robust log-Student-t tests for currency and duration metrics
+- Benjamini-Hochberg false-discovery control by time grain and period
+- Two-sided CUSUM and sequential likelihood evidence
+- Metric-specific eligibility, sample-size, effect-size, and detector-support policies
+- Anomaly event and change-point event formation
+- Ten deterministic evaluator scenarios with hidden ground truth
+- Reference standard benchmark: 100% scenario recall, 81.25% precision, 0.24% false-positive rate, and 1.2-period mean delay
+- Source-bound, self-validating Parquet artifacts and detector CLI commands
+
 ## Explicit limitations
 
-- The simulator produces healthy baseline data only; incident injection is not yet implemented.
-- Statistical anomaly detection is not yet implemented.
+- The simulator produces healthy baseline data only; raw-event incident injection is not yet implemented. Detector benchmarks currently use evaluator-only metric perturbations.
 - Churn, survival, causal impact, and revenue-at-risk models are not yet implemented.
 - No language model, agent framework, database service, frontend, Docker service, or cloud resource is required yet.
 - Generated data and analytical outputs are development benchmarks, not production forecasts.
 
 ## Next capability
 
-The next implementation adds robust seasonal and cohort-aware anomaly detection, change-point estimation, sequential monitoring, and false-discovery control over the deterministic metric observations.
+The next implementation adds customer churn, survival analysis, incident-exposure modelling, causal-impact evaluation, calibration, and revenue-at-risk estimation.

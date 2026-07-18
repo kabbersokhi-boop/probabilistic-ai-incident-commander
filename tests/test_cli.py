@@ -36,7 +36,7 @@ def test_summary_command_lists_incident_families(
     assert "payment_configuration" in payload["incident_families"]
 
 
-def test_export_schemas_writes_eight_documents(
+def test_export_schemas_writes_ten_documents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     output_dir = tmp_path / "schemas"
@@ -52,6 +52,8 @@ def test_export_schemas_writes_eight_documents(
         "dataset-manifest.schema.json",
         "analytics-config.schema.json",
         "analytics-manifest.schema.json",
+        "detection-config.schema.json",
+        "detection-manifest.schema.json",
     }
 
 

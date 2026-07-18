@@ -1,0 +1,190 @@
+schema_version: "1.0"
+detection_id: commerce-detection-standard
+timezone: UTC
+selectors:
+  - metric: checkout_conversion_rate
+    time_grains: [hour]
+    cohorts: [overall, region]
+  - metric: payment_approval_rate
+    time_grains: [hour]
+    cohorts: [overall]
+  - metric: payment_decline_rate
+    time_grains: [hour]
+    cohorts: [overall]
+  - metric: completed_orders
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: gross_order_value
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: inventory_exact_match_rate
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: on_time_delivery_rate
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: pipeline_row_retention_rate
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: feed_rejection_rate
+    time_grains: [day]
+    cohorts: [overall]
+baseline:
+  hour:
+    lookback_periods: 168
+    minimum_history: 72
+    seasonal_periods: 24
+    minimum_seasonal_history: 3
+    minimum_scale: 0.000001
+    relative_scale_floor: 0.01
+  day:
+    lookback_periods: 14
+    minimum_history: 7
+    seasonal_periods: 7
+    minimum_seasonal_history: 2
+    minimum_scale: 0.000001
+    relative_scale_floor: 0.01
+cusum:
+  enabled: true
+  drift: 0.5
+  threshold: 4.5
+sequential:
+  enabled: true
+  alpha: 0.01
+  alternative_standardized_shift: 1.5
+alert_policy:
+  fdr_alpha: 0.05
+  robust_z_threshold: 3.0
+  minimum_detector_support: 2
+  minimum_relative_effect: 0.08
+  minimum_absolute_effect: 0.0
+  minimum_sample_size: 10
+metric_overrides:
+  - metric: checkout_conversion_rate
+    minimum_relative_effect: 0.35
+    minimum_sample_size: 5
+  - metric: payment_approval_rate
+    minimum_relative_effect: 0.30
+    minimum_sample_size: 10
+  - metric: payment_decline_rate
+    minimum_relative_effect: 1.50
+    minimum_sample_size: 10
+  - metric: completed_orders
+    robust_z_threshold: 2.5
+    minimum_detector_support: 2
+    minimum_relative_effect: 0.25
+    minimum_sample_size: 1
+  - metric: gross_order_value
+    robust_z_threshold: 2.5
+    minimum_detector_support: 2
+    minimum_relative_effect: 0.45
+    minimum_sample_size: 1
+  - metric: inventory_exact_match_rate
+    minimum_relative_effect: 0.08
+    minimum_sample_size: 100
+  - metric: on_time_delivery_rate
+    minimum_relative_effect: 0.20
+    minimum_sample_size: 100
+  - metric: pipeline_row_retention_rate
+    minimum_relative_effect: 0.04
+    minimum_sample_size: 1
+  - metric: feed_rejection_rate
+    minimum_relative_effect: 0.30
+    minimum_sample_size: 1
+benchmark_scenarios:
+  - scenario_id: checkout-overall-drop
+    metric: checkout_conversion_rate
+    time_grain: hour
+    cohort: overall
+    start_at: "2026-04-10T06:00:00Z"
+    duration_periods: 12
+    kind: level_shift
+    magnitude: -0.22
+    expected_direction: decrease
+  - scenario_id: checkout-south-drop
+    metric: checkout_conversion_rate
+    time_grain: hour
+    cohort: region
+    dimension_values: {region: IN-SOUTH}
+    start_at: "2026-04-11T06:00:00Z"
+    duration_periods: 10
+    kind: level_shift
+    magnitude: -0.28
+    expected_direction: decrease
+  - scenario_id: payment-approval-drop
+    metric: payment_approval_rate
+    time_grain: hour
+    cohort: overall
+    start_at: "2026-04-12T06:00:00Z"
+    duration_periods: 10
+    kind: level_shift
+    magnitude: -0.25
+    expected_direction: decrease
+  - scenario_id: payment-decline-spike
+    metric: payment_decline_rate
+    time_grain: hour
+    cohort: overall
+    start_at: "2026-04-13T12:00:00Z"
+    duration_periods: 3
+    kind: spike
+    magnitude: 1.50
+    expected_direction: increase
+  - scenario_id: completed-orders-drop
+    metric: completed_orders
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-10T00:00:00Z"
+    duration_periods: 2
+    kind: level_shift
+    magnitude: -0.35
+    expected_direction: decrease
+  - scenario_id: gross-order-value-spike
+    metric: gross_order_value
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-12T00:00:00Z"
+    duration_periods: 2
+    kind: spike
+    magnitude: 0.70
+    expected_direction: increase
+  - scenario_id: inventory-accuracy-drop
+    metric: inventory_exact_match_rate
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-11T00:00:00Z"
+    duration_periods: 2
+    kind: level_shift
+    magnitude: -0.30
+    expected_direction: decrease
+  - scenario_id: on-time-delivery-drop
+    metric: on_time_delivery_rate
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-12T00:00:00Z"
+    duration_periods: 2
+    kind: level_shift
+    magnitude: -0.30
+    expected_direction: decrease
+  - scenario_id: pipeline-retention-drift
+    metric: pipeline_row_retention_rate
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-10T00:00:00Z"
+    duration_periods: 3
+    kind: drift
+    magnitude: -0.15
+    expected_direction: decrease
+  - scenario_id: feed-rejection-spike
+    metric: feed_rejection_rate
+    time_grain: day
+    cohort: overall
+    start_at: "2026-04-11T00:00:00Z"
+    duration_periods: 2
+    kind: level_shift
+    magnitude: 1.50
+    expected_direction: increase
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 50000
+  include_statistics: true

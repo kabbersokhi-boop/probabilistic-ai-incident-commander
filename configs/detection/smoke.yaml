@@ -1,0 +1,47 @@
+schema_version: "1.0"
+detection_id: commerce-detection-smoke
+timezone: UTC
+selectors:
+  - metric: checkout_conversion_rate
+    time_grains: [day]
+    cohorts: [overall]
+  - metric: payment_approval_rate
+    time_grains: [day]
+    cohorts: [overall]
+baseline:
+  hour:
+    lookback_periods: 48
+    minimum_history: 24
+    seasonal_periods: 24
+    minimum_seasonal_history: 2
+    minimum_scale: 0.000001
+    relative_scale_floor: 0.01
+  day:
+    lookback_periods: 14
+    minimum_history: 7
+    seasonal_periods: 7
+    minimum_seasonal_history: 2
+    minimum_scale: 0.000001
+    relative_scale_floor: 0.01
+cusum:
+  enabled: true
+  drift: 0.5
+  threshold: 5.0
+sequential:
+  enabled: true
+  alpha: 0.01
+  alternative_standardized_shift: 1.5
+alert_policy:
+  fdr_alpha: 0.05
+  robust_z_threshold: 3.0
+  minimum_detector_support: 2
+  minimum_relative_effect: 0.08
+  minimum_absolute_effect: 0.0
+  minimum_sample_size: 5
+metric_overrides: []
+benchmark_scenarios: []
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 50000
+  include_statistics: true

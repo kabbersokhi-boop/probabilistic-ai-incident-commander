@@ -4,10 +4,14 @@
       "additionalProperties": false,
       "properties": {
         "code": {
+          "maxLength": 80,
+          "minLength": 1,
           "title": "Code",
           "type": "string"
         },
         "message": {
+          "maxLength": 1000,
+          "minLength": 1,
           "title": "Message",
           "type": "string"
         }
@@ -60,6 +64,11 @@
     "incident_id": {
       "title": "Incident Id",
       "type": "string"
+    },
+    "normalized_arguments": {
+      "additionalProperties": true,
+      "title": "Normalized Arguments",
+      "type": "object"
     },
     "policy_decision": {
       "enum": [
@@ -114,6 +123,7 @@
     "byte_count",
     "truncated",
     "evidence_record_ids",
+    "normalized_arguments",
     "result_sha256"
   ],
   "title": "ToolResponse",

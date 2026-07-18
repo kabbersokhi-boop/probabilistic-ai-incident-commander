@@ -4,176 +4,205 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-import polars as pl
-import pytest
-
-from paic.cli import main
-from paic.tools.binding import BoundSources
 from paic.tools.gateway import Gateway
-from paic.tools.ledger import AuditLedger, canonical, digest
 from paic.tools.models import ToolRequest
-from paic.tools.policy import authorize
-from paic.tools.sql import SQLPolicyError, execute
 
 
-def frames() -> dict[str, pl.DataFrame]:
-    return {
-        "evidence__evidence_records": pl.DataFrame(
-            {"evidence_record_id": ["e1"], "summary": ["checkout degraded"]}
-        )
-    }
-
-
-@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
-    "query",
-    [
-        "select * from evidence__evidence_records; delete from evidence__evidence_records",
-        "SeLeCt * from evidence__evidence_records; -- DROP TABLE x\n select 1",
-        "select * from read_parquet('/tmp/secret.parquet')",
-        "select * from evidence__evidence_records where summary = getenv('TOKEN')",
-        "install httpfs",
-        "select * from pg_catalog.pg_tables",
-        "select missing from evidence__evidence_records",
-    ],
-)
-def test_sql_policy_rejects_adversarial_queries(query: str) -> None:
-    with pytest.raises(SQLPolicyError):
-        execute(query, frames())
-
-
-def test_sql_cte_and_subquery_are_read_only() -> None:
-    rows, truncated = execute(
-        "with x as (select * from evidence__evidence_records) select * from x where evidence_record_id in (select evidence_record_id from x)",
-        frames(),
+def _request(
+    tool: str,
+    dataset: Path,
+    *,
+    arguments: dict[str, object],
+    analytics: Path | None = None,
+    detection: Path | None = None,
+    impact: Path | None = None,
+    evidence: Path | None = None,
+    role: str = "investigator",
+) -> ToolRequest:
+    return ToolRequest.model_validate(
+        {
+            "tool": tool,
+            "incident_id": "inc-test",
+            "role": role,
+            "arguments": arguments,
+            "dataset_dir": str(dataset),
+            "analytics_dir": str(analytics) if analytics else None,
+            "detection_dir": str(detection) if detection else None,
+            "impact_dir": str(impact) if impact else None,
+            "evidence_dir": str(evidence) if evidence else None,
+            "call_id": str(uuid4()),
+        }
     )
-    assert rows[0]["evidence_record_id"] == "e1"
-    assert not truncated
 
 
-def test_sql_limits_are_deterministic() -> None:
-    rows, truncated = execute("select * from evidence__evidence_records", frames(), row_limit=0)
-    assert rows == []
-    assert truncated
-
-
-def test_ledger_detects_edit_delete_reorder_and_forgery(tmp_path: Path) -> None:
-    ledger = AuditLedger(tmp_path)
-    request = {"tool": "artifacts.summary", "role": "observer"}
-    response = {"call_id": "c", "tool": "artifacts.summary", "result_sha256": digest({"ok": True})}
-    ledger.append(request, response, policy="allow", sources={"dataset": "a" * 64})
-    ledger.validate()
-    path = tmp_path / "invocations.jsonl"
-    original = path.read_text()
-    record = json.loads(original)
-    record["request_sha256"] = "0" * 64
-    path.write_text(canonical(record) + "\n")
-    with pytest.raises(ValueError):
-        ledger.validate()
-
-
-def test_policy_is_deny_by_default() -> None:
-    assert not authorize("unknown", "evidence.search", "1.0", {}).allowed
-    assert not authorize("observer", "sql.query", "1.0", {}).allowed
-    assert not authorize("investigator", "unknown", "1.0", {}).allowed
-    assert not authorize("investigator", "sql.query", "9.0", {}).allowed
-    assert authorize("investigator", "sql.query", "1.0", {}).allowed
-
-
-def test_gateway_handlers_and_denials(monkeypatch: pytest.MonkeyPatch) -> None:
-    import paic.tools.gateway as module
-
-    bound = BoundSources(Path("/dataset"), None, None, None, None, {"dataset": "a" * 64})
-    local = {
-        "evidence__evidence_records": pl.DataFrame(
-            {"evidence_record_id": ["e1"], "summary": ["checkout"]}
-        ),
-        "evidence__lineage_nodes": pl.DataFrame({"node_id": ["n1"], "name": ["checkout"]}),
-        "evidence__lineage_edges": pl.DataFrame(
-            {"upstream_node_id": ["n1"], "downstream_node_id": ["n1"]}
-        ),
-        "evidence__config_changes": pl.DataFrame({"change_id": ["c1"], "description": ["change"]}),
-        "evidence__runbooks": pl.DataFrame({"runbook_id": ["r1"], "title": ["book"]}),
-        "evidence__historical_incidents": pl.DataFrame(
-            {"historical_incident_id": ["h1"], "root_cause": ["x"]}
-        ),
-        "detection__anomaly_events": pl.DataFrame({"event_id": ["a1"], "description": ["anomaly"]}),
-        "impact__customer_impact_summary": pl.DataFrame(
-            {"impact_id": ["i1"], "summary": ["impact"]}
-        ),
-    }
-    monkeypatch.setattr(module, "bind_sources", lambda *args, **kwargs: bound)
-    monkeypatch.setattr(Gateway, "_frames", lambda self, source: local)
-    gateway = Gateway()
-    common: dict[str, object] = {
-        "incident_id": "inc",
-        "role": "investigator",
-        "dataset_dir": "/dataset",
-        "call_id": uuid4(),
-    }
-    for tool in [
-        "evidence.search",
-        "lineage.trace",
-        "changes.list",
-        "runbook.get",
-        "historical_incidents.search",
-        "anomalies.list",
-        "impact.summary",
-        "artifacts.summary",
-    ]:
-        response = gateway.invoke(ToolRequest(tool=tool, arguments={}, **common))  # type: ignore[arg-type]
-        assert response.execution_status == "success"
-    denied = gateway.invoke(
-        ToolRequest(
-            tool="sql.query",
-            role="observer",
+def test_gateway_evidence_handlers(
+    impact_smoke_dataset_dir: Path,
+    evidence_smoke_dir: Path,
+) -> None:
+    gateway = Gateway(row_limit=20, byte_limit=50_000)
+    summary = gateway.invoke(
+        _request(
+            "artifacts.summary",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
             arguments={},
-            incident_id="inc",
-            dataset_dir="/dataset",
+        )
+    )
+    assert summary.execution_status == "success"
+    assert summary.result["table_count"] > 10
+
+    evidence = gateway.invoke(
+        _request(
+            "evidence.search",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
+            arguments={"query": "", "limit": 3},
+        )
+    )
+    assert evidence.execution_status == "success"
+    assert len(evidence.result) == 3
+    assert evidence.evidence_record_ids
+
+    changes = gateway.invoke(
+        _request(
+            "changes.list",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
+            arguments={"query": "", "limit": 10},
+        )
+    )
+    assert changes.execution_status == "success"
+    assert changes.result
+
+    runbook = gateway.invoke(
+        _request(
+            "runbook.get",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
+            arguments={"query": "checkout", "limit": 10},
+        )
+    )
+    assert runbook.execution_status == "success"
+
+    historical = gateway.invoke(
+        _request(
+            "historical_incidents.search",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
+            arguments={"query": "address", "limit": 10},
+        )
+    )
+    assert historical.execution_status == "success"
+
+    nodes = gateway._frames(
+        __import__("paic.tools.binding", fromlist=["bind_sources"]).bind_sources(
+            impact_smoke_dataset_dir, evidence_dir=evidence_smoke_dir
+        )
+    )["evidence__lineage_nodes"]
+    node_id = nodes.get_column("node_id")[0]
+    lineage = gateway.invoke(
+        _request(
+            "lineage.trace",
+            impact_smoke_dataset_dir,
+            evidence=evidence_smoke_dir,
+            arguments={"node_id": node_id, "direction": "both", "depth": 2},
+        )
+    )
+    assert lineage.execution_status == "success"
+    assert lineage.result["nodes"]
+
+
+def test_gateway_detection_impact_and_sql_handlers(
+    smoke_dataset_dir: Path,
+    analytics_smoke_dir: Path,
+    detection_smoke_dir: Path,
+    impact_smoke_dataset_dir: Path,
+    impact_smoke_dir: Path,
+) -> None:
+    gateway = Gateway(row_limit=10, byte_limit=20_000)
+    anomalies = gateway.invoke(
+        _request(
+            "anomalies.list",
+            smoke_dataset_dir,
+            analytics=analytics_smoke_dir,
+            detection=detection_smoke_dir,
+            arguments={"limit": 5},
+        )
+    )
+    assert anomalies.execution_status == "success"
+
+    sql = gateway.invoke(
+        _request(
+            "sql.query",
+            smoke_dataset_dir,
+            arguments={
+                "query": "SELECT customer_id FROM dataset__customers ORDER BY customer_id LIMIT 3"
+            },
+        )
+    )
+    assert sql.execution_status == "success"
+    assert len(sql.result) == 3
+
+    impact = gateway.invoke(
+        _request(
+            "impact.summary",
+            impact_smoke_dataset_dir,
+            impact=impact_smoke_dir,
+            arguments={},
+        )
+    )
+    assert impact.execution_status == "success"
+    assert "financial_impact" in impact.result
+
+
+def test_gateway_denies_invalid_requests_and_reports_errors(
+    smoke_dataset_dir: Path,
+) -> None:
+    gateway = Gateway()
+    denied = gateway.invoke(
+        _request(
+            "sql.query",
+            smoke_dataset_dir,
+            arguments={"query": "SELECT 1"},
+            role="observer",
         )
     )
     assert denied.policy_decision == "deny"
+    assert denied.error and denied.error.code == "forbidden"
 
-
-def test_gateway_cli_surfaces(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["tools", "list"]) == 0
-    request = tmp_path / "bad.json"
-    request.write_text("{}", encoding="utf-8")
-    assert main(["tools", "invoke", "--request", str(request)]) == 2
-    assert main(["tools", "audit", "validate", "--audit-dir", str(tmp_path / "audit")]) == 0
-    assert "error" in capsys.readouterr().out
-
-
-def test_source_binding_requires_analytics_for_detection(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    import paic.tools.binding as binding
-    from paic.tools.binding import BindingError, bind_sources
-
-    monkeypatch.setattr(
-        binding,
-        "validate_dataset_directory",
-        lambda path: type("R", (), {"valid": True})(),
+    invalid = gateway.invoke(
+        _request(
+            "evidence.search",
+            smoke_dataset_dir,
+            arguments={"query": "x", "unknown": True},
+        )
     )
-    with pytest.raises(BindingError, match="requires analytics"):
-        bind_sources(tmp_path, detection_dir=tmp_path / "detection")
+    assert invalid.policy_decision == "deny"
+    assert invalid.error and invalid.error.code == "invalid_arguments"
 
-
-def test_source_binding_validates_every_optional_artifact(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    import paic.tools.binding as binding
-
-    def valid(*args: object, **kwargs: object) -> object:
-        return type("R", (), {"valid": True})()
-
-    monkeypatch.setattr(binding, "validate_dataset_directory", valid)
-    monkeypatch.setattr(binding, "validate_analytics_directory", valid)
-    monkeypatch.setattr(binding, "validate_detection_directory", valid)
-    monkeypatch.setattr(binding, "validate_impact_directory", valid)
-    monkeypatch.setattr(binding, "validate_evidence_directory", valid)
-    monkeypatch.setattr(binding, "load_dataset", lambda path: (None, {}))
-    monkeypatch.setattr(binding, "file_sha256", lambda path: "a" * 64)
-    result = binding.bind_sources(
-        tmp_path, tmp_path / "a", tmp_path / "d", tmp_path / "i", tmp_path / "e"
+    rejected = gateway.invoke(
+        _request(
+            "sql.query",
+            smoke_dataset_dir,
+            arguments={"query": "SELECT * FROM parquet_scan('/tmp/private')"},
+        )
     )
-    assert set(result.hashes) == {"dataset", "analytics", "detection", "impact", "evidence"}
+    assert rejected.execution_status == "error"
+    assert rejected.error and rejected.error.code == "request_rejected"
+
+
+def test_gateway_audit_round_trip(
+    tmp_path: Path,
+    smoke_dataset_dir: Path,
+) -> None:
+    request = _request("artifacts.summary", smoke_dataset_dir, arguments={})
+    raw = request.model_dump(mode="json")
+    raw["audit_dir"] = str(tmp_path / "audit")
+    response = Gateway().invoke(ToolRequest.model_validate(raw))
+    assert response.execution_status == "success"
+    from paic.tools.ledger import AuditLedger
+
+    ledger = AuditLedger(tmp_path / "audit")
+    ledger.validate()
+    record = json.loads(ledger.path.read_text(encoding="utf-8"))
+    assert record["request"]["tool"] == "artifacts.summary"

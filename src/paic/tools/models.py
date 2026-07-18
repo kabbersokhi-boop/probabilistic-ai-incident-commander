@@ -1,4 +1,4 @@
-"""Strict wire models for gateway requests, responses, and errors."""
+"""Strict wire models for the Governed Tool Gateway."""
 
 from __future__ import annotations
 
@@ -28,8 +28,8 @@ class ToolRequest(StrictModel):
 
 
 class ToolError(StrictModel):
-    code: str
-    message: str
+    code: str = Field(min_length=1, max_length=80)
+    message: str = Field(min_length=1, max_length=1_000)
 
 
 class ToolResponse(StrictModel):
@@ -44,6 +44,7 @@ class ToolResponse(StrictModel):
     byte_count: int = Field(ge=0)
     truncated: bool
     evidence_record_ids: list[str]
+    normalized_arguments: dict[str, Any]
     result: Any = None
     result_sha256: str
     error: ToolError | None = None

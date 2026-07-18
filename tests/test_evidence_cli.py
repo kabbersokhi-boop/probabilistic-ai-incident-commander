@@ -80,7 +80,7 @@ def test_evidence_cli_requires_analytics_for_detection(
         )
         == 2
     )
-    assert json.loads(capsys.readouterr().out) == {
+    assert json.loads(capsys.readouterr().out) == {  # type: ignore[attr-defined]
         "success": False,
         "error": "--detection-dir requires --analytics-dir",
     }

@@ -21,6 +21,10 @@ from paic.detection.config import DetectionConfig, load_detection_config
 from paic.detection.engine import build_detection
 from paic.detection.io import export_detection
 from paic.detection.types import DetectionBuildResult
+from paic.evidence.config import EvidenceConfig, load_evidence_config
+from paic.evidence.engine import build_evidence
+from paic.evidence.io import export_evidence
+from paic.evidence.types import EvidenceBuildResult
 from paic.impact.config import ImpactConfig, load_impact_config
 from paic.impact.engine import build_impact
 from paic.impact.io import export_impact
@@ -226,4 +230,25 @@ def impact_smoke_dir(
 ) -> Path:
     output = cast(Path, tmp_path_factory.mktemp("impact-artifact")) / "impact"
     export_impact(impact_smoke_result, output)
+    return output
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def evidence_smoke_config(repo_root: Path) -> EvidenceConfig:
+    return load_evidence_config(repo_root / "configs" / "evidence" / "smoke.yaml")
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def evidence_smoke_result(
+    impact_smoke_dataset_dir: Path, evidence_smoke_config: EvidenceConfig
+) -> EvidenceBuildResult:
+    return build_evidence(impact_smoke_dataset_dir, evidence_smoke_config)
+
+
+@pytest.fixture(scope="session")  # type: ignore[untyped-decorator]
+def evidence_smoke_dir(
+    tmp_path_factory: pytest.TempPathFactory, evidence_smoke_result: EvidenceBuildResult
+) -> Path:
+    output = cast(Path, tmp_path_factory.mktemp("evidence-artifact")) / "evidence"
+    export_evidence(evidence_smoke_result, output)
     return output

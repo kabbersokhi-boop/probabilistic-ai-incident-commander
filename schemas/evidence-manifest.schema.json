@@ -1,0 +1,293 @@
+{
+  "$defs": {
+    "EvidenceColumnManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "dtype",
+        "nullable"
+      ],
+      "title": "EvidenceColumnManifest",
+      "type": "object"
+    },
+    "EvidenceRuntimeManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Packages",
+          "type": "object"
+        },
+        "platform": {
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_implementation": {
+          "minLength": 1,
+          "title": "Python Implementation",
+          "type": "string"
+        },
+        "python_version": {
+          "minLength": 1,
+          "title": "Python Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "python_version",
+        "python_implementation",
+        "platform",
+        "packages"
+      ],
+      "title": "EvidenceRuntimeManifest",
+      "type": "object"
+    },
+    "EvidenceTableManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/EvidenceColumnManifest"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "maximum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Timestamp"
+        },
+        "minimum_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Timestamp"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "primary_key": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Primary Key",
+          "type": "array"
+        },
+        "relative_path": {
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "relative_path",
+        "row_count",
+        "byte_size",
+        "sha256",
+        "primary_key",
+        "columns"
+      ],
+      "title": "EvidenceTableManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evidence_config_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Evidence Config Sha256",
+      "type": "string"
+    },
+    "evidence_id": {
+      "minLength": 1,
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "evidence_record_count": {
+      "minimum": 0,
+      "title": "Evidence Record Count",
+      "type": "integer"
+    },
+    "generator_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Generator Version",
+      "type": "string"
+    },
+    "incident_id": {
+      "minLength": 1,
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "lineage_edge_count": {
+      "minimum": 0,
+      "title": "Lineage Edge Count",
+      "type": "integer"
+    },
+    "lineage_node_count": {
+      "minimum": 0,
+      "title": "Lineage Node Count",
+      "type": "integer"
+    },
+    "logical_end_at": {
+      "format": "date-time",
+      "title": "Logical End At",
+      "type": "string"
+    },
+    "logical_start_at": {
+      "format": "date-time",
+      "title": "Logical Start At",
+      "type": "string"
+    },
+    "quality_error_count": {
+      "minimum": 0,
+      "title": "Quality Error Count",
+      "type": "integer"
+    },
+    "runtime": {
+      "$ref": "#/$defs/EvidenceRuntimeManifest"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_analytics_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Analytics Manifest Sha256"
+    },
+    "source_dataset_id": {
+      "minLength": 1,
+      "title": "Source Dataset Id",
+      "type": "string"
+    },
+    "source_dataset_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Dataset Manifest Sha256",
+      "type": "string"
+    },
+    "source_detection_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Detection Manifest Sha256"
+    },
+    "source_impact_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Impact Manifest Sha256"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/EvidenceTableManifest"
+      },
+      "title": "Tables",
+      "type": "array"
+    },
+    "timeline_event_count": {
+      "minimum": 0,
+      "title": "Timeline Event Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "incident_id",
+    "generator_version",
+    "runtime",
+    "source_dataset_id",
+    "source_dataset_manifest_sha256",
+    "evidence_config_sha256",
+    "logical_start_at",
+    "logical_end_at",
+    "evidence_record_count",
+    "timeline_event_count",
+    "lineage_node_count",
+    "lineage_edge_count",
+    "quality_error_count",
+    "tables"
+  ],
+  "title": "EvidenceManifest",
+  "type": "object"
+}

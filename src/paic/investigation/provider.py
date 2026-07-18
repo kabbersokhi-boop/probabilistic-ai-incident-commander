@@ -110,6 +110,13 @@ class _OpenAICompatibleProvider:
             "stream": False,
         }
         if self.provider.kind == "groq":
+            # Groq does not accept OpenAI's optional messages[].name field.
+            # Tool identity remains bound by tool_call_id and the assistant's
+            # validated function call, so dropping it does not weaken replay.
+            payload["messages"] = [
+                message.model_dump(mode="json", exclude_none=True, exclude={"name"})
+                for message in messages
+            ]
             payload["max_completion_tokens"] = self.route.max_tokens
             payload["reasoning_effort"] = self.route.reasoning_effort or "low"
             payload["reasoning_format"] = self.route.reasoning_format or "hidden"
@@ -200,6 +207,10 @@ class _OpenAICompatibleProvider:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                # Groq's edge rejects Python urllib's default user agent even
+                # when the API credential is valid. Keep this stable and free
+                # of host, path, credential, and request-specific data.
+                "User-Agent": "paic/0.8.0",
             },
             method="POST",
         )

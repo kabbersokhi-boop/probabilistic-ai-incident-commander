@@ -105,11 +105,16 @@ def test_groq_request_shape_is_explicit_and_does_not_use_nim_fields(
         del args, kwargs
         assert isinstance(request, Request)
         captured.update(json.loads(request.data.decode()))  # type: ignore[union-attr]
+        captured["user_agent"] = request.headers.get("User-agent")
         return _HTTPResponse(json.dumps(payload).encode())
 
     monkeypatch.setattr("paic.investigation.provider.urllib.request.urlopen", respond)
     GroqProvider(config.provider, config.provider.models[0]).complete(
-        [ChatMessage(role="user", content="x")], []
+        [
+            ChatMessage(role="user", content="x"),
+            ChatMessage(role="tool", content="{}", name="probe", tool_call_id="call-1"),
+        ],
+        [],
     )
     assert captured["model"] == "openai/gpt-oss-120b"
     assert captured["max_completion_tokens"] == 768
@@ -118,6 +123,10 @@ def test_groq_request_shape_is_explicit_and_does_not_use_nim_fields(
     assert captured["stream"] is False
     assert "max_tokens" not in captured
     assert "chat_template_kwargs" not in captured
+    assert captured["user_agent"] == "paic/0.8.0"
+    messages = captured["messages"]
+    assert isinstance(messages, list)
+    assert all(isinstance(message, dict) and "name" not in message for message in messages)
 
 
 def test_groq_rejects_tool_call_without_function_type(monkeypatch: pytest.MonkeyPatch) -> None:

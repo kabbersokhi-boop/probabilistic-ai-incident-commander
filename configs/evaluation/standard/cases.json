@@ -1,0 +1,17 @@
+[
+  {"case_id":"checkout-conversion","family":"checkout-conversion-failure","difficulty":"easy","incident_input":"Checkout conversion fell after a mobile deployment.","evidence_ids":["deploy","conversion"]},
+  {"case_id":"payment-approval","family":"payment-approval-degradation","difficulty":"medium","incident_input":"Payment approval declined in one region.","evidence_ids":["payment","region"]},
+  {"case_id":"latency-degradation","family":"latency-degradation","difficulty":"medium","incident_input":"API latency increased for checkout requests.","evidence_ids":["latency","service"]},
+  {"case_id":"inventory-inconsistency","family":"inventory-inconsistency","difficulty":"hard","incident_input":"Inventory counts diverge between warehouse and catalogue.","evidence_ids":["inventory","warehouse"]},
+  {"case_id":"promotion-error","family":"promotion-configuration-error","difficulty":"medium","incident_input":"A promotion applies an incorrect discount.","evidence_ids":["promotion","config"]},
+  {"case_id":"pipeline-failure","family":"data-pipeline-failure","difficulty":"hard","incident_input":"The hourly data pipeline stopped publishing records.","evidence_ids":["pipeline","freshness"]},
+  {"case_id":"regional-outage","family":"regional-outage","difficulty":"hard","incident_input":"Customers in one region cannot reach the service.","evidence_ids":["region","health"]},
+  {"case_id":"device-specific","family":"device-specific-failure","difficulty":"medium","incident_input":"Only one device family reports checkout errors.","evidence_ids":["device","conversion"]},
+  {"case_id":"misleading-correlation","family":"misleading-correlation","difficulty":"hard","incident_input":"A correlated deployment is healthy while a data issue is active.","evidence_ids":["deployment","lineage"]},
+  {"case_id":"multiple-causes","family":"multiple-plausible-causes","difficulty":"hard","incident_input":"Two independent signals could explain the incident.","evidence_ids":["signal-a","signal-b"]},
+  {"case_id":"insufficient-evidence","family":"insufficient-evidence","difficulty":"hard","incident_input":"Evidence is too sparse to select a root cause.","evidence_ids":["weak"]},
+  {"case_id":"no-action-safe","family":"no-action-safe","difficulty":"medium","incident_input":"The alert is not actionable and mutation is unsafe.","evidence_ids":["policy"]},
+  {"case_id":"payment-region","family":"payment-approval-degradation","difficulty":"hard","incident_input":"Approval degradation is isolated to a payment route.","evidence_ids":["payment","route"]},
+  {"case_id":"latency-device","family":"device-specific-failure","difficulty":"hard","incident_input":"Latency affects an older client version only.","evidence_ids":["latency","device"]},
+  {"case_id":"promotion-lineage","family":"promotion-configuration-error","difficulty":"hard","incident_input":"A configuration lineage change explains the promotion issue.","evidence_ids":["config","lineage"]}
+]

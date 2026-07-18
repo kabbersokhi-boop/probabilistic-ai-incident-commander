@@ -27,3 +27,9 @@ paic evaluation replay --run-dir .artifacts/evaluation-smoke
 The fixtures are synthetic and prove evaluator integrity, not production model
 quality, causality, latency, token usage, or cost. Optional live-provider
 evaluation remains explicitly outside credential-free CI.
+
+The standard offline benchmark contains 15 cases across checkout, payment,
+latency, inventory, promotion, pipeline, regional, device, misleading-correlation,
+multiple-cause, insufficient-evidence, and no-action-safe families. The
+no-lineage ablation is executed against the same visible cases and deterministically
+loses access to lineage evidence; the comparison reports its safety impact.

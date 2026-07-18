@@ -201,6 +201,11 @@ jobs:
           make evaluation-smoke
           make evaluation-validate-smoke
           make evaluation-replay-smoke
+      - name: Standard evaluation and ablation
+        if: matrix.python-version == '3.11'
+        run: make evaluation-compare-smoke
+      - name: Adversarial evaluation boundary
+        run: make evaluation-adversarial
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |

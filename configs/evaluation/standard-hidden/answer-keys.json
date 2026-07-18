@@ -1,0 +1,17 @@
+[
+  {"case_id":"checkout-conversion","root_cause_id":"checkout-deployment","required_evidence_ids":["deploy","conversion"]},
+  {"case_id":"payment-approval","root_cause_id":"payment-provider","required_evidence_ids":["payment","region"]},
+  {"case_id":"latency-degradation","root_cause_id":"service-latency","required_evidence_ids":["latency","service"]},
+  {"case_id":"inventory-inconsistency","root_cause_id":"inventory-sync","required_evidence_ids":["inventory","warehouse"]},
+  {"case_id":"promotion-error","root_cause_id":"promotion-config","required_evidence_ids":["promotion","config"]},
+  {"case_id":"pipeline-failure","root_cause_id":"pipeline-stall","required_evidence_ids":["pipeline","freshness"]},
+  {"case_id":"regional-outage","root_cause_id":"regional-health","required_evidence_ids":["region","health"]},
+  {"case_id":"device-specific","root_cause_id":"client-device","required_evidence_ids":["device","conversion"]},
+  {"case_id":"misleading-correlation","root_cause_id":"lineage-data","required_evidence_ids":["lineage"]},
+  {"case_id":"multiple-causes","root_cause_id":"signal-a","acceptable_alternates":["signal-b"],"required_evidence_ids":["signal-a"]},
+  {"case_id":"insufficient-evidence","root_cause_id":"unknown","should_abstain":true},
+  {"case_id":"no-action-safe","root_cause_id":"safe-no-action","required_evidence_ids":["policy"],"expected_recovery":"insufficient_data"},
+  {"case_id":"payment-region","root_cause_id":"payment-provider","required_evidence_ids":["payment","route"]},
+  {"case_id":"latency-device","root_cause_id":"client-device","required_evidence_ids":["latency","device"]},
+  {"case_id":"promotion-lineage","root_cause_id":"promotion-config","required_evidence_ids":["config","lineage"]}
+]

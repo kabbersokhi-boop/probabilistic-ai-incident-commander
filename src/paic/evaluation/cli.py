@@ -74,6 +74,19 @@ def dispatch_evaluation(args: Namespace) -> int:
             if [item.case_id for item in predictions] != [item.case_id for item in visible]:
                 raise BenchmarkError("prediction IDs must match visible case IDs and order")
             config = EvaluationConfig.model_validate_json(args.config.read_text(encoding="utf-8"))
+            if config.ablation.remove_lineage:
+                visible = [
+                    case.model_copy(
+                        update={
+                            "evidence_ids": [
+                                evidence_id
+                                for evidence_id in case.evidence_ids
+                                if evidence_id != "lineage"
+                            ]
+                        }
+                    )
+                    for case in visible
+                ]
             results = [
                 score_case(case, answer, prediction)
                 for case, answer, prediction in zip(visible, answers, predictions, strict=True)

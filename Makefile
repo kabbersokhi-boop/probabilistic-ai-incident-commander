@@ -213,7 +213,7 @@ recovery-smoke: remediation-smoke recovery-source-smoke
 	$(PYTHON) -m paic recovery state validate --state-store .artifacts/recovery-state-severe
 
 validate-recovery-smoke:
-	$(PYTHON) -m paic recovery validate --recovery-dir $(RECOVERY_HEALTHY_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
+	$(PYTHON) -m paic recovery validate --recovery-dir .artifacts/report-recovered --observations-dir .artifacts/obs-recovered --analytics-dir $(RECOVERY_ANALYTICS_DIR) --execution-dir $(REMEDIATION_EXECUTION_DIR)
 	$(PYTHON) -m paic recovery state validate --state-store $(RECOVERY_STATE_STORE)
 
 test:

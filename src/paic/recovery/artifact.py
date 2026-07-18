@@ -15,6 +15,8 @@ from paic.recovery.config import RecoveryConfig
 from paic.recovery.engine import evaluate_recovery, verify_report
 from paic.recovery.manifest import RecoveryArtifactFile, RecoveryArtifactManifest
 from paic.recovery.models import RecoveryObservationSet, RecoveryReport
+from paic.remediation.artifact import load_execution
+from paic.remediation.artifact import manifest_sha256 as execution_manifest_sha256
 
 
 class RecoveryArtifactError(RuntimeError):
@@ -111,7 +113,7 @@ def export_recovery(
                 "execution_manifest": report.execution_manifest_sha256,
                 "execution_receipt": report.execution_receipt_sha256,
                 "config": report.config_sha256,
-                "observations": report.observation_set_sha256,
+                "observation_manifest": report.observation_manifest_sha256,
             },
             files=sorted(files, key=lambda item: item.relative_path),
         )
@@ -228,6 +230,7 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
         config,
         observations,
         execution_manifest_sha256=report.execution_manifest_sha256,
+        observation_manifest_sha256=report.observation_manifest_sha256,
         evaluated_at=report.evaluated_at,
     )
     if replayed != report:
@@ -236,7 +239,7 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
         "execution_manifest": report.execution_manifest_sha256,
         "execution_receipt": report.execution_receipt_sha256,
         "config": report.config_sha256,
-        "observations": report.observation_set_sha256,
+        "observation_manifest": report.observation_manifest_sha256,
     }
     if (
         manifest.artifact_id != report.recovery_id
@@ -256,9 +259,44 @@ def validate_recovery(
     expected_execution_manifest_sha256: str | None = None,
     expected_incident_id: str | None = None,
     expected_executed_at: object | None = None,
+    observations_dir: str | Path | None = None,
+    analytics_dir: str | Path | None = None,
+    execution_dir: str | Path | None = None,
 ) -> list[str]:
     try:
+        if any(
+            value is not None for value in (observations_dir, analytics_dir, execution_dir)
+        ) and not all(
+            value is not None for value in (observations_dir, analytics_dir, execution_dir)
+        ):
+            raise RecoveryArtifactError(
+                "authoritative recovery validation requires observations, analytics, and execution artifacts"
+            )
         loaded = load_recovery(path)
+        if observations_dir is not None and analytics_dir is not None and execution_dir is not None:
+            from paic.recovery.observations import load_observations, observation_manifest_sha256
+
+            source_observations = load_observations(
+                observations_dir, analytics_dir=analytics_dir, execution_dir=execution_dir
+            )
+            if source_observations != loaded.observations:
+                raise RecoveryArtifactError("recovery artifact embeds another observation set")
+            if (
+                observation_manifest_sha256(observations_dir)
+                != loaded.report.observation_manifest_sha256
+            ):
+                raise RecoveryArtifactError(
+                    "recovery artifact is bound to another observation manifest"
+                )
+            execution = load_execution(execution_dir)
+            actual_execution_manifest = execution_manifest_sha256(execution_dir)
+            if (
+                execution.receipt.incident_id != loaded.report.incident_id
+                or execution.receipt.executed_at != loaded.observations.executed_at
+                or execution.receipt.receipt_sha256 != loaded.report.execution_receipt_sha256
+                or actual_execution_manifest != loaded.report.execution_manifest_sha256
+            ):
+                raise RecoveryArtifactError("recovery artifact execution identity is inconsistent")
         if (
             expected_execution_receipt_sha256 is not None
             and loaded.report.execution_receipt_sha256 != expected_execution_receipt_sha256

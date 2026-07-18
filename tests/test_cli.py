@@ -80,6 +80,7 @@ def test_export_schemas_writes_thirty_documents(
         "recovery-lifecycle-state.schema.json",
         "recovery-lifecycle-event.schema.json",
         "recovery-artifact-manifest.schema.json",
+        "recovery-observation-artifact-manifest.schema.json",
     }
 
 

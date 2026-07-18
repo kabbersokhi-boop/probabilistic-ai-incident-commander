@@ -23,7 +23,9 @@ def test_recovery_cli_evaluate_validate_summary_and_state(
     )
     monkeypatch.setattr(recovery_cli, "load_execution", lambda _: execution)
     monkeypatch.setattr(recovery_cli, "manifest_sha256", lambda _: sha("execution-manifest"))
+    monkeypatch.setattr(recovery_cli, "observation_manifest_sha256", lambda _: sha("observations"))
     monkeypatch.setattr(recovery_cli, "load_observations", lambda *_, **__: bound_observations)
+    monkeypatch.setattr(recovery_cli, "validate_recovery", lambda *_, **__: [])
     config_path = tmp_path / "config.json"
     config_path.write_text(config().model_dump_json(), encoding="utf-8")
     artifact = tmp_path / "recovery"
@@ -50,6 +52,8 @@ def test_recovery_cli_evaluate_validate_summary_and_state(
             argparse.Namespace(
                 recovery_command="validate",
                 recovery_dir=artifact,
+                observations_dir=tmp_path / "observations",
+                analytics_dir=tmp_path / "analytics",
                 execution_dir=tmp_path / "execution",
             )
         )

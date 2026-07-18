@@ -78,7 +78,7 @@ from paic.investigation.orchestrator import InvestigationError, Investigator, sc
 from paic.investigation.provider import ScriptedProvider
 from paic.recovery.cli import dispatch_recovery, register_recovery_parser
 from paic.recovery.config import RecoveryConfig
-from paic.recovery.manifest import RecoveryArtifactManifest
+from paic.recovery.manifest import ObservationArtifactManifest, RecoveryArtifactManifest
 from paic.recovery.models import (
     RecoveryLifecycleEvent,
     RecoveryLifecycleState,
@@ -220,6 +220,7 @@ def _export_schemas(output_dir: Path) -> int:
         "recovery-lifecycle-state.schema.json": RecoveryLifecycleState,
         "recovery-lifecycle-event.schema.json": RecoveryLifecycleEvent,
         "recovery-artifact-manifest.schema.json": RecoveryArtifactManifest,
+        "recovery-observation-artifact-manifest.schema.json": ObservationArtifactManifest,
     }
     for filename, model in models.items():
         path = output_dir / filename

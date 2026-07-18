@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from importlib.metadata import PackageNotFoundError, version
 
 # Avoid allocating a worker per host CPU in shared CI and container environments.
 # User-provided settings always take precedence.
@@ -13,9 +12,8 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
-try:
-    __version__ = version("probabilistic-ai-incident-commander")
-except PackageNotFoundError:  # pragma: no cover - editable source tree
-    __version__ = "0.10.0"
+# Keep source-tree execution authoritative when an older editable distribution
+# happens to remain installed in the developer environment.
+__version__ = "0.10.0"
 
 __all__ = ["__version__"]

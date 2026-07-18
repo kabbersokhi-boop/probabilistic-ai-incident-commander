@@ -4,6 +4,7 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -149,4 +150,64 @@ def test_validate_recovery_checks_all_execution_identity_bindings(tmp_path: Path
     ]
     assert validate_recovery(root, expected_executed_at=datetime(2026, 1, 2, tzinfo=UTC)) == [
         "recovery artifact execution timestamp differs from receipt"
+    ]
+
+
+def test_authoritative_recovery_validation_replays_observation_and_execution_bindings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.recovery.artifact as artifact_module
+    import paic.recovery.observations as observation_module
+
+    cfg = config()
+    obs = observations()
+    root = tmp_path / "recovery"
+    report = evaluate_recovery(cfg, obs, execution_manifest_sha256=sha("execution-manifest"))
+    export_recovery(cfg, obs, report, root)
+    monkeypatch.setattr(observation_module, "load_observations", lambda *_, **__: obs)
+    monkeypatch.setattr(
+        observation_module,
+        "observation_manifest_sha256",
+        lambda _: report.observation_manifest_sha256,
+    )
+    monkeypatch.setattr(
+        artifact_module,
+        "load_execution",
+        lambda _: SimpleNamespace(
+            receipt=SimpleNamespace(
+                incident_id=obs.incident_id,
+                executed_at=obs.executed_at,
+                receipt_sha256=obs.execution_receipt_sha256,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        artifact_module, "execution_manifest_sha256", lambda _: obs.execution_manifest_sha256
+    )
+    assert (
+        validate_recovery(
+            root,
+            observations_dir=tmp_path / "observations",
+            analytics_dir=tmp_path / "analytics",
+            execution_dir=tmp_path / "execution",
+        )
+        == []
+    )
+
+    monkeypatch.setattr(
+        observation_module,
+        "load_observations",
+        lambda *_, **__: obs.model_copy(update={"incident_id": "other-incident"}),
+    )
+    assert (
+        "another observation set"
+        in validate_recovery(
+            root,
+            observations_dir=tmp_path / "observations",
+            analytics_dir=tmp_path / "analytics",
+            execution_dir=tmp_path / "execution",
+        )[0]
+    )
+    assert validate_recovery(root, observations_dir=tmp_path / "observations") == [
+        "authoritative recovery validation requires observations, analytics, and execution artifacts"
     ]

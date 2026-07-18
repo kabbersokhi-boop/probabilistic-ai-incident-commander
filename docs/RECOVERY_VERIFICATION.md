@@ -55,6 +55,25 @@ the analytics manifest and source lineage, execution receipt and manifest, incid
 execution timestamp, and generator-configuration digest. `evaluate` accepts this
 validated directory rather than caller-authored rows or per-row hashes.
 
+Only analytics rows strictly before the execution receipt timestamp are eligible
+baseline evidence. Rows at or after execution are never copied into the
+post-action window; post-action values come only from the resolved evaluator
+scenario. The public observation validator requires both bound source
+directories and reproduces the complete payload before reporting success.
+
+Authoritative recovery validation requires all four artifacts:
+
+```text
+paic recovery validate --recovery-dir REPORT \
+  --observations-dir OBSERVATIONS --analytics-dir ANALYTICS \
+  --execution-dir EXECUTION
+```
+
+It checks the observation-manifest hash carried by the report, embedded
+observation equality, analytics replay, execution identity and timestamp, and
+the deterministic recovery replay. Structural checks are not a substitute for
+source-authoritative validation.
+
 The lifecycle's generation zero stores the resolved policy snapshot. Later immutable
 generations contain state, report, and event; event hashes bind both state hashes,
 the report, policy, transition, and previous event. Validation replays every
@@ -71,6 +90,12 @@ artifact and continues to label post-remediation rows as evaluator-generated
 synthetic evidence rather than production telemetry.
 
 ## Trust and limitations
+
+Before `current()` or `apply()` returns, the lifecycle store validates the
+current generation and replays the committed lineage under its single lock.
+Missing evidence emits `recovery_evidence_gap`; it does not increment the
+regression counter or reopen an incident by default. Only observed failed or
+qualifying degraded evaluations count toward consecutive reopening.
 
 - Observation producers remain part of the trusted data boundary.
 - Exactly-once lifecycle updates are scoped to one local filesystem store and its locking semantics.

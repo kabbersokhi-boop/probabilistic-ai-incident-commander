@@ -191,6 +191,7 @@ def evaluate_recovery(
     observation_set: RecoveryObservationSet,
     *,
     execution_manifest_sha256: str,
+    observation_manifest_sha256: str | None = None,
     evaluated_at: datetime | None = None,
 ) -> RecoveryReport:
     if config.incident_id != observation_set.incident_id:
@@ -233,7 +234,9 @@ def evaluate_recovery(
     all_primary = all(item.status == "recovered" for item in primary)
     all_guardrails = all(item.status == "recovered" for item in guardrails)
     any_failed = any(item.status == "failed" for item in evaluations)
-    if any_insufficient:
+    if severe:
+        decision = "failed"
+    elif any_insufficient:
         decision = "insufficient_data"
     elif all_primary and all_guardrails:
         decision = "recovered"
@@ -251,6 +254,8 @@ def evaluate_recovery(
         "execution_manifest_sha256": execution_manifest_sha256,
         "config_sha256": digest(config.model_dump(mode="json")),
         "observation_set_sha256": digest(observation_set.model_dump(mode="json")),
+        "observation_manifest_sha256": observation_manifest_sha256
+        or digest(observation_set.model_dump(mode="json")),
         "evaluated_at": at,
         "decision": decision,
         "primary_recovered": sum(item.status == "recovered" for item in primary),

@@ -21,6 +21,7 @@ from paic.recovery.observations import (
     ObservationScenario,
     build_observations,
     load_observations,
+    observation_manifest_sha256,
     validate_observations,
 )
 from paic.remediation.artifact import load_execution, manifest_sha256
@@ -48,6 +49,7 @@ def _evaluate(args: argparse.Namespace) -> int:
             config,
             observations,
             execution_manifest_sha256=manifest_sha256(args.execution_dir),
+            observation_manifest_sha256=observation_manifest_sha256(args.observations_dir),
         )
         manifest = export_recovery(
             config,
@@ -62,6 +64,7 @@ def _evaluate(args: argparse.Namespace) -> int:
         RecoveryConfigError,
         RecoveryEvaluationError,
         RecoveryArtifactError,
+        ObservationError,
     ) as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2))
         return 2
@@ -83,26 +86,24 @@ def _evaluate(args: argparse.Namespace) -> int:
 
 
 def _validate(args: argparse.Namespace) -> int:
-    expected = None
-    expected_manifest = None
-    expected_incident = None
-    expected_executed_at = None
-    if args.execution_dir is not None:
-        try:
-            execution = load_execution(args.execution_dir)
-            expected = execution.receipt.receipt_sha256
-            expected_manifest = manifest_sha256(args.execution_dir)
-            expected_incident = execution.receipt.incident_id
-            expected_executed_at = execution.receipt.executed_at
-        except Exception as exc:
-            print(json.dumps({"valid": False, "issues": [str(exc)]}, indent=2))
-            return 2
+    try:
+        execution = load_execution(args.execution_dir)
+        expected = execution.receipt.receipt_sha256
+        expected_manifest = manifest_sha256(args.execution_dir)
+        expected_incident = execution.receipt.incident_id
+        expected_executed_at = execution.receipt.executed_at
+    except Exception as exc:
+        print(json.dumps({"valid": False, "issues": [str(exc)]}, indent=2))
+        return 2
     issues = validate_recovery(
         args.recovery_dir,
         expected_execution_receipt_sha256=expected,
         expected_execution_manifest_sha256=expected_manifest,
         expected_incident_id=expected_incident,
         expected_executed_at=expected_executed_at,
+        observations_dir=args.observations_dir,
+        analytics_dir=args.analytics_dir,
+        execution_dir=args.execution_dir,
     )
     print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
     return 1 if issues else 0
@@ -219,8 +220,8 @@ def register_recovery_parser(subparsers: Any) -> None:
     observation_build.add_argument("--overwrite", action="store_true")
     observation_validate = observation_commands.add_parser("validate")
     observation_validate.add_argument("--observations-dir", type=Path, required=True)
-    observation_validate.add_argument("--analytics-dir", type=Path)
-    observation_validate.add_argument("--execution-dir", type=Path)
+    observation_validate.add_argument("--analytics-dir", type=Path, required=True)
+    observation_validate.add_argument("--execution-dir", type=Path, required=True)
     evaluate = commands.add_parser(
         "evaluate", help="Evaluate primary and guardrail recovery windows."
     )
@@ -234,7 +235,9 @@ def register_recovery_parser(subparsers: Any) -> None:
         "validate", help="Validate and deterministically replay a recovery artifact."
     )
     validate.add_argument("--recovery-dir", type=Path, required=True)
-    validate.add_argument("--execution-dir", type=Path)
+    validate.add_argument("--observations-dir", type=Path, required=True)
+    validate.add_argument("--analytics-dir", type=Path, required=True)
+    validate.add_argument("--execution-dir", type=Path, required=True)
     summary = commands.add_parser("summary", help="Print a recovery report.")
     summary.add_argument("--recovery-dir", type=Path, required=True)
     state = commands.add_parser(

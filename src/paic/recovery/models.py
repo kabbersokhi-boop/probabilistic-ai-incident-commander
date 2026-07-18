@@ -121,6 +121,7 @@ class RecoveryReport(StrictModel):
     execution_manifest_sha256: Sha256
     config_sha256: Sha256
     observation_set_sha256: Sha256
+    observation_manifest_sha256: Sha256
     evaluated_at: datetime
     decision: RecoveryDecision
     primary_recovered: int = Field(ge=0)

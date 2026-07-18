@@ -394,6 +394,15 @@ The agent may investigate autonomously through approved tools. It may recommend 
 
 Successful execution is not the same as successful remediation. Recovery requires adequate sample size, sustained improvement, return toward an expected statistical range, and healthy guardrail metrics.
 
+Recovery observations are source-authoritative: analytics rows strictly before
+the execution timestamp provide baseline evidence, while post-action values are
+explicitly evaluator-generated synthetic evidence from a resolved scenario.
+Structural artifact validation is distinct from authoritative source replay;
+observation validation requires the bound analytics and execution artifacts,
+and recovery validation additionally requires the observation artifact. Missing
+evidence emits a separate lifecycle gap trigger and does not count as an
+observed regression by default.
+
 ## Safety model
 
 The project operates entirely on synthetic systems and simulated remediations. Its intended boundaries include:
@@ -460,8 +469,8 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 The next major capabilities are:
 
 1. expanded hidden-incident evaluation, calibration, ablations, and security testing,
-3. developer TUI and public web product,
-4. Docker, observability, hosted demonstration, and portfolio packaging.
+2. developer TUI and public web product,
+3. Docker, observability, hosted demonstration, and portfolio packaging.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

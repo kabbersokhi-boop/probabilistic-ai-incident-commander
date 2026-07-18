@@ -89,8 +89,9 @@ def _scenario() -> ObservationScenario:
 def _refresh_payload_hashes(artifact: Path) -> None:
     manifest_path = artifact / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for name in manifest["files"]:
-        manifest["files"][name] = file_sha256(artifact / name)
+    for item in manifest["files"]:
+        item["byte_size"] = (artifact / item["relative_path"]).stat().st_size
+        item["sha256"] = file_sha256(artifact / item["relative_path"])
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     (artifact / "_SUCCESS").write_text(file_sha256(manifest_path) + "\n", encoding="utf-8")
 
@@ -248,6 +249,76 @@ def test_observation_builder_selects_one_coarsest_analytics_grain(
     assert baseline == [0.8, 0.82]
 
 
+def test_observation_builder_filters_all_non_preexecution_analytics_rows(
+    bound_sources: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    analytics_dir, execution_dir = bound_sources
+    executed = datetime(2026, 1, 3, tzinfo=UTC)
+    table = pl.DataFrame(
+        {
+            "metric_name": ["checkout_conversion_rate"] * 5,
+            "cohort_name": ["overall"] * 5,
+            "period_start": [
+                datetime(2026, 1, 1, tzinfo=UTC),
+                datetime(2026, 1, 2, tzinfo=UTC),
+                executed,
+                datetime(2026, 1, 3, 1, tzinfo=UTC),
+                datetime(2026, 1, 3, 5, tzinfo=UTC),
+            ],
+            "value": [0.80, 0.82, 0.83, 0.84, 0.85],
+            "sample_size": [100, 101, 102, 103, 104],
+        }
+    )
+    monkeypatch.setattr(
+        observation_module,
+        "load_analytics",
+        lambda _: SimpleNamespace(tables={"metric_observations": table}),
+    )
+    monkeypatch.setattr(
+        observation_module,
+        "load_execution",
+        lambda _: SimpleNamespace(
+            receipt=SimpleNamespace(
+                incident_id="incident-smoke",
+                executed_at=executed,
+                receipt_sha256=_sha("receipt"),
+            )
+        ),
+    )
+    scenario = _scenario().model_copy(update={"generated_at_offset_hours": 4})
+    built = build_observations(scenario, analytics_dir, execution_dir, tmp_path / "filtered")
+    assert [item.value for item in built.observations if item.observed_at < executed] == [
+        0.80,
+        0.82,
+    ]
+    assert [item.value for item in built.observations if item.observed_at >= executed] == [
+        0.81,
+        0.82,
+    ]
+    assert all(item.value not in {0.83, 0.84, 0.85} for item in built.observations)
+    assert (
+        load_observations(
+            tmp_path / "filtered", analytics_dir=analytics_dir, execution_dir=execution_dir
+        )
+        == built
+    )
+
+
+def test_observation_manifest_is_strict_and_closed_world(
+    bound_sources: tuple[Path, Path], tmp_path: Path
+) -> None:
+    analytics_dir, execution_dir = bound_sources
+    artifact = tmp_path / "observations"
+    build_observations(_scenario(), analytics_dir, execution_dir, artifact)
+    manifest = json.loads((artifact / "manifest.json").read_text(encoding="utf-8"))
+    manifest["files"] = manifest["files"][:-1]
+    (artifact / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (artifact / "_SUCCESS").write_text(
+        file_sha256(artifact / "manifest.json") + "\n", encoding="utf-8"
+    )
+    assert "invalid observation manifest" in validate_observations(artifact)[0]
+
+
 def test_observation_validation_rejects_hash_binding_and_series_tampering(
     bound_sources: tuple[Path, Path], tmp_path: Path
 ) -> None:
@@ -264,7 +335,7 @@ def test_observation_validation_rejects_hash_binding_and_series_tampering(
     manifest["artifact_id"] = "other-observations"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     (artifact / "_SUCCESS").write_text(file_sha256(manifest_path) + "\n", encoding="utf-8")
-    assert "bindings" in validate_observations(artifact)[0]
+    assert "invalid observation manifest" in validate_observations(artifact)[0]
 
     build_observations(_scenario(), analytics_dir, execution_dir, artifact, overwrite=True)
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
@@ -277,3 +348,52 @@ def test_observation_validation_rejects_hash_binding_and_series_tampering(
             artifact, analytics_dir=analytics_dir, execution_dir=execution_dir
         )[0]
     )
+
+
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
+    ("field", "value"),
+    [
+        ("incident_id", "other-incident"),
+        ("evaluator_generated", False),
+        ("analytics_manifest_sha256", _sha("other-analytics")),
+        ("generator_version", "0.0.0"),
+    ],
+)
+def test_observation_manifest_rejects_binding_substitution(
+    bound_sources: tuple[Path, Path], tmp_path: Path, field: str, value: object
+) -> None:
+    analytics_dir, execution_dir = bound_sources
+    artifact = tmp_path / field
+    build_observations(_scenario(), analytics_dir, execution_dir, artifact)
+    manifest = json.loads((artifact / "manifest.json").read_text(encoding="utf-8"))
+    manifest[field] = value
+    (artifact / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (artifact / "_SUCCESS").write_text(
+        file_sha256(artifact / "manifest.json") + "\n", encoding="utf-8"
+    )
+    issue = validate_observations(artifact)[0]
+    assert "manifest" in issue or "bindings" in issue or "version" in issue
+
+
+def test_observation_manifest_rejects_duplicate_and_unsafe_files(
+    bound_sources: tuple[Path, Path], tmp_path: Path
+) -> None:
+    analytics_dir, execution_dir = bound_sources
+    artifact = tmp_path / "files"
+    build_observations(_scenario(), analytics_dir, execution_dir, artifact)
+    manifest = json.loads((artifact / "manifest.json").read_text(encoding="utf-8"))
+    manifest["files"][1]["relative_path"] = manifest["files"][0]["relative_path"]
+    (artifact / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (artifact / "_SUCCESS").write_text(
+        file_sha256(artifact / "manifest.json") + "\n", encoding="utf-8"
+    )
+    assert "manifest" in validate_observations(artifact)[0]
+
+    build_observations(_scenario(), analytics_dir, execution_dir, artifact, overwrite=True)
+    manifest = json.loads((artifact / "manifest.json").read_text(encoding="utf-8"))
+    manifest["files"][0]["relative_path"] = "../unsafe.json"
+    (artifact / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (artifact / "_SUCCESS").write_text(
+        file_sha256(artifact / "manifest.json") + "\n", encoding="utf-8"
+    )
+    assert "manifest" in validate_observations(artifact)[0]

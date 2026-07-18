@@ -117,6 +117,13 @@ def transition_state(
         status = "recovered"
         failures = 0
         trigger = "recovery_verified"
+    elif report.decision == "insufficient_data":
+        # Missing evidence is not an observed regression. Preserve the prior
+        # counter and keep a recovered lifecycle recovered until qualifying
+        # degraded evidence is observed.
+        status = "recovered" if previous.status == "recovered" else "monitoring"
+        failures = previous.consecutive_failed_evaluations
+        trigger = "recovery_evidence_gap"
     else:
         failures = previous.consecutive_failed_evaluations + 1 if previous.ever_recovered else 0
         severe = report.severe_guardrail_breach and config.immediate_reopen_on_severe_guardrail
@@ -241,7 +248,9 @@ class RecoveryStateStore:
             raise RecoveryStateStoreError("recovery-state pointer is unsafe")
         return pointer
 
-    def _current(self) -> tuple[RecoveryLifecycleState, RecoveryLifecycleEvent | None, Path]:
+    def _load_current_basic(
+        self,
+    ) -> tuple[RecoveryLifecycleState, RecoveryLifecycleEvent | None, Path]:
         if not self.current_path.exists():
             raise RecoveryStateStoreError("recovery-state store is not initialized")
         pointer = self._read_pointer()
@@ -263,6 +272,13 @@ class RecoveryStateStore:
             raise RecoveryStateStoreError("recovery-state generation does not match pointer")
         if event is not None and event.event_sha256 != pointer["event_sha256"]:
             raise RecoveryStateStoreError("recovery-state event does not match pointer")
+        return state, event, root
+
+    def _current(self) -> tuple[RecoveryLifecycleState, RecoveryLifecycleEvent | None, Path]:
+        state, event, root = self._load_current_basic()
+        issues = self._validate_lineage_locked()
+        if issues:
+            raise RecoveryStateStoreError(issues[0])
         return state, event, root
 
     def current(self) -> RecoveryLifecycleState:
@@ -332,121 +348,119 @@ class RecoveryStateStore:
                 raise
             return state, event
 
+    def _validate_lineage_locked(self) -> list[str]:
+        try:
+            current, _, current_root = self._load_current_basic()
+            roots: dict[int, Path] = {}
+            for entry in self.generations.iterdir():
+                if entry.name.startswith(".prepare-"):
+                    continue
+                if entry.is_symlink() or not entry.is_dir():
+                    raise RecoveryStateStoreError("recovery-state store contains an invalid entry")
+                if entry.name == "00000000000000000000":
+                    generation = 0
+                else:
+                    match = re.fullmatch(r"(\d{20})-[0-9a-f]{16}", entry.name)
+                    if match is None:
+                        raise RecoveryStateStoreError(
+                            "recovery-state store contains an invalid entry"
+                        )
+                    generation = int(match.group(1))
+                if generation in roots:
+                    raise RecoveryStateStoreError(
+                        "recovery-state store contains duplicate generations"
+                    )
+                roots[generation] = entry
+            committed = {k: v for k, v in roots.items() if k <= current.generation}
+            if (
+                set(committed) != set(range(current.generation + 1))
+                or committed[current.generation] != current_root
+            ):
+                raise RecoveryStateStoreError("recovery-state generations are not contiguous")
+            previous_event_hash = ZERO_HASH
+            previous_state: RecoveryLifecycleState | None = None
+            stored_config: RecoveryConfig | None = None
+            for generation in range(current.generation + 1):
+                root = committed[generation]
+                expected_files = (
+                    {"state.json", "recovery.config.resolved.json"}
+                    if generation == 0
+                    else {"state.json", "event.json", "report.json"}
+                )
+                entries = list(root.iterdir())
+                if {entry.name for entry in entries} != expected_files or any(
+                    entry.is_symlink() or not entry.is_file() for entry in entries
+                ):
+                    raise RecoveryStateStoreError(
+                        "recovery-state generation contains missing or undeclared paths"
+                    )
+                state = RecoveryLifecycleState.model_validate_json(
+                    (root / "state.json").read_text(encoding="utf-8")
+                )
+                if state.generation != generation:
+                    raise RecoveryStateStoreError("stored recovery generation is inconsistent")
+                if generation == 0:
+                    stored_config = RecoveryConfig.model_validate_json(
+                        (root / "recovery.config.resolved.json").read_text(encoding="utf-8")
+                    )
+                    if (
+                        digest(stored_config.model_dump(mode="json")) != state.config_sha256
+                        or stored_config.recovery_id != state.recovery_id
+                        or stored_config.incident_id != state.incident_id
+                    ):
+                        raise RecoveryStateStoreError(
+                            "initial recovery policy binding is inconsistent"
+                        )
+                else:
+                    if previous_state is None or stored_config is None:
+                        raise RecoveryStateStoreError("recovery lifecycle has no initial policy")
+                    report = RecoveryReport.model_validate_json(
+                        (root / "report.json").read_text(encoding="utf-8")
+                    )
+                    verify_report(report)
+                    event = RecoveryLifecycleEvent.model_validate_json(
+                        (root / "event.json").read_text(encoding="utf-8")
+                    )
+                    payload = event.model_dump(mode="json")
+                    payload.pop("event_sha256")
+                    if event.event_sha256 != digest(payload):
+                        raise RecoveryStateStoreError("recovery lifecycle event hash mismatch")
+                    if event.previous_event_sha256 != previous_event_hash:
+                        raise RecoveryStateStoreError("recovery lifecycle event chain is broken")
+                    if (
+                        event.from_status != previous_state.status
+                        or event.to_status != state.status
+                    ):
+                        raise RecoveryStateStoreError(
+                            "recovery lifecycle event transition is inconsistent"
+                        )
+                    if (
+                        event.recovery_id != state.recovery_id
+                        or event.incident_id != state.incident_id
+                        or event.config_sha256 != state.config_sha256
+                        or event.report_sha256 != report.report_sha256
+                        or event.before_state_sha256
+                        != digest(previous_state.model_dump(mode="json"))
+                        or event.after_state_sha256 != digest(state.model_dump(mode="json"))
+                    ):
+                        raise RecoveryStateStoreError(
+                            "recovery lifecycle event bindings are inconsistent"
+                        )
+                    recomputed, trigger = transition_state(previous_state, report, stored_config)
+                    if recomputed != state or trigger != event.trigger:
+                        raise RecoveryStateStoreError(
+                            "recovery lifecycle transition does not match semantic replay"
+                        )
+                    previous_event_hash = event.event_sha256
+                previous_state = state
+        except (RecoveryStateStoreError, OSError, ValueError) as exc:
+            return [str(exc)]
+        return []
+
     def validate(self) -> list[str]:
         try:
             self._ensure_root()
             with _lock(self.lock_path):
-                current, _, current_root = self._current()
-                roots: dict[int, Path] = {}
-                for entry in self.generations.iterdir():
-                    if entry.name.startswith(".prepare-"):
-                        continue
-                    if entry.is_symlink() or not entry.is_dir():
-                        raise RecoveryStateStoreError(
-                            "recovery-state store contains an invalid entry"
-                        )
-                    if entry.name == "00000000000000000000":
-                        generation = 0
-                    else:
-                        match = re.fullmatch(r"(\d{20})-[0-9a-f]{16}", entry.name)
-                        if match is None:
-                            raise RecoveryStateStoreError(
-                                "recovery-state store contains an invalid entry"
-                            )
-                        generation = int(match.group(1))
-                    if generation in roots:
-                        raise RecoveryStateStoreError(
-                            "recovery-state store contains duplicate generations"
-                        )
-                    roots[generation] = entry
-                committed = {k: v for k, v in roots.items() if k <= current.generation}
-                if (
-                    set(committed) != set(range(current.generation + 1))
-                    or committed[current.generation] != current_root
-                ):
-                    raise RecoveryStateStoreError("recovery-state generations are not contiguous")
-                previous_event_hash = ZERO_HASH
-                previous_state: RecoveryLifecycleState | None = None
-                stored_config: RecoveryConfig | None = None
-                for generation in range(current.generation + 1):
-                    root = committed[generation]
-                    expected_files = (
-                        {"state.json", "recovery.config.resolved.json"}
-                        if generation == 0
-                        else {"state.json", "event.json", "report.json"}
-                    )
-                    entries = list(root.iterdir())
-                    if {entry.name for entry in entries} != expected_files or any(
-                        entry.is_symlink() or not entry.is_file() for entry in entries
-                    ):
-                        raise RecoveryStateStoreError(
-                            "recovery-state generation contains missing or undeclared paths"
-                        )
-                    state = RecoveryLifecycleState.model_validate_json(
-                        (root / "state.json").read_text(encoding="utf-8")
-                    )
-                    if state.generation != generation:
-                        raise RecoveryStateStoreError("stored recovery generation is inconsistent")
-                    if generation == 0:
-                        stored_config = RecoveryConfig.model_validate_json(
-                            (root / "recovery.config.resolved.json").read_text(encoding="utf-8")
-                        )
-                        if (
-                            digest(stored_config.model_dump(mode="json")) != state.config_sha256
-                            or stored_config.recovery_id != state.recovery_id
-                            or stored_config.incident_id != state.incident_id
-                        ):
-                            raise RecoveryStateStoreError(
-                                "initial recovery policy binding is inconsistent"
-                            )
-                    else:
-                        if previous_state is None or stored_config is None:
-                            raise RecoveryStateStoreError(
-                                "recovery lifecycle has no initial policy"
-                            )
-                        report = RecoveryReport.model_validate_json(
-                            (root / "report.json").read_text(encoding="utf-8")
-                        )
-                        verify_report(report)
-                        event = RecoveryLifecycleEvent.model_validate_json(
-                            (root / "event.json").read_text(encoding="utf-8")
-                        )
-                        payload = event.model_dump(mode="json")
-                        payload.pop("event_sha256")
-                        if event.event_sha256 != digest(payload):
-                            raise RecoveryStateStoreError("recovery lifecycle event hash mismatch")
-                        if event.previous_event_sha256 != previous_event_hash:
-                            raise RecoveryStateStoreError(
-                                "recovery lifecycle event chain is broken"
-                            )
-                        if (
-                            event.from_status != previous_state.status
-                            or event.to_status != state.status
-                        ):
-                            raise RecoveryStateStoreError(
-                                "recovery lifecycle event transition is inconsistent"
-                            )
-                        if (
-                            event.recovery_id != state.recovery_id
-                            or event.incident_id != state.incident_id
-                            or event.config_sha256 != state.config_sha256
-                            or event.report_sha256 != report.report_sha256
-                            or event.before_state_sha256
-                            != digest(previous_state.model_dump(mode="json"))
-                            or event.after_state_sha256 != digest(state.model_dump(mode="json"))
-                        ):
-                            raise RecoveryStateStoreError(
-                                "recovery lifecycle event bindings are inconsistent"
-                            )
-                        recomputed, trigger = transition_state(
-                            previous_state, report, stored_config
-                        )
-                        if recomputed != state or trigger != event.trigger:
-                            raise RecoveryStateStoreError(
-                                "recovery lifecycle transition does not match semantic replay"
-                            )
-                        previous_event_hash = event.event_sha256
-                    previous_state = state
+                return self._validate_lineage_locked()
         except (RecoveryStateStoreError, OSError, ValueError) as exc:
             return [str(exc)]
-        return []

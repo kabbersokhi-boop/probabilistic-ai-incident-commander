@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from paic.recovery.engine import digest, evaluate_recovery
 from paic.recovery.lifecycle import RecoveryStateStore, RecoveryStateStoreError, transition_state
-from paic.recovery.models import RecoveryLifecycleState
-from test_recovery_unit import config, report, sha
+from paic.recovery.models import RecoveryLifecycleState, RecoveryReport
+from test_recovery_unit import config, observations, report, sha
 
 
 def initial_state() -> RecoveryLifecycleState:
@@ -22,8 +23,6 @@ def initial_state() -> RecoveryLifecycleState:
 
 
 def sha_config() -> str:
-    from paic.recovery.engine import digest
-
     return digest(config().model_dump(mode="json"))
 
 
@@ -196,6 +195,24 @@ def test_policy_substitution_and_generation_tampering_are_rejected(tmp_path: Pat
     assert store.validate() != []
 
 
+def test_current_and_apply_reject_tampered_authoritative_generation(tmp_path: Path) -> None:
+    import json
+
+    store = RecoveryStateStore(tmp_path / "store")
+    store.initialize(config(), sha("receipt"), sha("execution-manifest"))
+    state, _ = store.apply(report(True, 6), config())
+    state_path = next(store.generations.glob(f"{state.generation:020d}-*/state.json"))
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    payload["ever_recovered"] = False
+    state_path.write_text(json.dumps(payload), encoding="utf-8")
+    pointer_before = store.current_path.read_text(encoding="utf-8")
+    with pytest.raises(RecoveryStateStoreError):
+        store.current()
+    with pytest.raises(RecoveryStateStoreError):
+        store.apply(report(False, 12), config())
+    assert store.current_path.read_text(encoding="utf-8") == pointer_before
+
+
 def test_transition_rejects_manifest_policy_and_stale_bindings() -> None:
     candidate = report(True, 6)
     with pytest.raises(RecoveryStateStoreError, match="execution manifest"):
@@ -213,6 +230,45 @@ def test_transition_rejects_manifest_policy_and_stale_bindings() -> None:
     recovered, _ = transition_state(initial_state(), candidate, config())
     with pytest.raises(RecoveryStateStoreError, match="evaluation-time order"):
         transition_state(recovered, report(False, 6), config())
+
+
+def test_insufficient_evidence_is_not_a_regression_after_recovery() -> None:
+    recovered, _ = transition_state(initial_state(), report(True, 6), config())
+    gap_report = evaluate_recovery(
+        config(),
+        observations(include_guardrail=False, generated_hours=7),
+        execution_manifest_sha256=sha("execution-manifest"),
+    )
+    monitoring, trigger = transition_state(recovered, gap_report, config())
+    assert monitoring.status == "recovered"
+    assert monitoring.consecutive_failed_evaluations == 0
+    assert trigger == "recovery_evidence_gap"
+
+    def non_severe_failure(hours: int) -> RecoveryReport:
+        source = observations(healthy=False, generated_hours=hours)
+        rows = [
+            item.model_copy(
+                update={
+                    "value": 0.960
+                    if item.metric_id == "payment-approval"
+                    and item.observed_at >= source.executed_at
+                    else item.value
+                }
+            )
+            for item in source.observations
+        ]
+        return evaluate_recovery(
+            config(),
+            source.model_copy(update={"observations": rows}),
+            execution_manifest_sha256=sha("execution-manifest"),
+        )
+
+    first_failure, _ = transition_state(monitoring, non_severe_failure(8), config())
+    assert first_failure.status == "monitoring"
+    assert first_failure.consecutive_failed_evaluations == 1
+    reopened, trigger = transition_state(first_failure, non_severe_failure(9), config())
+    assert reopened.status == "reopened"
+    assert trigger == "sustained_recovery_regression"
 
 
 def test_pointer_post_commit_fsync_is_nonfatal(

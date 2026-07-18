@@ -254,6 +254,11 @@
       "title": "Metric Evaluations",
       "type": "array"
     },
+    "observation_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Observation Manifest Sha256",
+      "type": "string"
+    },
     "observation_set_id": {
       "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
       "title": "Observation Set Id",
@@ -303,6 +308,7 @@
     "execution_manifest_sha256",
     "config_sha256",
     "observation_set_sha256",
+    "observation_manifest_sha256",
     "evaluated_at",
     "decision",
     "primary_recovered",

@@ -18,9 +18,11 @@ from typing import Annotated
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
 from paic.recovery.artifact import file_sha256
+from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
 from paic.recovery.models import Identifier, RecoveryObservationSet
 from paic.remediation.artifact import load_execution, manifest_sha256
 
@@ -114,6 +116,7 @@ def _derive_observations(
                 key=lambda value: (_GRAIN_RANK.get(str(value), 0), str(value)),
             )
             selected = selected.filter(pl.col("time_grain") == grain)
+        selected = selected.filter(pl.col("period_start") < execution.receipt.executed_at)
         for row in selected.iter_rows(named=True):
             rows.append(
                 {
@@ -175,23 +178,27 @@ def build_observations(
             json.dumps(scenario.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         )
         _write(staged / "observation-set.json", observation_set.model_dump_json(indent=2) + "\n")
-        manifest = {
-            "schema_version": "1.0",
-            "artifact_id": scenario.observation_set_id,
-            "incident_id": observation_set.incident_id,
-            "evaluator_generated": True,
-            "bindings": {
-                "analytics_manifest": observation_set.analytics_manifest_sha256,
-                "execution_manifest": observation_set.execution_manifest_sha256,
-                "execution_receipt": observation_set.execution_receipt_sha256,
-                "generator_config": observation_set.generator_config_sha256,
-            },
-            "files": {
-                name: file_sha256(staged / name)
+        manifest = ObservationArtifactManifest(
+            observation_set_id=observation_set.observation_set_id,
+            incident_id=observation_set.incident_id,
+            generator_version=__version__,
+            analytics_manifest_sha256=observation_set.analytics_manifest_sha256,
+            execution_manifest_sha256=observation_set.execution_manifest_sha256,
+            execution_receipt_sha256=observation_set.execution_receipt_sha256,
+            generator_config_sha256=observation_set.generator_config_sha256,
+            files=[
+                ObservationArtifactFile(
+                    relative_path=name,
+                    byte_size=(staged / name).stat().st_size,
+                    sha256=file_sha256(staged / name),
+                )
                 for name in ("observation.config.resolved.json", "observation-set.json")
-            },
-        }
-        _write(staged / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            ],
+        )
+        _write(
+            staged / "manifest.json",
+            manifest.model_dump_json(indent=2) + "\n",
+        )
         _write(staged / "_SUCCESS", file_sha256(staged / "manifest.json") + "\n")
         _fsync_dir(staged)
         backup: Path | None = None
@@ -241,14 +248,20 @@ def load_observations(
         raise ObservationError("observation artifact contains missing or undeclared paths")
     if any(item.is_symlink() or not item.is_file() for item in root.iterdir()):
         raise ObservationError("observation artifact contains non-regular paths")
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    try:
+        manifest = ObservationArtifactManifest.model_validate_json(
+            (root / "manifest.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as exc:
+        raise ObservationError(f"invalid observation manifest: {exc}") from exc
     if (root / "_SUCCESS").read_text(encoding="utf-8").strip() != file_sha256(
         root / "manifest.json"
     ):
         raise ObservationError("observation success marker mismatch")
-    for name, expected in manifest.get("files", {}).items():
-        if name not in EXPECTED or file_sha256(root / name) != expected:
-            raise ObservationError("observation manifest file hash mismatch")
+    for item in manifest.files:
+        target = root / item.relative_path
+        if target.stat().st_size != item.byte_size or file_sha256(target) != item.sha256:
+            raise ObservationError("observation manifest file hash mismatch (or size mismatch)")
     scenario = ObservationScenario.model_validate_json(
         (root / "observation.config.resolved.json").read_text(encoding="utf-8")
     )
@@ -257,15 +270,18 @@ def load_observations(
     )
     if observations.generator_config_sha256 != _digest(scenario.model_dump(mode="json")):
         raise ObservationError("observation generator configuration hash mismatch")
-    if manifest.get("artifact_id") != observations.observation_set_id or manifest.get(
-        "bindings"
-    ) != {
-        "analytics_manifest": observations.analytics_manifest_sha256,
-        "execution_manifest": observations.execution_manifest_sha256,
-        "execution_receipt": observations.execution_receipt_sha256,
-        "generator_config": observations.generator_config_sha256,
-    }:
+    if (
+        manifest.observation_set_id != observations.observation_set_id
+        or manifest.incident_id != observations.incident_id
+        or manifest.evaluator_generated != observations.evaluator_generated
+        or manifest.analytics_manifest_sha256 != observations.analytics_manifest_sha256
+        or manifest.execution_manifest_sha256 != observations.execution_manifest_sha256
+        or manifest.execution_receipt_sha256 != observations.execution_receipt_sha256
+        or manifest.generator_config_sha256 != observations.generator_config_sha256
+    ):
         raise ObservationError("observation manifest bindings differ from payload")
+    if manifest.generator_version != __version__:
+        raise ObservationError("observation manifest generator version differs from package")
     if execution_dir is not None:
         execution = load_execution(execution_dir)
         if (
@@ -303,6 +319,10 @@ def load_observations(
         if observations != expected:
             raise ObservationError("observation payload is not reproducible from bound sources")
     return observations
+
+
+def observation_manifest_sha256(path: str | Path) -> str:
+    return file_sha256(Path(path) / "manifest.json")
 
 
 def validate_observations(

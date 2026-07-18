@@ -195,36 +195,7 @@ jobs:
             --execution-dir .artifacts/remediation-execution
           rm -f .artifacts/remediation-approval.token
       - name: Recovery verification and reopening smoke
-        run: |
-          receipt_sha="$(python -c 'import json; print(json.load(open(".artifacts/remediation-execution/receipt.json"))["receipt_sha256"])')"
-          python examples/build_recovery_smoke_inputs.py \
-            --execution-receipt-sha256 "$receipt_sha" \
-            --output-dir .artifacts/recovery-inputs
-          python -m paic recovery evaluate \
-            --config configs/recovery/smoke.yaml \
-            --observations .artifacts/recovery-inputs/healthy.json \
-            --execution-dir .artifacts/remediation-execution \
-            --output-dir .artifacts/recovery-healthy
-          python -m paic recovery validate \
-            --recovery-dir .artifacts/recovery-healthy \
-            --execution-dir .artifacts/remediation-execution
-          python -m paic recovery state apply \
-            --recovery-dir .artifacts/recovery-healthy \
-            --state-store .artifacts/recovery-state
-          set +e
-          python -m paic recovery evaluate \
-            --config configs/recovery/smoke.yaml \
-            --observations .artifacts/recovery-inputs/regression.json \
-            --execution-dir .artifacts/remediation-execution \
-            --output-dir .artifacts/recovery-regression
-          test "$?" -eq 1
-          python -m paic recovery state apply \
-            --recovery-dir .artifacts/recovery-regression \
-            --state-store .artifacts/recovery-state
-          test "$?" -eq 1
-          set -e
-          python -m paic recovery state validate \
-            --state-store .artifacts/recovery-state
+        run: make recovery-smoke
       - name: Generate, analyse, detect, and validate standard dataset
         if: matrix.python-version == '3.11'
         run: |

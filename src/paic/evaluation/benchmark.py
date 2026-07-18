@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -105,6 +106,36 @@ def _validate_case_ids(
     return case_ids
 
 
+def _normalise_label(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _validate_hidden_label_isolation(
+    visible: Sequence[VisibleCase], answers: Sequence[HiddenAnswerKey]
+) -> None:
+    """Reject direct answer-label disclosure in fields supplied to prediction generation."""
+
+    for case, answer in zip(visible, answers, strict=True):
+        visible_text = _normalise_label(case.incident_input)
+        visible_identifiers = {
+            _normalise_label(case.case_id),
+            _normalise_label(case.family),
+            *(_normalise_label(item) for item in case.evidence_ids),
+            *(_normalise_label(item) for item in case.allowed_tools),
+        }
+        hidden_labels = [answer.root_cause_id, *answer.acceptable_alternates]
+        for hidden_label in hidden_labels:
+            normalised = _normalise_label(hidden_label)
+            if not normalised:
+                continue
+            if normalised in visible_identifiers or re.search(
+                rf"(?:^| ){re.escape(normalised)}(?: |$)", visible_text
+            ):
+                raise BenchmarkError(
+                    f"visible case directly discloses hidden answer label: {case.case_id}"
+                )
+
+
 def load_benchmark(
     visible_dir: str | Path, answers_dir: str | Path
 ) -> tuple[list[VisibleCase], list[HiddenAnswerKey], str, str]:
@@ -117,6 +148,7 @@ def load_benchmark(
     answer_ids = _validate_case_ids(answers, "answer keys")
     if answer_ids != visible_ids:
         raise BenchmarkError("answer keys must exactly match visible case IDs and order")
+    _validate_hidden_label_isolation(visible, answers)
     return visible, answers, digest_models(visible), digest_models(answers)
 
 
@@ -167,7 +199,7 @@ def resolve_prediction_ablation(
     resolved: list[Prediction] = []
     for prediction in predictions:
         ranked = prediction.ranked_hypotheses[:max_hypotheses]
-        probability_mass = sum(prediction.probabilities[item] for item in ranked)
+        probability_mass = math.fsum(prediction.probabilities[item] for item in ranked)
         if probability_mass <= 0.0:
             raise BenchmarkError("ablation removed all positive probability mass")
         probabilities = {item: prediction.probabilities[item] / probability_mass for item in ranked}

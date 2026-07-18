@@ -58,6 +58,9 @@ def test_export_schemas_writes_evidence_documents(
         "impact-manifest.schema.json",
         "evidence-config.schema.json",
         "evidence-manifest.schema.json",
+        "tool-request.schema.json",
+        "tool-response.schema.json",
+        "tool-error.schema.json",
     }
 
 

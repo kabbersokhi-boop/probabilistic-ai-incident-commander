@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -125,6 +125,17 @@ validate-evidence-standard:
 
 summarize-evidence-standard:
 	$(PYTHON) -m paic evidence summary --evidence-dir $(EVIDENCE_STANDARD_DIR)
+
+tools-list:
+	$(PYTHON) -m paic tools list
+
+tools-smoke: analytics-smoke detection-smoke
+	@mkdir -p .artifacts/tool-audit
+	@printf '%s\n' '{"tool":"artifacts.summary","incident_id":"smoke","role":"investigator","dataset_dir":"$(SMOKE_DIR)","analytics_dir":"$(ANALYTICS_SMOKE_DIR)","detection_dir":"$(DETECTION_SMOKE_DIR)","audit_dir":".artifacts/tool-audit","arguments":{}}' > .artifacts/tool-request.json
+	$(PYTHON) -m paic tools invoke --request .artifacts/tool-request.json
+
+tools-audit:
+	$(PYTHON) -m paic tools audit validate --audit-dir .artifacts/tool-audit
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

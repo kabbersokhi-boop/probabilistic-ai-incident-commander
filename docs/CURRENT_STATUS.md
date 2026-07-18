@@ -67,3 +67,6 @@
 ## Next capability
 
 The next implementation adds operational evidence, lineage, historical incident retrieval, and safe read-only tool access.
+# Current status
+
+The repository includes a deterministic Governed Tool Gateway at version 0.7.0. It is suitable for controlled read-only integration tests and future agent adapters. It does not include an LLM provider, autonomous planning, remediation execution, approval execution, or hosted infrastructure.

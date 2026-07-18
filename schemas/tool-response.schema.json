@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "ToolError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ToolError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "byte_count": {
+      "minimum": 0,
+      "title": "Byte Count",
+      "type": "integer"
+    },
+    "call_id": {
+      "title": "Call Id",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ToolError"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_record_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Record Ids",
+      "type": "array"
+    },
+    "execution_status": {
+      "enum": [
+        "success",
+        "error"
+      ],
+      "title": "Execution Status",
+      "type": "string"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "normalized_arguments": {
+      "additionalProperties": true,
+      "title": "Normalized Arguments",
+      "type": "object"
+    },
+    "policy_decision": {
+      "enum": [
+        "allow",
+        "deny"
+      ],
+      "title": "Policy Decision",
+      "type": "string"
+    },
+    "result": {
+      "default": null,
+      "title": "Result"
+    },
+    "result_sha256": {
+      "title": "Result Sha256",
+      "type": "string"
+    },
+    "row_count": {
+      "minimum": 0,
+      "title": "Row Count",
+      "type": "integer"
+    },
+    "source_manifest_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Source Manifest Hashes",
+      "type": "object"
+    },
+    "tool": {
+      "title": "Tool",
+      "type": "string"
+    },
+    "tool_version": {
+      "title": "Tool Version",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "call_id",
+    "incident_id",
+    "tool",
+    "tool_version",
+    "policy_decision",
+    "execution_status",
+    "source_manifest_hashes",
+    "row_count",
+    "byte_count",
+    "truncated",
+    "evidence_record_ids",
+    "normalized_arguments",
+    "result_sha256"
+  ],
+  "title": "ToolResponse",
+  "type": "object"
+}

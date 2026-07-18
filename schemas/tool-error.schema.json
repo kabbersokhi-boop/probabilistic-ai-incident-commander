@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "message"
+  ],
+  "title": "ToolError",
+  "type": "object"
+}

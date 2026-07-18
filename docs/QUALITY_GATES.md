@@ -146,3 +146,6 @@ The resulting wheel must install in a clean Python 3.11 or 3.12 environment. The
 - Financial components exactly reconstruct total impact.
 - Repeated builds are deterministic within the same runtime.
 - Manifest, source binding, configuration, marker, schema, row count, and table hashes are validated.
+# Governed Tool Gateway quality gates
+
+Gateway changes require contract validation, strict schema regeneration, formatting, linting, mypy, the complete coverage suite, adversarial SQL and authorization tests, artifact source-binding tests, audit-ledger tamper tests, and smoke execution on Python 3.11 and 3.12.

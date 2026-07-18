@@ -12,12 +12,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from paic.evaluation.models import (
-    EvaluationConfig,
-    HiddenAnswerKey,
-    Prediction,
-    VisibleCase,
-)
+from paic.evaluation.models import EvaluationConfig, HiddenAnswerKey, Prediction, VisibleCase
 
 
 class BenchmarkError(RuntimeError):
@@ -59,8 +54,7 @@ def tool_policy_digest(cases: list[VisibleCase], config: EvaluationConfig) -> st
         {
             "max_tool_calls": config.ablation.max_tool_calls,
             "cases": [
-                {"case_id": case.case_id, "allowed_tools": case.allowed_tools}
-                for case in cases
+                {"case_id": case.case_id, "allowed_tools": case.allowed_tools} for case in cases
             ],
         }
     )
@@ -148,18 +142,12 @@ def load_benchmark(
     visible_root = Path(visible_dir)
     answer_root = Path(answers_dir)
     _validate_distinct_roots(visible_root, answer_root)
-    visible = _load_model_list(
-        visible_root / "cases.json", VisibleCase, "visible cases"
-    )
-    answers = _load_model_list(
-        answer_root / "answer-keys.json", HiddenAnswerKey, "answer keys"
-    )
+    visible = _load_model_list(visible_root / "cases.json", VisibleCase, "visible cases")
+    answers = _load_model_list(answer_root / "answer-keys.json", HiddenAnswerKey, "answer keys")
     visible_ids = _validate_case_ids(visible, "visible benchmark")
     answer_ids = _validate_case_ids(answers, "answer keys")
     if answer_ids != visible_ids:
-        raise BenchmarkError(
-            "answer keys must exactly match visible case IDs and order"
-        )
+        raise BenchmarkError("answer keys must exactly match visible case IDs and order")
     _validate_hidden_label_isolation(visible, answers)
     return visible, answers, digest_models(visible), digest_models(answers)
 
@@ -179,9 +167,7 @@ def resolve_ablation(cases: list[VisibleCase], config: Any) -> list[VisibleCase]
     if config.remove_history:
         removed_terms.extend(["history", "historical"])
     if config.remove_contradictions:
-        removed_terms.extend(
-            ["contradiction", "contradictory", "contradicts", "contradict"]
-        )
+        removed_terms.extend(["contradiction", "contradictory", "contradicts", "contradict"])
 
     def keep(value: str) -> bool:
         lowered = value.lower()
@@ -216,9 +202,7 @@ def resolve_prediction_ablation(
         probability_mass = math.fsum(prediction.probabilities[item] for item in ranked)
         if probability_mass <= 0.0:
             raise BenchmarkError("ablation removed all positive probability mass")
-        probabilities = {
-            item: prediction.probabilities[item] / probability_mass for item in ranked
-        }
+        probabilities = {item: prediction.probabilities[item] / probability_mass for item in ranked}
         payload = prediction.model_dump(mode="python")
         payload.update(
             {

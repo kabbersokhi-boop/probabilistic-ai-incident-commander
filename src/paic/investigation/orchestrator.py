@@ -42,6 +42,11 @@ class ToolGateway(Protocol):
     def invoke(self, request: ToolRequest) -> ToolResponse: ...
 
 
+def _require_source_lineage(response: ToolResponse, expected: Mapping[str, str]) -> None:
+    if response.execution_status == "success" and response.source_manifest_hashes != dict(expected):
+        raise InvestigationError("governed tool source lineage changed during investigation")
+
+
 def _event(
     events: list[TranscriptEvent], event_type: str, payload: dict[str, Any]
 ) -> TranscriptEvent:
@@ -250,6 +255,7 @@ class Investigator:
                 call_id=call_uuid,
             )
             tool_response = self.gateway.invoke(tool_request)
+            _require_source_lineage(tool_response, bound.hashes)
             # A model may cite only evidence returned by a successful governed
             # tool invocation. Error responses are not observations.
             if tool_response.execution_status == "success":

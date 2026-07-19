@@ -74,9 +74,16 @@ def _locked(path: Path) -> Iterator[None]:
 class AuditLedger:
     def __init__(self, directory: str | Path):
         self.root = Path(directory)
+        if self.root.exists() and (self.root.is_symlink() or not self.root.is_dir()):
+            raise ValueError("audit ledger root must be a regular non-symlink directory")
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "invocations.jsonl"
         self.lock_path = self.root / ".ledger.lock"
+
+    def _ensure_regular_files(self) -> None:
+        for path in (self.path, self.lock_path):
+            if path.is_symlink() or (path.exists() and not path.is_file()):
+                raise ValueError("audit ledger paths must be regular non-symlink files")
 
     def append(
         self,
@@ -90,7 +97,13 @@ class AuditLedger:
         response_receipt = _redact(
             {key: value for key, value in response.items() if key != "result"}
         )
+        self._ensure_regular_files()
         with _locked(self.lock_path):
+            # Never extend a corrupted history. Validation runs while the same
+            # process-wide ledger lock is held, so another cooperating writer
+            # cannot modify the file between validation and append.
+            self._ensure_regular_files()
+            self.validate()
             records = (
                 self.path.read_text(encoding="utf-8").splitlines() if self.path.exists() else []
             )
@@ -116,6 +129,7 @@ class AuditLedger:
         return record
 
     def validate(self) -> None:
+        self._ensure_regular_files()
         lines = self.path.read_text(encoding="utf-8").splitlines() if self.path.exists() else []
         previous = "0" * 64
         seen: set[str] = set()

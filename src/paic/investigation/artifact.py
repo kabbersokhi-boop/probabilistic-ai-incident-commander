@@ -8,15 +8,20 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
-from paic.investigation.config import InvestigationConfig
+from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest
 from paic.investigation.models import InvestigationReport, InvestigationRequest, TranscriptEvent
 from paic.investigation.probability import verify_report
+from paic.investigation.prompts import SUBMIT_TOOL, gateway_name
 from paic.simulator.io import file_sha256
 from paic.tools.binding import BindingError, bind_sources
+from paic.tools.gateway import Gateway
 from paic.tools.ledger import canonical
+from paic.tools.models import ToolRequest
+from paic.tools.policy import authorize
 
 
 class InvestigationArtifactError(RuntimeError):
@@ -172,6 +177,72 @@ def load_investigation(path: str | Path) -> LoadedInvestigation:
     return LoadedInvestigation(manifest, config, report, transcript, request_receipt)
 
 
+def _transcript_semantic_issues(loaded: LoadedInvestigation) -> list[str]:
+    issues: list[str] = []
+    provider_round = 0
+    trace_index = 0
+    previous: TranscriptEvent | None = None
+    for event in loaded.transcript:
+        if event.event_type == "provider_response":
+            provider_round += 1
+            previous = event
+            continue
+        if event.event_type not in {"tool_result", "proposal_rejected", "proposal_accepted"}:
+            previous = event
+            continue
+        if previous is None or previous.event_type != "provider_response":
+            issues.append(f"{event.event_type} is not paired with a provider response")
+            previous = event
+            continue
+        calls = previous.payload.get("tool_calls")
+        if not isinstance(calls, list) or len(calls) != 1 or not isinstance(calls[0], dict):
+            issues.append(f"{event.event_type} requires exactly one provider tool call")
+            previous = event
+            continue
+        call = calls[0]
+        call_id = call.get("id")
+        name = call.get("name")
+        arguments = call.get("arguments")
+        if event.payload.get("tool_call_id") != call_id:
+            issues.append(f"{event.event_type} provider tool-call identity mismatch")
+        if event.event_type == "tool_result":
+            if trace_index >= len(loaded.report.tool_trace):
+                issues.append("transcript has more tool results than the report trace")
+                previous = event
+                continue
+            trace = loaded.report.tool_trace[trace_index]
+            trace_index += 1
+            if (
+                not isinstance(call_id, str)
+                or not isinstance(name, str)
+                or not isinstance(arguments, dict)
+            ):
+                issues.append("provider tool call is malformed")
+                previous = event
+                continue
+            tool = gateway_name(name)
+            decision = authorize("investigator", tool, "1.0", arguments)
+            expected_call_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    f"{loaded.config.investigation_id}:{provider_round}:{call_id}:"
+                    f"{tool}:{canonical(arguments)}",
+                )
+            )
+            if tool != trace.tool:
+                issues.append("provider tool name differs from report trace")
+            if not decision.allowed or decision.normalized_arguments != trace.arguments:
+                issues.append("provider tool arguments differ from normalized report trace")
+            if expected_call_id != trace.call_id:
+                issues.append("report trace call ID does not reconstruct from provider event")
+        elif name != SUBMIT_TOOL:
+            issues.append(f"{event.event_type} is not paired with submit_investigation")
+        previous = event
+    if trace_index != len(loaded.report.tool_trace):
+        issues.append("report trace has no matching transcript tool result")
+    return issues
+
+
 def validate_investigation(
     path: str | Path,
     *,
@@ -267,6 +338,15 @@ def validate_investigation(
         previous = event.event_sha256
     if len(loaded.transcript) != loaded.manifest.transcript_event_count:
         issues.append("transcript event count differs from manifest")
+    transcript_traces = [
+        event.payload.get("trace")
+        for event in loaded.transcript
+        if event.event_type == "tool_result"
+    ]
+    report_traces = [item.model_dump(mode="json") for item in loaded.report.tool_trace]
+    if transcript_traces != report_traces:
+        issues.append("transcript tool results differ from report trace")
+    issues.extend(_transcript_semantic_issues(loaded))
     accepted = [event for event in loaded.transcript if event.event_type == "proposal_accepted"]
     if (
         len(accepted) != 1
@@ -290,11 +370,167 @@ def validate_investigation(
     return issues
 
 
-def replay_investigation(path: str | Path) -> InvestigationReport:
-    issues = validate_investigation(path)
+def _replay_governed_tool_trace(
+    loaded: LoadedInvestigation,
+    *,
+    dataset_dir: str | Path,
+    analytics_dir: str | Path | None,
+    detection_dir: str | Path | None,
+    impact_dir: str | Path | None,
+    evidence_dir: str | Path | None,
+) -> None:
+    gateway = Gateway(byte_limit=loaded.config.budget.max_tool_result_bytes)
+    observed: set[str] = set()
+    for expected_sequence, trace in enumerate(loaded.report.tool_trace, 1):
+        if trace.sequence != expected_sequence:
+            raise InvestigationArtifactError("investigation tool trace sequence is invalid")
+        if trace.tool not in loaded.config.allowed_tools:
+            raise InvestigationArtifactError(
+                "investigation trace uses a tool outside resolved policy"
+            )
+        try:
+            call_id = UUID(trace.call_id)
+        except ValueError as exc:
+            raise InvestigationArtifactError(
+                f"invalid governed tool call ID at trace sequence {trace.sequence}"
+            ) from exc
+        replayed = gateway.invoke(
+            ToolRequest(
+                tool=trace.tool,
+                incident_id=loaded.report.incident_id,
+                role="investigator",
+                arguments=trace.arguments,
+                dataset_dir=str(dataset_dir),
+                analytics_dir=None if analytics_dir is None else str(analytics_dir),
+                detection_dir=None if detection_dir is None else str(detection_dir),
+                impact_dir=None if impact_dir is None else str(impact_dir),
+                evidence_dir=None if evidence_dir is None else str(evidence_dir),
+                call_id=call_id,
+            )
+        )
+        expected = (
+            trace.call_id,
+            trace.execution_status,
+            trace.arguments,
+            trace.result_sha256,
+            trace.evidence_record_ids,
+            trace.truncated,
+            trace.error_code,
+        )
+        actual = (
+            replayed.call_id,
+            replayed.execution_status,
+            replayed.normalized_arguments,
+            replayed.result_sha256,
+            replayed.evidence_record_ids,
+            replayed.truncated,
+            replayed.error.code if replayed.error else None,
+        )
+        if actual != expected:
+            raise InvestigationArtifactError(
+                f"governed tool semantic replay mismatch at trace sequence {trace.sequence}"
+            )
+        if (
+            replayed.execution_status == "success"
+            and replayed.source_manifest_hashes != loaded.report.source_manifest_hashes
+        ):
+            raise InvestigationArtifactError(
+                f"governed tool source binding mismatch at trace sequence {trace.sequence}"
+            )
+        if replayed.execution_status == "success":
+            observed.update(replayed.evidence_record_ids)
+    if sorted(observed) != loaded.report.observed_evidence_record_ids:
+        raise InvestigationArtifactError(
+            "observed evidence does not equal successful governed tool output"
+        )
+
+
+def replay_investigation(
+    path: str | Path,
+    *,
+    dataset_dir: str | Path | None = None,
+    analytics_dir: str | Path | None = None,
+    detection_dir: str | Path | None = None,
+    impact_dir: str | Path | None = None,
+    evidence_dir: str | Path | None = None,
+    config_path: str | Path | None = None,
+    artifact_only: bool = False,
+) -> InvestigationReport:
+    structural_issues = validate_investigation(path)
+    if structural_issues:
+        raise InvestigationArtifactError(
+            "investigation artifact validation failed before replay: "
+            + "; ".join(structural_issues)
+        )
+    loaded = load_investigation(path)
+    optional_presence = loaded.request_receipt.get("source_presence")
+    expected_optional = {"analytics", "detection", "impact", "evidence"}
+    if not isinstance(optional_presence, dict) or set(optional_presence) != expected_optional:
+        raise InvestigationArtifactError(
+            "investigation request receipt has invalid source presence"
+        )
+    source_presence = {"dataset": True, **optional_presence}
+    supplied = {
+        "dataset": dataset_dir,
+        "analytics": analytics_dir,
+        "detection": detection_dir,
+        "impact": impact_dir,
+        "evidence": evidence_dir,
+    }
+    if artifact_only:
+        if any(value is not None for value in supplied.values()) or config_path is not None:
+            raise InvestigationArtifactError(
+                "artifact-only replay does not accept source directories or config"
+            )
+        issues: list[str] = []
+    else:
+        if config_path is None:
+            raise InvestigationArtifactError(
+                "authoritative replay requires the original investigation config"
+            )
+        try:
+            external_config = load_investigation_config(config_path)
+        except Exception as exc:
+            raise InvestigationArtifactError(
+                f"cannot load authoritative investigation config: {exc}"
+            ) from exc
+        if external_config != loaded.config:
+            raise InvestigationArtifactError("authoritative investigation config mismatch")
+        missing = [
+            name
+            for name, present in source_presence.items()
+            if present and supplied.get(name) is None
+        ]
+        unexpected = [
+            name
+            for name, value in supplied.items()
+            if value is not None and not bool(source_presence.get(name))
+        ]
+        if missing or unexpected:
+            raise InvestigationArtifactError(
+                "authoritative replay source set mismatch: "
+                f"missing={sorted(missing)}, unexpected={sorted(unexpected)}"
+            )
+        assert dataset_dir is not None
+        issues = validate_investigation(
+            path,
+            dataset_dir=dataset_dir,
+            analytics_dir=analytics_dir,
+            detection_dir=detection_dir,
+            impact_dir=impact_dir,
+            evidence_dir=evidence_dir,
+        )
+        if not issues:
+            _replay_governed_tool_trace(
+                loaded,
+                dataset_dir=dataset_dir,
+                analytics_dir=analytics_dir,
+                detection_dir=detection_dir,
+                impact_dir=impact_dir,
+                evidence_dir=evidence_dir,
+            )
     if issues:
         raise InvestigationArtifactError(
             "investigation artifact validation failed before replay: " + "; ".join(issues)
         )
-    loaded = load_investigation(path)
     return loaded.report

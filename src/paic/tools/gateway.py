@@ -317,6 +317,15 @@ class Gateway:
                 req.evidence_dir,
             )
             result, truncated = self._run(req, bound, decision.normalized_arguments)
+            rebound = bind_sources(
+                req.dataset_dir,
+                req.analytics_dir,
+                req.detection_dir,
+                req.impact_dir,
+                req.evidence_dir,
+            )
+            if rebound.hashes != bound.hashes:
+                raise GatewayError("source artifacts changed during tool invocation")
             encoded = canonical(result).encode()
             refs = _evidence_refs(result)
             base.update(

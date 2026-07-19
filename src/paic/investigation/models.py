@@ -42,6 +42,18 @@ class ProviderUsage(StrictModel):
     completion_tokens: int = Field(default=0, ge=0)
     total_tokens: int = Field(default=0, ge=0)
 
+    @model_validator(mode="after")
+    def reconcile_token_totals(self) -> ProviderUsage:
+        component_total = self.prompt_tokens + self.completion_tokens
+        # Some compatible providers report only total_tokens, while others
+        # omit total_tokens but provide both components. Derive a missing/zero
+        # total from real components, but reject a conflicting non-zero value.
+        if component_total and self.total_tokens not in (0, component_total):
+            raise ValueError("total_tokens must equal prompt_tokens plus completion_tokens")
+        if component_total and self.total_tokens == 0:
+            object.__setattr__(self, "total_tokens", component_total)
+        return self
+
 
 class ProviderResponse(StrictModel):
     model: str

@@ -4,9 +4,9 @@
 
 **Evidence-grounded, governed agentic AI for diagnosing commerce incidents under uncertainty.**
 
-Probabilistic AI Incident Commander is an open reference implementation of an autonomous operations system that combines statistical anomaly detection, analytical investigation, probabilistic root-cause ranking, controlled remediation, and recovery verification.
+Probabilistic AI Incident Commander is an open reference implementation of a governed agentic operations system that combines statistical anomaly detection, analytical investigation, probabilistic root-cause ranking, controlled remediation, and recovery verification.
 
-It is designed to answer more than *“What changed?”* The completed system will determine:
+It is designed to answer more than *“What changed?”* The implemented system determines:
 
 - where the impact is concentrated,
 - which explanations are supported or contradicted by evidence,
@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides nine working capabilities.
+The repository currently provides eleven working capabilities.
 
 ### Executable product and evaluation contracts
 
@@ -139,6 +139,22 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 - Atomic simulated deployment rollback, feature-flag, and configuration execution
 - One-time token and plan replay protection plus fresh inverse rollback proposals
 - No production infrastructure mutation; recovery verification remains a separate capability
+
+### Deterministic recovery verification and reopening
+
+- Source-bound primary and guardrail observations with strict pre/post windows
+- Robust baselines, equivalence tests, sustained recovery bands, adverse trends, and severe-breach handling
+- Closed-world recovery artifacts with deterministic semantic replay
+- Immutable local lifecycle generations and automatic reopening after verified regression
+- Recovery authority remains ordinary code; execution success and model prose cannot declare recovery
+
+### Hidden-benchmark evaluation and adversarial testing
+
+- Separate agent-visible cases and evaluator-only answer keys
+- Top-k, reciprocal-rank, complete-outcome Brier, clipped log-loss, reliability/ECE, abstention, coverage/risk, evidence, safety, remediation, and recovery metrics
+- Source-bound closed-world evaluation and comparison artifacts with semantic replay
+- Real input/configuration ablations and deterministic paired bootstrap intervals
+- SQL, path, artifact, approval, token, remediation, and recovery adversarial boundaries
 
 ## Quick start
 
@@ -356,7 +372,7 @@ Evidence-backed incident report and evaluator
 
 A checkout conversion metric falls sharply for Android customers in one region shortly after several operational changes.
 
-The completed system will:
+The implemented system can:
 
 1. detect that the decline is statistically unusual,
 2. identify the affected geography, device, and application version,
@@ -384,7 +400,7 @@ Every root-cause hypothesis must define expected observations, planned tests, su
 
 ### Explicit uncertainty
 
-Root-cause probabilities will be calculated outside the language model and evaluated for calibration against hidden ground truth. A confidence value is useful only when its reliability is measured.
+Root-cause probabilities are calculated outside the language model and evaluated for calibration against hidden ground truth. A confidence value is useful only when its reliability is measured.
 
 ### Bounded autonomy
 
@@ -430,17 +446,18 @@ Each benchmark incident has hidden ground truth so system behaviour can be measu
 | False-positive rate | 0.24% |
 | Mean detection delay | 1.2 periods |
 
-The wider product evaluation will also measure:
+The expanded offline evaluator now measures:
 
-- anomaly-detection precision, recall, false-positive rate, and detection delay across raw-event incident families,
-- root-cause Top-1 and Top-3 accuracy,
-- Brier score and probability calibration,
-- evidence quality and unsupported-claim rate,
-- tool-call count, latency, SQL cost, and model cost,
-- SQL safety and unauthorized-action block rates,
-- remediation success and recovery-verification accuracy,
-- churn, survival, and customer-impact model quality,
-- ablations with lineage, history, contradiction search, and other components removed.
+- root-cause Top-1 and Top-3 accuracy, reciprocal rank, and hypothesis-set recall,
+- complete-outcome Brier score, clipped log loss, reliability bins, and expected calibration error,
+- abstention accuracy, coverage, selective accuracy, and selective risk,
+- evidence citation validity, required-evidence coverage, and unsupported claims,
+- governed tool calls, tool failures, tool-budget failures, and authority violations,
+- remediation and recovery correctness,
+- paired baseline/ablation deltas with deterministic descriptive bootstrap intervals,
+- source-bound semantic replay and adversarial SQL, path, artifact, approval, token, remediation, and recovery boundaries.
+
+Synthetic evaluator scores demonstrate reproducibility and control integrity; they are not production model-quality claims. Token, latency, and cost fields are populated only from real provider metadata.
 
 No README or résumé result should be published until a reproducible benchmark command produces it.
 
@@ -456,7 +473,10 @@ src/paic/detection/     Statistical baselines, predictive tests, FDR, change det
 src/paic/impact/        Customer features, survival, causal estimates, and financial impact
 src/paic/evidence/      Operational evidence, lineage, timelines, and source binding
 src/paic/tools/         Governed read-only tools, SQL policy, authorization, and audit ledger
-src/paic/investigation/ Model routing, tool orchestration, probability, artifacts, and evaluation
+src/paic/investigation/ Model routing, tool orchestration, probability, and source-bound reports
+src/paic/remediation/   Policy, approvals, tokens, reversible simulated execution, and state lineage
+src/paic/recovery/      Statistical recovery, authoritative observations, artifacts, and reopening lifecycle
+src/paic/evaluation/    Hidden benchmarks, scoring, ablations, comparisons, replay, and adversarial tests
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
 tests/                  Unit, invariant, CLI, reconciliation, integrity, and adversarial tests
@@ -468,9 +488,8 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 
 The next major capabilities are:
 
-1. expanded hidden-incident evaluation, calibration, ablations, and security testing (in progress),
-2. developer TUI and public web product,
-3. Docker, observability, hosted demonstration, and portfolio packaging.
+1. developer TUI and public web product over the governed domain layer,
+2. Docker, observability, hosted demonstration, and portfolio packaging.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

@@ -231,7 +231,7 @@ def test_isolated_investigation_export_validate_replay_and_tamper(
     manifest = export_investigation(report, _config(), request, transcript, output)
     assert manifest.tool_call_count == 1
     assert validate_investigation(output) == []
-    assert replay_investigation(output) == report
+    assert replay_investigation(output, artifact_only=True) == report
 
     transcript_path = output / "transcript.jsonl"
     lines = transcript_path.read_text(encoding="utf-8").splitlines()

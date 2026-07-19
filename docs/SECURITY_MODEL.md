@@ -4,11 +4,11 @@ The machine-readable source is `specs/safety.yaml`.
 
 ## Current boundary
 
-The implemented simulator is local, deterministic, incident-free, and requires no secrets or external credentials. Generated datasets contain synthetic identifiers and fictional entities only.
+The implemented system is a local synthetic reference environment. Dataset generation, analytics, detection, impact, evidence, tool execution, remediation, recovery, and evaluation are deterministic and credential-free. Optional live investigation providers read keys only from the process environment. Remediation mutates only validated simulated control-state artifacts and cannot access production infrastructure.
 
 ## Trust boundaries
 
-- Logs, runbooks, historical incidents, seller fields, and retrieved documents will be treated as untrusted data.
+- Logs, runbooks, historical incidents, seller fields, and retrieved documents are treated as untrusted data.
 - Natural language will never be accepted as approval.
 - The language model will not receive direct database, cloud, deployment, or secret credentials.
 - Tool arguments will be validated by deterministic code before execution.
@@ -16,7 +16,7 @@ The implemented simulator is local, deterministic, incident-free, and requires n
 
 ## SQL policy
 
-Investigative SQL will use a read-only role, approved schemas, parsed statement types, row and result limits, timeouts, parameterized values, query-plan checks, cancellation, and audit records.
+Investigative SQL uses approved in-memory tables, AST-parsed read-only statements, row and byte limits, timeouts, bounded complexity, and audit records. External table functions, filesystem access, extensions, mutation, and multi-statement queries are rejected.
 
 ## Action policy
 

@@ -16,6 +16,7 @@ from paic.investigation.config import InvestigationConfig, ModelRoute
 from paic.investigation.models import InvestigationRequest, ProviderResponse
 from paic.investigation.orchestrator import Investigator, scripted_factory
 from paic.investigation.provider import ChatProvider, ProviderError, ScriptedProvider
+from paic.tools.gateway import Gateway
 
 
 def _config() -> InvestigationConfig:
@@ -191,6 +192,7 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
     impact_smoke_dataset_dir: Path,
     evidence_smoke_dir: Path,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ids = (
         load_evidence(evidence_smoke_dir)
@@ -224,7 +226,37 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
         dataset_dir=impact_smoke_dataset_dir,
         evidence_dir=evidence_smoke_dir,
     )
-    assert replay_investigation(artifact) == report
+    with pytest.raises(InvestigationArtifactError, match="original investigation config"):
+        replay_investigation(artifact)
+    assert replay_investigation(artifact, artifact_only=True) == report
+    config_path = tmp_path / "investigation-config.json"
+    config_path.write_text(_config().model_dump_json(), encoding="utf-8")
+    assert (
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+        == report
+    )
+    original_invoke = Gateway.invoke
+
+    def altered_invoke(self: Gateway, request: object) -> object:
+        response = original_invoke(self, request)  # type: ignore[arg-type]
+        if response.execution_status == "success":
+            return response.model_copy(update={"result_sha256": "f" * 64})
+        return response
+
+    monkeypatch.setattr(Gateway, "invoke", altered_invoke)
+    with pytest.raises(InvestigationArtifactError, match="semantic replay mismatch"):
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+    monkeypatch.setattr(Gateway, "invoke", original_invoke)
 
     report_path = artifact / "report.json"
     raw = json.loads(report_path.read_text(encoding="utf-8"))
@@ -232,7 +264,7 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
     report_path.write_text(json.dumps(raw), encoding="utf-8")
     assert validate_investigation(artifact)
     with pytest.raises(InvestigationArtifactError, match="validation failed"):
-        replay_investigation(artifact)
+        replay_investigation(artifact, artifact_only=True)
 
 
 class _FailureProvider:

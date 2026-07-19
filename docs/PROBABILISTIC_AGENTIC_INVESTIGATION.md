@@ -62,11 +62,11 @@ An exported investigation contains:
 - a file manifest,
 - a tamper-evident success marker.
 
-Validation recomputes file hashes, transcript links, report probabilities, report hash, source-manifest bindings, and counts. Replay verifies and returns the report without accessing NVIDIA NIM.
+Validation recomputes file hashes, transcript links, report probabilities, report hash, source-manifest bindings, and counts. Authoritative replay requires the exact original source set and investigation configuration, semantically pairs transcript events with provider calls, re-executes every governed tool call, and compares call identity, normalized arguments, source hashes, result hashes, evidence identifiers, truncation, status, and errors without accessing a model provider. Explicit artifact-only replay validates embedded payloads for diagnostics but is not provenance validation.
 
 The exported transcript contains only bounded provider operational metadata: model, finish reason, usage, validated tool calls, and a presence/byte-count/SHA-256 receipt for free-form content. It never persists provider `content`, reasoning traces, or unrestricted model prose. Exports are closed-world: the six documented regular files are the only permitted paths.
 
-Benchmark cases use `investigation_dir`, not a standalone `report.json`. Each case is loaded through complete artifact validation and replay before scoring. The multiclass Brier metric uses the project's sum-style convention; a true hypothesis omitted from the report contributes its full `(0 - 1)^2` error term.
+Benchmark cases use `investigation_dir`, not a standalone `report.json`. The legacy Phase 7 benchmark performs explicit diagnostic artifact replay; source-authoritative system evaluation is provided by Phase 10, whose benchmark artifacts bind the original visible cases, hidden answers, predictions, and resolved configuration. The multiclass Brier metric uses the project's sum-style convention; a true hypothesis omitted from the report contributes its full `(0 - 1)^2` error term.
 
 ## CLI
 
@@ -74,7 +74,7 @@ Benchmark cases use `investigation_dir`, not a standalone `report.json`. Each ca
 paic investigate models --config configs/investigation/smoke.yaml
 paic investigate run --request request.json --config configs/investigation/smoke.yaml --output-dir .artifacts/investigation
 paic investigate validate --investigation-dir .artifacts/investigation --dataset-dir <dataset> --evidence-dir <evidence>
-paic investigate replay --investigation-dir .artifacts/investigation
+paic investigate replay --investigation-dir .artifacts/investigation --dataset-dir <dataset> --analytics-dir <analytics> --detection-dir <detection> --impact-dir <impact> --evidence-dir <evidence> --config configs/investigation/smoke.yaml
 paic investigate benchmark --cases benchmark-cases.json
 ```
 
@@ -87,5 +87,5 @@ Use `--provider-script` for deterministic local and CI execution. A live NIM cal
 - Likelihood ratios originate from model proposals and are bounded and evaluated, but not yet learned from historical calibration data.
 - The default loop is synchronous and single-agent.
 - Model endpoints can be rate-limited or unavailable, especially free hosted endpoints.
-- No remediation, approval execution, or recovery declaration exists in this capability.
-- A replay proves deterministic reconstruction of the accepted report, not that the original model reasoning was correct.
+- Remediation and recovery are separate governed capabilities; investigation cannot authorize mutation or declare recovery.
+- Authoritative replay proves deterministic governed-tool and report reconstruction against the supplied artifacts, not that the original model reasoning or likelihood-ratio judgment was correct.

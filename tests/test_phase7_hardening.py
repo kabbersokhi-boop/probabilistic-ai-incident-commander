@@ -527,12 +527,28 @@ def test_exported_transcript_never_persists_provider_free_form_content(tmp_path:
     _event(
         events,
         "provider_response",
-        _provider_event_payload(ProviderResponse(model="unit", content=marker)),
+        _provider_event_payload(
+            ProviderResponse(
+                model="unit",
+                content=marker,
+                tool_calls=[
+                    ProviderToolCall(
+                        id="submit",
+                        name="submit_investigation",
+                        arguments={},
+                    )
+                ],
+            )
+        ),
     )
     _event(
         events,
         "proposal_accepted",
-        {"report_sha256": report.report_sha256, "status": report.status},
+        {
+            "tool_call_id": "submit",
+            "report_sha256": report.report_sha256,
+            "status": report.status,
+        },
     )
     output = tmp_path / "artifact"
     export_investigation(report, config, request, events, output)

@@ -195,7 +195,7 @@ def test_remediation_cli_end_to_end_with_scripted_investigation(
         )
         == 0
     )
-    report = replay_investigation(investigation_dir)
+    report = replay_investigation(investigation_dir, artifact_only=True)
 
     state_input = tmp_path / "control-state.json"
     state_input.write_text(
@@ -269,6 +269,12 @@ def test_remediation_cli_end_to_end_with_scripted_investigation(
                 "build",
                 "--investigation-dir",
                 str(investigation_dir),
+                "--investigation-config",
+                str(repo_root / "configs/investigation/smoke.yaml"),
+                "--dataset-dir",
+                str(impact_smoke_dataset_dir),
+                "--evidence-dir",
+                str(evidence_smoke_dir),
                 "--state-dir",
                 str(state_dir),
                 "--proposal",
@@ -292,6 +298,12 @@ def test_remediation_cli_end_to_end_with_scripted_investigation(
                 str(plan_dir),
                 "--investigation-dir",
                 str(investigation_dir),
+                "--investigation-config",
+                str(repo_root / "configs/investigation/smoke.yaml"),
+                "--dataset-dir",
+                str(impact_smoke_dataset_dir),
+                "--evidence-dir",
+                str(evidence_smoke_dir),
                 "--state-dir",
                 str(state_dir),
             ]

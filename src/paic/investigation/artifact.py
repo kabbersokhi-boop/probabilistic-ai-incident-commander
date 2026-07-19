@@ -231,8 +231,19 @@ def _transcript_semantic_issues(loaded: LoadedInvestigation) -> list[str]:
             )
             if tool != trace.tool:
                 issues.append("provider tool name differs from report trace")
-            if not decision.allowed or decision.normalized_arguments != trace.arguments:
+            if decision.normalized_arguments != trace.arguments:
                 issues.append("provider tool arguments differ from normalized report trace")
+            execution_status = getattr(trace, "execution_status", "success")
+            error_code = getattr(trace, "error_code", None)
+            if execution_status == "success":
+                if not decision.allowed:
+                    issues.append("successful report trace was not policy-authorized")
+                if error_code is not None:
+                    issues.append("successful report trace contains an error code")
+            else:
+                expected_error_code = "request_rejected" if decision.allowed else decision.code
+                if error_code != expected_error_code:
+                    issues.append("report trace error code differs from governed tool outcome")
             if expected_call_id != trace.call_id:
                 issues.append("report trace call ID does not reconstruct from provider event")
         elif name != SUBMIT_TOOL:
@@ -381,6 +392,17 @@ def _replay_governed_tool_trace(
 ) -> None:
     gateway = Gateway(byte_limit=loaded.config.budget.max_tool_result_bytes)
     observed: set[str] = set()
+    provider_arguments = [
+        event.payload["tool_calls"][0]["arguments"]
+        for index, event in enumerate(loaded.transcript)
+        if event.event_type == "provider_response"
+        and index + 1 < len(loaded.transcript)
+        and loaded.transcript[index + 1].event_type == "tool_result"
+        and isinstance(event.payload.get("tool_calls"), list)
+        and len(event.payload["tool_calls"]) == 1
+        and isinstance(event.payload["tool_calls"][0], dict)
+        and isinstance(event.payload["tool_calls"][0].get("arguments"), dict)
+    ]
     for expected_sequence, trace in enumerate(loaded.report.tool_trace, 1):
         if trace.sequence != expected_sequence:
             raise InvestigationArtifactError("investigation tool trace sequence is invalid")
@@ -399,7 +421,11 @@ def _replay_governed_tool_trace(
                 tool=trace.tool,
                 incident_id=loaded.report.incident_id,
                 role="investigator",
-                arguments=trace.arguments,
+                arguments=(
+                    provider_arguments[expected_sequence - 1]
+                    if expected_sequence <= len(provider_arguments)
+                    else trace.arguments
+                ),
                 dataset_dir=str(dataset_dir),
                 analytics_dir=None if analytics_dir is None else str(analytics_dir),
                 detection_dir=None if detection_dir is None else str(detection_dir),

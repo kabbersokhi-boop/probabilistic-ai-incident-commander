@@ -267,6 +267,69 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
         replay_investigation(artifact, artifact_only=True)
 
 
+def test_governed_tool_denial_can_recover_and_authoritatively_replay(
+    impact_smoke_dataset_dir: Path,
+    evidence_smoke_dir: Path,
+    tmp_path: Path,
+) -> None:
+    ids = (
+        load_evidence(evidence_smoke_dir)
+        .tables["evidence_records"]
+        .get_column("evidence_record_id")
+        .head(2)
+        .to_list()
+    )
+    invalid_call = ProviderResponse.model_validate(
+        {
+            "model": "test/model",
+            "tool_calls": [
+                {
+                    "id": "call-invalid-search",
+                    "name": "evidence__search",
+                    "arguments": {"query": "", "limit": 0},
+                }
+            ],
+            "usage": {"total_tokens": 10},
+        }
+    )
+    provider = ScriptedProvider("test/model", [invalid_call, *_responses(ids)])
+    request = InvestigationRequest(
+        incident_id="checkout-address-validation-smoke",
+        question="What caused the incident?",
+        dataset_dir=str(impact_smoke_dataset_dir),
+        evidence_dir=str(evidence_smoke_dir),
+        audit_dir=str(tmp_path / "tool-audit"),
+    )
+    config = _config()
+    report, transcript = Investigator(
+        config, provider_factory=scripted_factory({"test/model": provider})
+    ).run(request)
+
+    assert report.status == "concluded"
+    assert report.tool_trace[0].execution_status == "error"
+    assert report.tool_trace[0].arguments == {}
+    assert report.tool_trace[0].error_code == "invalid_arguments"
+    assert report.tool_trace[1].execution_status == "success"
+    artifact = tmp_path / "investigation"
+    export_investigation(report, config, request, transcript, artifact)
+    assert not validate_investigation(
+        artifact,
+        dataset_dir=impact_smoke_dataset_dir,
+        evidence_dir=evidence_smoke_dir,
+    )
+    config_path = tmp_path / "investigation-config.json"
+    config_path.write_text(config.model_dump_json(), encoding="utf-8")
+    assert (
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+        == report
+    )
+
+
 class _FailureProvider:
     def complete(self, messages: object, tools: object) -> ProviderResponse:
         del messages, tools

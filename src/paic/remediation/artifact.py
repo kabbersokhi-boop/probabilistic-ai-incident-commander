@@ -417,6 +417,12 @@ def validate_plan(
     *,
     investigation_dir: str | Path | None = None,
     control_state_dir: str | Path | None = None,
+    dataset_dir: str | Path | None = None,
+    analytics_dir: str | Path | None = None,
+    detection_dir: str | Path | None = None,
+    impact_dir: str | Path | None = None,
+    evidence_dir: str | Path | None = None,
+    investigation_config_path: str | Path | None = None,
 ) -> list[str]:
     try:
         loaded = load_plan(path)
@@ -426,7 +432,15 @@ def validate_plan(
     report = None
     if investigation_dir is not None:
         try:
-            report = replay_investigation(investigation_dir)
+            report = replay_investigation(
+                investigation_dir,
+                dataset_dir=dataset_dir,
+                analytics_dir=analytics_dir,
+                detection_dir=detection_dir,
+                impact_dir=impact_dir,
+                evidence_dir=evidence_dir,
+                config_path=investigation_config_path,
+            )
         except Exception as exc:
             issues.append(f"cannot validate bound investigation: {exc}")
         else:

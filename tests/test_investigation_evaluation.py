@@ -15,8 +15,8 @@ from paic.investigation.models import (
     InvestigationRequest,
     TranscriptEvent,
 )
+from paic.investigation.orchestrator import _event
 from paic.investigation.probability import score_proposal
-from paic.tools.ledger import canonical
 
 
 def _export_case(tmp_path: Path, report: InvestigationReport) -> Path:
@@ -28,21 +28,27 @@ def _export_case(tmp_path: Path, report: InvestigationReport) -> Path:
             "decision": {"minimum_distinct_evidence": 1},
         }
     )
-    base = {
-        "sequence": 1,
-        "event_type": "proposal_accepted",
-        "payload": {"report_sha256": report.report_sha256, "status": report.status},
-        "previous_event_sha256": "0" * 64,
-    }
-    event = TranscriptEvent.model_validate(
-        {**base, "event_sha256": hashlib.sha256(canonical(base).encode()).hexdigest()}
+    events: list[TranscriptEvent] = []
+    _event(
+        events,
+        "provider_response",
+        {"tool_calls": [{"id": "submit", "name": "submit_investigation", "arguments": {}}]},
+    )
+    _event(
+        events,
+        "proposal_accepted",
+        {
+            "tool_call_id": "submit",
+            "report_sha256": report.report_sha256,
+            "status": report.status,
+        },
     )
     output = tmp_path / "investigation"
     export_investigation(
         report,
         config,
         InvestigationRequest(incident_id="inc", question="why", dataset_dir="/unused"),
-        [event],
+        events,
         output,
     )
     return output

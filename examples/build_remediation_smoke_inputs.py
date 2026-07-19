@@ -16,7 +16,7 @@ def _write(path: Path, value: object) -> None:
 
 
 def build_initial(investigation_dir: Path, state_input: Path, proposal: Path) -> None:
-    report = replay_investigation(investigation_dir)
+    report = replay_investigation(investigation_dir, artifact_only=True)
     if report.status != "concluded" or report.selected_hypothesis_id is None:
         raise RuntimeError("remediation smoke requires a concluded investigation")
     selected = next(

@@ -182,6 +182,16 @@ def test_missing_series_is_insufficient_data() -> None:
     ]
 
 
+def test_failed_metric_dominates_unrelated_insufficient_data() -> None:
+    result = evaluate_recovery(
+        config(),
+        observations(healthy=False, include_guardrail=False),
+        execution_manifest_sha256=sha("execution-manifest"),
+    )
+    assert result.decision == "failed"
+    assert {item.status for item in result.metric_evaluations} == {"failed", "insufficient_data"}
+
+
 def test_undeclared_series_is_rejected() -> None:
     value = observations().model_dump(mode="json")
     extra = dict(value["observations"][0])

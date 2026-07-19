@@ -16,6 +16,7 @@ from paic.investigation.config import InvestigationConfig, ModelRoute
 from paic.investigation.models import InvestigationRequest, ProviderResponse
 from paic.investigation.orchestrator import Investigator, scripted_factory
 from paic.investigation.provider import ChatProvider, ProviderError, ScriptedProvider
+from paic.tools.gateway import Gateway
 
 
 def _config() -> InvestigationConfig:
@@ -191,6 +192,7 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
     impact_smoke_dataset_dir: Path,
     evidence_smoke_dir: Path,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ids = (
         load_evidence(evidence_smoke_dir)
@@ -224,7 +226,37 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
         dataset_dir=impact_smoke_dataset_dir,
         evidence_dir=evidence_smoke_dir,
     )
-    assert replay_investigation(artifact) == report
+    with pytest.raises(InvestigationArtifactError, match="original investigation config"):
+        replay_investigation(artifact)
+    assert replay_investigation(artifact, artifact_only=True) == report
+    config_path = tmp_path / "investigation-config.json"
+    config_path.write_text(_config().model_dump_json(), encoding="utf-8")
+    assert (
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+        == report
+    )
+    original_invoke = Gateway.invoke
+
+    def altered_invoke(self: Gateway, request: object) -> object:
+        response = original_invoke(self, request)  # type: ignore[arg-type]
+        if response.execution_status == "success":
+            return response.model_copy(update={"result_sha256": "f" * 64})
+        return response
+
+    monkeypatch.setattr(Gateway, "invoke", altered_invoke)
+    with pytest.raises(InvestigationArtifactError, match="semantic replay mismatch"):
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+    monkeypatch.setattr(Gateway, "invoke", original_invoke)
 
     report_path = artifact / "report.json"
     raw = json.loads(report_path.read_text(encoding="utf-8"))
@@ -232,7 +264,70 @@ def test_offline_tool_loop_rejects_unsupported_claim_then_concludes(
     report_path.write_text(json.dumps(raw), encoding="utf-8")
     assert validate_investigation(artifact)
     with pytest.raises(InvestigationArtifactError, match="validation failed"):
-        replay_investigation(artifact)
+        replay_investigation(artifact, artifact_only=True)
+
+
+def test_governed_tool_denial_can_recover_and_authoritatively_replay(
+    impact_smoke_dataset_dir: Path,
+    evidence_smoke_dir: Path,
+    tmp_path: Path,
+) -> None:
+    ids = (
+        load_evidence(evidence_smoke_dir)
+        .tables["evidence_records"]
+        .get_column("evidence_record_id")
+        .head(2)
+        .to_list()
+    )
+    invalid_call = ProviderResponse.model_validate(
+        {
+            "model": "test/model",
+            "tool_calls": [
+                {
+                    "id": "call-invalid-search",
+                    "name": "evidence__search",
+                    "arguments": {"query": "", "limit": 0},
+                }
+            ],
+            "usage": {"total_tokens": 10},
+        }
+    )
+    provider = ScriptedProvider("test/model", [invalid_call, *_responses(ids)])
+    request = InvestigationRequest(
+        incident_id="checkout-address-validation-smoke",
+        question="What caused the incident?",
+        dataset_dir=str(impact_smoke_dataset_dir),
+        evidence_dir=str(evidence_smoke_dir),
+        audit_dir=str(tmp_path / "tool-audit"),
+    )
+    config = _config()
+    report, transcript = Investigator(
+        config, provider_factory=scripted_factory({"test/model": provider})
+    ).run(request)
+
+    assert report.status == "concluded"
+    assert report.tool_trace[0].execution_status == "error"
+    assert report.tool_trace[0].arguments == {}
+    assert report.tool_trace[0].error_code == "invalid_arguments"
+    assert report.tool_trace[1].execution_status == "success"
+    artifact = tmp_path / "investigation"
+    export_investigation(report, config, request, transcript, artifact)
+    assert not validate_investigation(
+        artifact,
+        dataset_dir=impact_smoke_dataset_dir,
+        evidence_dir=evidence_smoke_dir,
+    )
+    config_path = tmp_path / "investigation-config.json"
+    config_path.write_text(config.model_dump_json(), encoding="utf-8")
+    assert (
+        replay_investigation(
+            artifact,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+        == report
+    )
 
 
 class _FailureProvider:

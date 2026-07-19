@@ -152,7 +152,23 @@ def test_investigation_cli_scripted_run_validate_replay_and_benchmark(
         == 0
     )
     capsys.readouterr()
-    assert main(["investigate", "replay", "--investigation-dir", str(output)]) == 0
+    assert (
+        main(
+            [
+                "investigate",
+                "replay",
+                "--investigation-dir",
+                str(output),
+                "--dataset-dir",
+                str(impact_smoke_dataset_dir),
+                "--evidence-dir",
+                str(evidence_smoke_dir),
+                "--config",
+                str(config),
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
 
     cases = tmp_path / "cases.json"

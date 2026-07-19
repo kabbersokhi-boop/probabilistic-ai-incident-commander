@@ -755,9 +755,27 @@ def _investigate_benchmark(cases_path: Path) -> int:
     return 0
 
 
-def _investigate_replay(investigation_dir: Path) -> int:
+def _investigate_replay(
+    investigation_dir: Path,
+    dataset_dir: Path | None,
+    analytics_dir: Path | None,
+    detection_dir: Path | None,
+    impact_dir: Path | None,
+    evidence_dir: Path | None,
+    config_path: Path | None,
+    artifact_only: bool,
+) -> int:
     try:
-        report = replay_investigation(investigation_dir)
+        report = replay_investigation(
+            investigation_dir,
+            dataset_dir=dataset_dir,
+            analytics_dir=analytics_dir,
+            detection_dir=detection_dir,
+            impact_dir=impact_dir,
+            evidence_dir=evidence_dir,
+            config_path=config_path,
+            artifact_only=artifact_only,
+        )
     except InvestigationArtifactError as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2))
         return 2
@@ -956,9 +974,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     investigate_benchmark.add_argument("--cases", type=Path, required=True)
     investigate_replay = investigate_subparsers.add_parser(
-        "replay", help="Recompute and print a report without calling a model."
+        "replay", help="Recompute and source-validate a report without calling a model."
     )
     investigate_replay.add_argument("--investigation-dir", type=Path, required=True)
+    investigate_replay.add_argument("--dataset-dir", type=Path)
+    investigate_replay.add_argument("--analytics-dir", type=Path)
+    investigate_replay.add_argument("--detection-dir", type=Path)
+    investigate_replay.add_argument("--impact-dir", type=Path)
+    investigate_replay.add_argument("--evidence-dir", type=Path)
+    investigate_replay.add_argument("--config", type=Path)
+    investigate_replay.add_argument(
+        "--artifact-only",
+        action="store_true",
+        help="Diagnostic replay of embedded payloads only; not provenance validation.",
+    )
     register_remediation_parser(subparsers)
     register_recovery_parser(subparsers)
     register_evaluation_parser(subparsers)
@@ -1061,7 +1090,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "investigate" and args.investigate_command == "benchmark":
         return _investigate_benchmark(args.cases)
     if args.command == "investigate" and args.investigate_command == "replay":
-        return _investigate_replay(args.investigation_dir)
+        return _investigate_replay(
+            args.investigation_dir,
+            args.dataset_dir,
+            args.analytics_dir,
+            args.detection_dir,
+            args.impact_dir,
+            args.evidence_dir,
+            args.config,
+            args.artifact_only,
+        )
     if args.command == "remediate":
         return dispatch_remediation(args)
     if args.command == "recovery":

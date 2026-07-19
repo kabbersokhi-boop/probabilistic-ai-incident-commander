@@ -234,14 +234,15 @@ def evaluate_recovery(
     all_primary = all(item.status == "recovered" for item in primary)
     all_guardrails = all(item.status == "recovered" for item in guardrails)
     any_failed = any(item.status == "failed" for item in evaluations)
-    if severe:
+    # Observed failure has higher authority than an unrelated evidence
+    # gap. Otherwise one missing series can mask a verified regression and keep
+    # a previously recovered lifecycle from incrementing its reopening counter.
+    if severe or any_failed:
         decision = "failed"
     elif any_insufficient:
         decision = "insufficient_data"
     elif all_primary and all_guardrails:
         decision = "recovered"
-    elif severe or any_failed:
-        decision = "failed"
     else:
         decision = "recovering"
 

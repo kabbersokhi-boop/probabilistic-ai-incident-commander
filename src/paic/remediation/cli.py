@@ -91,7 +91,15 @@ def _store_validate(args: argparse.Namespace) -> int:
 def _plan_build(args: argparse.Namespace) -> int:
     try:
         config = load_remediation_config(args.config)
-        report = replay_investigation(args.investigation_dir)
+        report = replay_investigation(
+            args.investigation_dir,
+            dataset_dir=args.dataset_dir,
+            analytics_dir=args.analytics_dir,
+            detection_dir=args.detection_dir,
+            impact_dir=args.impact_dir,
+            evidence_dir=args.evidence_dir,
+            config_path=args.investigation_config,
+        )
         loaded_state = load_control_state(args.state_dir)
         proposal = RemediationProposal.model_validate_json(
             args.proposal.read_text(encoding="utf-8")
@@ -136,6 +144,12 @@ def _plan_validate(args: argparse.Namespace) -> int:
         args.plan_dir,
         investigation_dir=args.investigation_dir,
         control_state_dir=args.state_dir,
+        dataset_dir=args.dataset_dir,
+        analytics_dir=args.analytics_dir,
+        detection_dir=args.detection_dir,
+        impact_dir=args.impact_dir,
+        evidence_dir=args.evidence_dir,
+        investigation_config_path=args.investigation_config,
     )
     print(json.dumps({"valid": not issues, "issues": issues}, indent=2, sort_keys=True))
     return 1 if issues else 0
@@ -314,6 +328,12 @@ def register_remediation_parser(subparsers: Any) -> None:
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
     plan_build = plan_commands.add_parser("build")
     plan_build.add_argument("--investigation-dir", type=Path, required=True)
+    plan_build.add_argument("--investigation-config", type=Path, required=True)
+    plan_build.add_argument("--dataset-dir", type=Path, required=True)
+    plan_build.add_argument("--analytics-dir", type=Path)
+    plan_build.add_argument("--detection-dir", type=Path)
+    plan_build.add_argument("--impact-dir", type=Path)
+    plan_build.add_argument("--evidence-dir", type=Path)
     plan_build.add_argument("--state-dir", type=Path, required=True)
     plan_build.add_argument("--proposal", type=Path, required=True)
     plan_build.add_argument("--config", type=Path, required=True)
@@ -322,6 +342,12 @@ def register_remediation_parser(subparsers: Any) -> None:
     plan_validate = plan_commands.add_parser("validate")
     plan_validate.add_argument("--plan-dir", type=Path, required=True)
     plan_validate.add_argument("--investigation-dir", type=Path)
+    plan_validate.add_argument("--investigation-config", type=Path)
+    plan_validate.add_argument("--dataset-dir", type=Path)
+    plan_validate.add_argument("--analytics-dir", type=Path)
+    plan_validate.add_argument("--detection-dir", type=Path)
+    plan_validate.add_argument("--impact-dir", type=Path)
+    plan_validate.add_argument("--evidence-dir", type=Path)
     plan_validate.add_argument("--state-dir", type=Path)
 
     approval = commands.add_parser("approval", help="Record and evaluate human approval.")

@@ -170,20 +170,20 @@ validate-investigation-smoke:
 	$(PYTHON) -m paic tools audit validate --audit-dir $(INVESTIGATION_AUDIT_DIR)
 
 replay-investigation-smoke:
-	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR)
+	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR) --config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR)
 
 remediation-smoke: investigation-smoke
 	rm -rf $(REMEDIATION_STATE_DIR) $(REMEDIATION_PLAN_DIR) $(REMEDIATION_APPROVAL_DIR) $(REMEDIATION_EXECUTION_DIR) $(REMEDIATION_STATE_AFTER_DIR) $(REMEDIATION_STATE_STORE) .artifacts/remediation-approval.token
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-input .artifacts/remediation-state-input.json --proposal .artifacts/remediation-proposal.json
 	$(PYTHON) -m paic remediate state build --input .artifacts/remediation-state-input.json --output-dir $(REMEDIATION_STATE_DIR) --overwrite
-	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
+	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --plan-dir $(REMEDIATION_PLAN_DIR) --decision-one .artifacts/remediation-decision-one.json --decision-two .artifacts/remediation-decision-two.json --execution-request .artifacts/remediation-execution-request.json
 	@secret="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; primary="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; manager="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; export PAIC_APPROVAL_SECRET="$$secret" PAIC_APPROVER_ONCALL_PRIMARY_KEY="$$primary" PAIC_APPROVER_CHANGE_MANAGER_KEY="$$manager"; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-one.json; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-two.json; $(PYTHON) -m paic remediate token issue --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --at 2026-07-18T00:07:00+00:00 --output .artifacts/remediation-approval.token; $(PYTHON) -m paic remediate execute --plan-dir $(REMEDIATION_PLAN_DIR) --state-dir $(REMEDIATION_STATE_DIR) --state-store $(REMEDIATION_STATE_STORE) --approval-dir $(REMEDIATION_APPROVAL_DIR) --token-file .artifacts/remediation-approval.token --request .artifacts/remediation-execution-request.json --output-state-dir $(REMEDIATION_STATE_AFTER_DIR) --output-dir $(REMEDIATION_EXECUTION_DIR) --overwrite
 	rm -f .artifacts/remediation-approval.token
 
 validate-remediation-smoke:
 	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_DIR)
-	$(PYTHON) -m paic remediate plan validate --plan-dir $(REMEDIATION_PLAN_DIR) --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR)
+	$(PYTHON) -m paic remediate plan validate --plan-dir $(REMEDIATION_PLAN_DIR) --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR)
 	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_AFTER_DIR)
 	$(PYTHON) -m paic remediate execution validate --execution-dir $(REMEDIATION_EXECUTION_DIR) --plan-dir $(REMEDIATION_PLAN_DIR) --before-state-dir $(REMEDIATION_STATE_DIR) --after-state-dir $(REMEDIATION_STATE_AFTER_DIR)
 

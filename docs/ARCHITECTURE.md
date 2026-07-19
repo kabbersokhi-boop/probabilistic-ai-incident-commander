@@ -167,14 +167,18 @@ Every exported detection artifact contains scored observations, anomaly and chan
 
 Every exported impact artifact contains customer features, survival curves, Cox coefficients, propensity scores, causal estimates, segment impact, financial impact, model metrics, quality evidence, the resolved impact configuration, source-dataset identity, table hashes, and a manifest-bound success marker.
 
-## Planned component boundaries
+## Implemented component boundaries
 
-- `evidence`: logs, deployments, configuration, lineage, retrieval
-- `tools`: scoped interfaces and SQL gateway
-- `agent`: controlled state machine and investigation policy
-- `recovery`: statistical verification, source-bound artifacts, immutable local lifecycle, and reopening
-- `evaluation`: ground truth, baselines, ablations, and adversarial tests
-- `api`, `web`, and `tui`: product interfaces over the same core services
+- `evidence`: source-bound health, changes, configuration, lineage, runbooks, history, and timelines
+- `tools`: deny-by-default read-only interfaces, parsed SQL, source binding, limits, and audit records
+- `investigation`: provider-neutral bounded orchestration, evidence-grounded hypotheses, deterministic probability, abstention, and replay
+- `remediation`: deterministic action policy, trusted human attestations, short-lived authorization tokens, reversible simulated mutation, and canonical state lineage
+- `recovery`: evaluator-authoritative observations, statistical verification, source-bound artifacts, immutable lifecycle generations, and reopening
+- `evaluation`: hidden ground truth, deterministic scoring, paired comparisons, real ablations, semantic replay, and adversarial tests
+
+## Planned product boundaries
+
+- `api`, `web`, and `tui`: product interfaces over the same governed domain services; they must not reimplement or bypass authority checks
 
 ## Operational evidence and lineage
 

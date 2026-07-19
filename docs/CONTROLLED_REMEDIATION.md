@@ -116,6 +116,10 @@ paic remediate state build \
 
 paic remediate plan build \
   --investigation-dir .artifacts/investigation-smoke \
+  --investigation-config configs/investigation/smoke.yaml \
+  --dataset-dir .artifacts/impact-source-smoke \
+  --impact-dir .artifacts/impact-smoke \
+  --evidence-dir .artifacts/evidence-smoke \
   --state-dir .artifacts/remediation-state \
   --proposal .artifacts/remediation-proposal.json \
   --config configs/remediation/smoke.yaml \
@@ -150,5 +154,5 @@ rm -f .artifacts/remediation-approval.token
 - No production infrastructure is mutated.
 - The local approver registry and per-identity environment keys are the reference trust boundary, not SSO-backed identity or managed keys.
 - HMAC secrets are process-environment inputs, not managed-key-service keys.
-- Recovery is not inferred from action completion. Statistical recovery verification and automatic reopening belong to the next capability.
+- Recovery is not inferred from action completion. The separate recovery capability performs statistical verification and automatic reopening.
 - Docker and cloud deployment remain later capability milestones and must not be pulled into this implementation.

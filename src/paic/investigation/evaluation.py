@@ -41,7 +41,7 @@ def _load_report(path: str | Path) -> InvestigationReport:
     root = Path(path)
     if root.name == "report.json" or not root.is_dir():
         raise InvestigationArtifactError("benchmark cases require an investigation_dir export")
-    return replay_investigation(root)
+    return replay_investigation(root, artifact_only=True)
 
 
 def evaluate_cases(cases: list[EvaluationCase]) -> EvaluationSummary:

@@ -1,9 +1,9 @@
 # Current Status
 
-Phases 0 through 10 are complete on `main`. The repository now provides executable contracts, deterministic synthetic commerce data, analytics, anomaly detection, customer-impact modelling, operational evidence and lineage, a governed read-only tool gateway, probabilistic investigation, governed simulated remediation, deterministic recovery verification with automatic reopening, and hidden-benchmark/adversarial evaluation.
+Phases 0 through 10 are complete on `main`. Phase 11 is in progress and begins with a read-only terminal control room that presents existing validation and authoritative replay results without gaining operational authority.
 
-The system remains a local, synthetic reference implementation. Language models may plan, select governed read-only tools, and propose hypotheses, but ordinary code owns probability, validation, authorization, mutation, recovery authority, and evaluation authority.
+The system remains a local, synthetic reference implementation. Language models may plan, select governed read-only tools, and propose hypotheses, but ordinary code owns probability, validation, authorization, mutation, recovery authority, and evaluation authority. The TUI is another read-only client of those ordinary-code boundaries.
 
-CI is credential-free and runs Python 3.11 and 3.12 contracts, formatting, lint, strict typing, full tests with branch coverage, schema regeneration, smoke workflows, adversarial checks, and package build. Live-provider evaluation is optional and outside CI.
+CI is credential-free and runs Python 3.11 and 3.12 contracts, formatting, lint, strict typing, full tests with branch coverage, schema regeneration, smoke workflows, adversarial checks, and package build. Phase 11 adds deterministic TUI snapshots and workspace validation to that matrix. Live-provider evaluation remains optional and outside CI.
 
-Not yet implemented: production identity and key management, persistent services, distributed coordination, TUI/web product surfaces, Docker, hosted infrastructure, production observability, or production telemetry. Synthetic benchmark results are evaluator evidence, not production performance claims.
+Phase 11 still requires endurance, interruption, corruption, terminal-compatibility, and shared artifact-publication hardening. Phase 12 will add Docker and production engineering. The public web product is deferred until those reliability gates pass. Synthetic benchmark results are evaluator evidence, not production performance claims.

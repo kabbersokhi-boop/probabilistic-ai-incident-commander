@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository currently provides eleven working capabilities.
+The repository provides eleven completed governed capabilities. Phase 11 now adds the first read-only developer TUI unit for exhaustive validation and operational inspection.
 
 ### Executable product and evaluation contracts
 
@@ -155,6 +155,14 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 - Source-bound closed-world evaluation and comparison artifacts with semantic replay
 - Real input/configuration ablations and deterministic paired bootstrap intervals
 - SQL, path, artifact, approval, token, remediation, and recovery adversarial boundaries
+
+### Read-only terminal control room (Phase 11 in progress)
+
+- Plain-language status across data, detection, impact, evidence, investigation, remediation, recovery, and evaluation
+- Existing validators and authoritative replay functions remain the only source of truth
+- Deterministic JSON snapshots for CI, regression fixtures, and support bundles
+- Safe workspace-relative paths, ASCII/no-color modes, EOF and interrupt handling
+- No approval, execution, rollback, recovery, shell, cloud, or secret authority
 
 ## Quick start
 
@@ -477,6 +485,7 @@ src/paic/investigation/ Model routing, tool orchestration, probability, and sour
 src/paic/remediation/   Policy, approvals, tokens, reversible simulated execution, and state lineage
 src/paic/recovery/      Statistical recovery, authoritative observations, artifacts, and reopening lifecycle
 src/paic/evaluation/    Hidden benchmarks, scoring, ablations, comparisons, replay, and adversarial tests
+src/paic/tui/           Read-only terminal workspace inspection and deterministic snapshots
 schemas/                Generated JSON Schemas
 examples/               Small programmatic usage examples
 tests/                  Unit, invariant, CLI, reconciliation, integrity, and adversarial tests
@@ -486,10 +495,11 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 
 ## Development roadmap
 
-The next major capabilities are:
+The remaining delivery sequence is:
 
-1. developer TUI and public web product over the governed domain layer,
-2. Docker, observability, hosted demonstration, and portfolio packaging.
+1. complete the developer TUI, exhaustive lifecycle testing, endurance testing, and artifact-publication hardening;
+2. add Docker and production engineering, including observability, persistent services, identity, secrets, and deployment testing;
+3. build the public web product only after the TUI and containerized system meet their reliability gates.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

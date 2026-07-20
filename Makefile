@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial test coverage lint format format-check typecheck check verify clean
+.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -39,6 +39,7 @@ EVALUATION_SMOKE_DIR ?= .artifacts/evaluation-smoke
 EVALUATION_STANDARD_DIR ?= .artifacts/evaluation-standard
 EVALUATION_ABLATION_DIR ?= .artifacts/evaluation-standard-no-lineage
 EVALUATION_COMPARISON_DIR ?= .artifacts/evaluation-comparison
+TUI_WORKSPACE ?= configs/tui/smoke.yaml
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -249,6 +250,15 @@ evaluation-adversarial:
 	$(PYTHON) -m paic evaluation adversarial-suite --cases configs/evaluation/adversarial/cases.json
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_remediation_hardening.py -k "plan_semantic_tampering or token_verification_fails_closed or execution_rechecks_state_binding"
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q tests/test_recovery_artifact.py -k "semantic_tamper_is_rejected_even_after_file_hash_refresh or wrong_execution_binding_is_rejected or authoritative_recovery_validation"
+
+tui-smoke: detection-smoke remediation-smoke recovery-smoke evaluation-smoke
+	$(PYTHON) -m paic tui validate --workspace $(TUI_WORKSPACE)
+
+tui-snapshot:
+	$(PYTHON) -m paic tui snapshot --workspace $(TUI_WORKSPACE) --format json
+
+tui-validate:
+	$(PYTHON) -m paic tui validate --workspace $(TUI_WORKSPACE)
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

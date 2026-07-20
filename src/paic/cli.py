@@ -118,6 +118,7 @@ from paic.simulator.validation import (
 from paic.tools.gateway import Gateway, GatewayError
 from paic.tools.ledger import AuditLedger
 from paic.tools.models import ToolError, ToolRequest, ToolResponse
+from paic.tui.cli import dispatch_tui, register_tui_parser
 
 
 def _validate_contracts(spec_dir: Path, output_format: str) -> int:
@@ -991,6 +992,7 @@ def build_parser() -> argparse.ArgumentParser:
     register_remediation_parser(subparsers)
     register_recovery_parser(subparsers)
     register_evaluation_parser(subparsers)
+    register_tui_parser(subparsers)
     return parser
 
 
@@ -1106,6 +1108,8 @@ def main(argv: list[str] | None = None) -> int:
         return dispatch_recovery(args)
     if args.command == "evaluation":
         return dispatch_evaluation(args)
+    if args.command == "tui":
+        return dispatch_tui(args)
     raise AssertionError(f"unhandled command: {args.command}")  # pragma: no cover
 
 

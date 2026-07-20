@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "probabilistic-ai-incident-commander"
-version = "0.11.0"
+version = "0.12.0"
 description = "Evidence-grounded agentic AI for probabilistic investigation and governed remediation."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,6 +35,7 @@ dev = [
 [project.scripts]
 paic = "paic.cli:main"
 paic-contract = "paic.cli:main"
+paic-tui = "paic.tui.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

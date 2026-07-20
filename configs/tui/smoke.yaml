@@ -1,0 +1,30 @@
+schema_version: "1.0"
+workspace_id: smoke-control-room
+display_name: "PAIC smoke incident"
+root_dir: ../..
+paths:
+  metrics:
+    dataset_dir: .artifacts/smoke
+    analytics_dir: .artifacts/analytics-smoke
+    detection_dir: .artifacts/detection-smoke
+  incident:
+    dataset_dir: .artifacts/impact-source-smoke
+    impact_dir: .artifacts/impact-smoke
+    evidence_dir: .artifacts/evidence-smoke
+    investigation_dir: .artifacts/investigation-smoke
+    investigation_config: configs/investigation/smoke.yaml
+  remediation:
+    plan_dir: .artifacts/remediation-plan
+    state_before_dir: .artifacts/remediation-state
+    state_after_dir: .artifacts/remediation-state-after
+    execution_dir: .artifacts/remediation-execution
+  recovery:
+    observations_dir: .artifacts/obs-recovered
+    analytics_dir: .artifacts/recovery-analytics
+    report_dir: .artifacts/report-recovered
+  evaluation:
+    run_dir: .artifacts/evaluation-smoke
+    visible_dir: configs/evaluation/smoke
+    answers_dir: configs/evaluation/answers
+    predictions: configs/evaluation/smoke/predictions.json
+    config: configs/evaluation/smoke/evaluation.json

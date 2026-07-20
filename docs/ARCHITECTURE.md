@@ -176,9 +176,10 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 - `recovery`: evaluator-authoritative observations, statistical verification, source-bound artifacts, immutable lifecycle generations, and reopening
 - `evaluation`: hidden ground truth, deterministic scoring, paired comparisons, real ablations, semantic replay, and adversarial tests
 
-## Planned product boundaries
+## Product interface boundaries
 
-- `api`, `web`, and `tui`: product interfaces over the same governed domain services; they must not reimplement or bypass authority checks
+- `tui`: Phase 11 read-only workspace inspection over existing validators and replay functions; it cannot approve, execute, mutate, or declare recovery
+- `api` and `web`: deferred until the TUI and Phase 12 containerized system meet reliability gates; they must use the same governed services and cannot reimplement authority
 
 ## Operational evidence and lineage
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
-import shutil
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -14,6 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.config import SimulationConfig
 from paic.simulator.manifest import (
     ColumnManifest,
@@ -69,15 +69,19 @@ def export_dataset(
     *,
     overwrite: bool = False,
 ) -> DatasetManifest:
-    """Write all tables as Parquet plus a self-validating JSON manifest."""
+    """Publish a complete dataset without deleting the previous valid generation first."""
 
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise DatasetIOError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise DatasetIOError(f"output path is a file: {root}")
-        shutil.rmtree(root)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_dataset_to_root(result, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise DatasetIOError(str(exc)) from exc
+
+
+def _export_dataset_to_root(result: SimulationResult, root: Path) -> DatasetManifest:
     table_dir = root / "tables"
     table_dir.mkdir(parents=True, exist_ok=False)
 

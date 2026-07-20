@@ -81,7 +81,7 @@ def test_export_requires_explicit_overwrite_and_rejects_file_target(
 
     target = tmp_path / "file"
     target.write_text("not a directory", encoding="utf-8")
-    with pytest.raises(AnalyticsIOError, match="output path is a file"):
+    with pytest.raises(AnalyticsIOError, match="artifact target must be a directory"):
         export_analytics(analytics_smoke_result, target, overwrite=True)
 
 
@@ -191,3 +191,92 @@ def test_validation_detects_readable_table_hash_drift(
 
     assert not report.valid
     assert {item.code for item in report.issues} >= {"analytics.hash"}
+
+
+def test_overwrite_failure_preserves_generation_and_cleans_publication_debris(
+    tmp_path: Path,
+    analytics_smoke_result: AnalyticsBuildResult,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "analytics"
+    export_analytics(analytics_smoke_result, output)
+    previous = (output / "tables" / "metric_observations.parquet").read_bytes()
+
+    def fail(point: str) -> None:
+        if point == "payload-written":
+            raise RuntimeError("injected before commit")
+
+    class FailingPublisher:
+        def __init__(self, target: Path, *, overwrite: bool) -> None:
+            from paic.artifacts.publication import AtomicDirectoryPublisher
+
+            self._publisher = AtomicDirectoryPublisher(
+                target, overwrite=overwrite, failure_hook=fail
+            )
+
+        def __enter__(self) -> Path:
+            return self._publisher.__enter__()
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            self._publisher.__exit__(exc_type, exc, traceback)
+
+        def commit(self) -> object:
+            return self._publisher.commit()
+
+    monkeypatch.setattr("paic.analytics.io.AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(RuntimeError, match="injected before commit"):
+        export_analytics(analytics_smoke_result, output, overwrite=True)
+    assert (output / "tables" / "metric_observations.parquet").read_bytes() == previous
+    assert validate_analytics_directory(output).valid
+    assert not list(tmp_path.glob(".analytics.staging-*"))
+    assert not list(tmp_path.glob(".analytics.backup-*"))
+
+
+def test_overwrite_success_and_post_visibility_failure_are_explicit(
+    tmp_path: Path,
+    analytics_smoke_result: AnalyticsBuildResult,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "analytics"
+    export_analytics(analytics_smoke_result, output)
+    export_analytics(analytics_smoke_result, output, overwrite=True)
+    assert validate_analytics_directory(output).valid
+    assert not list(tmp_path.glob(".analytics.staging-*"))
+    assert not list(tmp_path.glob(".analytics.backup-*"))
+
+    def fail_after_visibility(point: str) -> None:
+        if point == "new-committed":
+            raise RuntimeError("injected after visibility")
+
+    class PostVisibilityPublisher:
+        def __init__(self, target: Path, *, overwrite: bool) -> None:
+            from paic.artifacts.publication import AtomicDirectoryPublisher
+
+            self._publisher = AtomicDirectoryPublisher(
+                target, overwrite=overwrite, failure_hook=fail_after_visibility
+            )
+
+        def __enter__(self) -> Path:
+            return self._publisher.__enter__()
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            self._publisher.__exit__(exc_type, exc, traceback)
+
+        def commit(self) -> object:
+            return self._publisher.commit()
+
+    monkeypatch.setattr("paic.analytics.io.AtomicDirectoryPublisher", PostVisibilityPublisher)
+    with pytest.raises(AnalyticsIOError, match="committed but durability is uncertain"):
+        export_analytics(analytics_smoke_result, output, overwrite=True)
+    assert validate_analytics_directory(output).valid
+
+
+def test_overwrite_rejects_symlink_target(
+    tmp_path: Path, analytics_smoke_result: AnalyticsBuildResult
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "analytics"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(AnalyticsIOError, match="symbolic link"):
+        export_analytics(analytics_smoke_result, link, overwrite=True)

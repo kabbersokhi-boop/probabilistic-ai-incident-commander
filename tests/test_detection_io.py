@@ -79,7 +79,7 @@ def test_export_requires_explicit_overwrite_and_rejects_file_target(
 
     target = tmp_path / "target-file"
     target.write_text("x", encoding="utf-8")
-    with pytest.raises(DetectionIOError, match="output path is a file"):
+    with pytest.raises(DetectionIOError, match="artifact target must be a directory"):
         export_detection(detection_smoke_result, target, overwrite=True)
 
 

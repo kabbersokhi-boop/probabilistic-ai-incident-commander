@@ -485,7 +485,7 @@ def test_artifact_export_path_and_load_failures(tmp_path: Path) -> None:
         export_investigation(report, config, request, [event], output)
     file_target = tmp_path / "file"
     file_target.write_text("x", encoding="utf-8")
-    with pytest.raises(InvestigationArtifactError, match="output path is a file"):
+    with pytest.raises(InvestigationArtifactError, match="artifact target must be a directory"):
         export_investigation(report, config, request, [event], file_target, overwrite=True)
     with pytest.raises(InvestigationArtifactError, match="unsafe"):
         _safe_path(output, "../outside")

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest
 from paic.investigation.models import InvestigationReport, InvestigationRequest, TranscriptEvent
@@ -60,14 +60,23 @@ def export_investigation(
     *,
     overwrite: bool = False,
 ) -> InvestigationManifest:
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise InvestigationArtifactError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise InvestigationArtifactError(f"output path is a file: {root}")
-        shutil.rmtree(root)
-    root.mkdir(parents=True)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_investigation_to_root(report, config, request, transcript, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise InvestigationArtifactError(str(exc)) from exc
+
+
+def _export_investigation_to_root(
+    report: InvestigationReport,
+    config: InvestigationConfig,
+    request: InvestigationRequest,
+    transcript: list[TranscriptEvent],
+    root: Path,
+) -> InvestigationManifest:
     payloads: dict[str, str] = {
         "investigation.config.resolved.json": json.dumps(
             config.model_dump(mode="json"), indent=2, sort_keys=True

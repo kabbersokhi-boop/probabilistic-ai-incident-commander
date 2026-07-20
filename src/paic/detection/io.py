@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import platform
-import shutil
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -14,6 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.detection.config import DetectionConfig
 from paic.detection.engine import detection_quality_error_count
 from paic.detection.manifest import (
@@ -70,13 +70,17 @@ def export_detection(
     *,
     overwrite: bool = False,
 ) -> DetectionManifest:
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise DetectionIOError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise DetectionIOError(f"output path is a file: {root}")
-        shutil.rmtree(root)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_detection_to_root(result, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise DetectionIOError(str(exc)) from exc
+
+
+def _export_detection_to_root(result: DetectionBuildResult, root: Path) -> DetectionManifest:
     table_dir = root / "tables"
     table_dir.mkdir(parents=True, exist_ok=False)
     config_path = root / "detection.config.resolved.json"

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.evidence.io import load_evidence
 from paic.investigation.artifact import (
     InvestigationArtifactError,
@@ -327,6 +328,114 @@ def test_governed_tool_denial_can_recover_and_authoritatively_replay(
             config_path=config_path,
         )
         == report
+    )
+
+
+def test_investigation_publication_preserves_replayable_generation(
+    impact_smoke_dataset_dir: Path,
+    evidence_smoke_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ids = (
+        load_evidence(evidence_smoke_dir)
+        .tables["evidence_records"]
+        .get_column("evidence_record_id")
+        .head(2)
+        .to_list()
+    )
+    config = _config()
+    request = InvestigationRequest(
+        incident_id="checkout-address-validation-smoke",
+        question="What caused the incident?",
+        dataset_dir=str(impact_smoke_dataset_dir),
+        evidence_dir=str(evidence_smoke_dir),
+        audit_dir=str(tmp_path / "audit"),
+    )
+    report, transcript = Investigator(
+        config,
+        provider_factory=scripted_factory(
+            {"test/model": ScriptedProvider("test/model", _responses(ids))}
+        ),
+    ).run(request)
+    output = tmp_path / "investigation"
+    export_investigation(report, config, request, transcript, output)
+    previous = (output / "manifest.json").read_bytes()
+
+    def before_commit(point: str) -> None:
+        if point == "payload-written":
+            raise RuntimeError("before commit")
+
+    class BeforeCommitPublisher(AtomicDirectoryPublisher):
+        def __init__(self, target: str | Path, *, overwrite: bool = False) -> None:
+            super().__init__(target, overwrite=overwrite, failure_hook=before_commit)
+
+    monkeypatch.setattr(
+        "paic.investigation.artifact.AtomicDirectoryPublisher", BeforeCommitPublisher
+    )
+    with pytest.raises(RuntimeError, match="before commit"):
+        export_investigation(report, config, request, transcript, output, overwrite=True)
+    assert (output / "manifest.json").read_bytes() == previous
+    assert (
+        validate_investigation(
+            output, dataset_dir=impact_smoke_dataset_dir, evidence_dir=evidence_smoke_dir
+        )
+        == []
+    )
+    assert not list(tmp_path.glob(".investigation.staging-*"))
+    assert not list(tmp_path.glob(".investigation.backup-*"))
+
+    monkeypatch.setattr(
+        "paic.investigation.artifact.AtomicDirectoryPublisher", AtomicDirectoryPublisher
+    )
+    export_investigation(report, config, request, transcript, output, overwrite=True)
+    assert (
+        validate_investigation(
+            output, dataset_dir=impact_smoke_dataset_dir, evidence_dir=evidence_smoke_dir
+        )
+        == []
+    )
+    config_path = tmp_path / "config.json"
+    config_path.write_text(config.model_dump_json(), encoding="utf-8")
+    assert (
+        replay_investigation(
+            output,
+            dataset_dir=impact_smoke_dataset_dir,
+            evidence_dir=evidence_smoke_dir,
+            config_path=config_path,
+        )
+        == report
+    )
+
+    real = tmp_path / "real-investigation"
+    real.mkdir()
+    link = tmp_path / "investigation-link"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(InvestigationArtifactError, match="symbolic link"):
+        export_investigation(report, config, request, transcript, link, overwrite=True)
+    file_target = tmp_path / "investigation-file"
+    file_target.write_text("not a directory", encoding="utf-8")
+    with pytest.raises(InvestigationArtifactError, match="artifact target must be a directory"):
+        export_investigation(report, config, request, transcript, file_target, overwrite=True)
+
+    def after_visibility(point: str) -> None:
+        if point == "new-committed":
+            raise RuntimeError("after visibility")
+
+    class AfterVisibilityPublisher(AtomicDirectoryPublisher):
+        def __init__(self, target: str | Path, *, overwrite: bool = False) -> None:
+            super().__init__(target, overwrite=overwrite, failure_hook=after_visibility)
+
+    monkeypatch.setattr(
+        "paic.investigation.artifact.AtomicDirectoryPublisher", AfterVisibilityPublisher
+    )
+    with pytest.raises(InvestigationArtifactError, match="committed but durability is uncertain"):
+        export_investigation(report, config, request, transcript, output, overwrite=True)
+    assert (
+        validate_investigation(
+            output, dataset_dir=impact_smoke_dataset_dir, evidence_dir=evidence_smoke_dir
+        )
+        == []
     )
 
 

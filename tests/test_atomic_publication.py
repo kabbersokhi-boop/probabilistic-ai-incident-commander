@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
 import shutil
 import subprocess
@@ -10,6 +12,7 @@ from threading import Event, Thread
 
 import pytest
 
+from paic.artifacts import publication
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 
 
@@ -144,6 +147,124 @@ def test_exclusive_writer_lock_allows_only_one_writer(tmp_path: Path) -> None:
             second.__enter__()
         first.commit()
     assert not first.lock_path.exists()
+
+
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
+    "failure", [OSError("renameat2 unavailable"), OSError(errno.EXDEV, "cross-device")]
+)
+def test_atomic_exchange_unavailable_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: OSError
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    (target / "value.txt").write_text("old", encoding="utf-8")
+
+    def unavailable(_left: Path, _right: Path) -> None:
+        raise failure
+
+    monkeypatch.setattr(publication, "_rename_exchange", unavailable)
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    with pytest.raises(ArtifactPublicationError, match="not committed"), publisher as staging:
+        (staging / "value.txt").write_text("new", encoding="utf-8")
+        publisher.commit()
+    assert (target / "value.txt").read_text(encoding="utf-8") == "old"
+    assert not publisher.lock_path.exists()
+    assert not list(tmp_path.glob(".artifact.staging-*"))
+
+
+def test_stale_writer_lock_fails_closed_without_mutating_target(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    (target / "value.txt").write_text("old", encoding="utf-8")
+    lock = tmp_path / ".artifact.lock"
+    lock.write_text("999999\n", encoding="utf-8")
+    with pytest.raises(ArtifactPublicationError, match="already locked"):
+        AtomicDirectoryPublisher(target, overwrite=True).__enter__()
+    assert (target / "value.txt").read_text(encoding="utf-8") == "old"
+    assert lock.read_text(encoding="utf-8") == "999999\n"
+
+
+def test_rename_exchange_reports_unavailable_and_errno(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class NoExchange:
+        renameat2 = None
+
+    monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: NoExchange())
+    with pytest.raises(OSError, match="unavailable"):
+        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+
+    class FailingExchange:
+        argtypes: object = None
+        restype: object = None
+
+        def __call__(self, *_args: object) -> int:
+            return -1
+
+    class ErrnoExchange:
+        renameat2 = FailingExchange()
+
+    monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: ErrnoExchange())
+    monkeypatch.setattr(ctypes, "get_errno", lambda: errno.EXDEV)
+    with pytest.raises(OSError, match="cross-device"):
+        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+
+
+def test_parent_and_lock_safety_reject_symlink_and_nonregular_components(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    parent_link = tmp_path / "parent-link"
+    parent_link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(ArtifactPublicationError, match="parent traverses"):
+        AtomicDirectoryPublisher(parent_link / "artifact", overwrite=True).__enter__()
+    parent_file = tmp_path / "parent-file"
+    parent_file.write_text("not a directory", encoding="utf-8")
+    with pytest.raises(ArtifactPublicationError, match="non-directory component"):
+        AtomicDirectoryPublisher(parent_file / "artifact", overwrite=True).__enter__()
+    target = tmp_path / "target"
+    target.mkdir()
+    lock = tmp_path / ".target.lock"
+    lock.mkdir()
+    with pytest.raises(ArtifactPublicationError, match="lock is not a regular"):
+        AtomicDirectoryPublisher(target, overwrite=True).__enter__()
+
+
+def test_lock_acquisition_oserror_is_controlled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    monkeypatch.setattr(
+        os, "open", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied"))
+    )
+    with pytest.raises(ArtifactPublicationError, match="cannot acquire"):
+        AtomicDirectoryPublisher(target, overwrite=True).__enter__()
+
+
+def test_commit_without_entering_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ArtifactPublicationError, match="has not been entered"):
+        AtomicDirectoryPublisher(tmp_path / "artifact", overwrite=True).commit()
+
+
+def test_commit_failure_restores_backup_when_target_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    publisher = AtomicDirectoryPublisher(tmp_path / "artifact", overwrite=True)
+    staging = tmp_path / ".artifact.staging-manual"
+    staging.mkdir()
+    backup = tmp_path / ".artifact.backup-manual"
+    backup.mkdir()
+    (backup / "value.txt").write_text("old", encoding="utf-8")
+    publisher.staging = staging
+    publisher.backup = backup
+    monkeypatch.setattr(
+        publication,
+        "_fsync_payload_tree",
+        lambda _root: (_ for _ in ()).throw(OSError("before exchange")),
+    )
+    with pytest.raises(ArtifactPublicationError, match="not committed"):
+        publisher.commit()
+    assert (publisher.target / "value.txt").read_text(encoding="utf-8") == "old"
 
 
 def test_subprocess_termination_after_staging_preserves_old_generation(tmp_path: Path) -> None:

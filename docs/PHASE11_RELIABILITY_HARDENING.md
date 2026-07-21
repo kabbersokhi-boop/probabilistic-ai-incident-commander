@@ -23,6 +23,13 @@ with `renameat2(RENAME_EXCHANGE)`, so readers never observe a missing target.
 Platforms without that primitive fail closed rather than using an unsafe
 two-rename fallback.
 
+The exchange is the Linux `renameat2(2)` interface with
+`RENAME_EXCHANGE` (`flags=2`), and both names must be directories on the same
+filesystem. `ENOSYS`, `EINVAL`, `EXDEV`, and permission failures are surfaced as
+controlled, non-committing publication errors; the live generation is untouched.
+Initial publication without overwrite still uses ordinary `os.replace` and is
+portable. Crash-consistent overwrite is therefore explicitly Linux-only.
+
 If restoration fails, the complete backup is retained and its path is included in
 the controlled error. Cleanup never deletes the only remaining complete generation.
 

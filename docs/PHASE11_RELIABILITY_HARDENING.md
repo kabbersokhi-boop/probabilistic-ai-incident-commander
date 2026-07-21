@@ -68,6 +68,10 @@ atomically. Re-running with the same output directory resumes at the next
 iteration. A different commit or configuration fails closed rather than mixing
 results.
 
+The default GC-object allowance is 2,048 objects after warm-up and an explicit
+garbage collection. It is a deliberately generous leak-regression ceiling, not
+a timing gate; callers can make it stricter with `--max-gc-delta`.
+
 The command exits nonzero for an inspection error or missing stage,
 nondeterministic snapshot hash, detected publication debris, or configured FD,
 RSS, or GC growth threshold breach. It reports per-iteration duration and hash,

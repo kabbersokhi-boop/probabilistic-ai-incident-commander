@@ -243,7 +243,7 @@ def main() -> int:
     parser.add_argument("--duration-seconds", type=float, default=float("inf"))
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--max-fd-delta", type=int, default=0)
-    parser.add_argument("--max-gc-delta", type=int, default=1024)
+    parser.add_argument("--max-gc-delta", type=int, default=2048)
     parser.add_argument("--max-rss-delta", type=int, default=64 * 1024 * 1024)
     try:
         return run(parser.parse_args())

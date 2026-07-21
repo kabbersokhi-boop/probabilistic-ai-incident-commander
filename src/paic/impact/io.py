@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import platform
-import shutil
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -14,6 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.impact.config import ImpactConfig
 from paic.impact.engine import impact_quality_error_count
 from paic.impact.manifest import (
@@ -65,13 +65,17 @@ def _timestamp_bounds(
 def export_impact(
     result: ImpactBuildResult, output_dir: str | Path, *, overwrite: bool = False
 ) -> ImpactManifest:
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise ImpactIOError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise ImpactIOError(f"output path is a file: {root}")
-        shutil.rmtree(root)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_impact_to_root(result, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise ImpactIOError(str(exc)) from exc
+
+
+def _export_impact_to_root(result: ImpactBuildResult, root: Path) -> ImpactManifest:
     table_dir = root / "tables"
     table_dir.mkdir(parents=True, exist_ok=False)
     config_path = root / "impact.config.resolved.json"

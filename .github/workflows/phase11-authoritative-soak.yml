@@ -1,0 +1,50 @@
+name: Phase 11 authoritative soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: Full authoritative inspection iterations
+        required: false
+        default: "25"
+      duration_seconds:
+        description: Maximum soak duration in seconds
+        required: false
+        default: "1800"
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-authoritative-soak-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'phase11-authoritative-soak')
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: make tui-smoke
+      - run: make phase11-authoritative-soak PHASE11_SOAK_ITERATIONS=${{ inputs.iterations || '25' }} PHASE11_SOAK_DURATION_SECONDS=${{ inputs.duration_seconds || '1800' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase11-authoritative-soak-py${{ matrix.python }}
+          path: .artifacts/phase11-authoritative-soak

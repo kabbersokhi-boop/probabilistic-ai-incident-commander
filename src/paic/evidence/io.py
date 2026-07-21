@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import platform
-import shutil
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -14,6 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import evidence_quality_error_count
 from paic.evidence.manifest import (
@@ -72,13 +72,17 @@ def export_evidence(
     *,
     overwrite: bool = False,
 ) -> EvidenceManifest:
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise EvidenceIOError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise EvidenceIOError(f"output path is a file: {root}")
-        shutil.rmtree(root)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_evidence_to_root(result, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise EvidenceIOError(str(exc)) from exc
+
+
+def _export_evidence_to_root(result: EvidenceBuildResult, root: Path) -> EvidenceManifest:
     table_dir = root / "tables"
     table_dir.mkdir(parents=True, exist_ok=False)
     config_path = root / "evidence.config.resolved.json"

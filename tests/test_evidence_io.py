@@ -147,7 +147,7 @@ def test_export_overwrite_and_load_failures(
     try:
         export_evidence(evidence_smoke_result, file_target, overwrite=True)
     except EvidenceIOError as exc:
-        assert "output path is a file" in str(exc)
+        assert "artifact target must be a directory" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("file targets must be rejected")
 

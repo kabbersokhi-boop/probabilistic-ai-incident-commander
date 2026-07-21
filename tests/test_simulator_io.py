@@ -51,7 +51,7 @@ def test_export_requires_explicit_overwrite(tmp_path: Path, smoke_result: Simula
 
     file_path = tmp_path / "not-a-directory"
     file_path.write_text("x", encoding="utf-8")
-    with pytest.raises(DatasetIOError, match="output path is a file"):
+    with pytest.raises(DatasetIOError, match="artifact target must be a directory"):
         export_dataset(smoke_result, file_path, overwrite=True)
 
 
@@ -172,3 +172,93 @@ def test_directory_validation_detects_manifest_config_identity_drift(
     assert "manifest.simulation_id" in codes
     assert "manifest.seed" in codes
     assert "manifest.logical_end" in codes
+
+
+def test_overwrite_failure_preserves_generation_and_cleans_publication_debris(
+    tmp_path: Path,
+    smoke_result: SimulationResult,
+    rich_result: SimulationResult,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "dataset"
+    export_dataset(smoke_result, output)
+    previous = (output / "tables" / "customers.parquet").read_bytes()
+
+    class FailingPublisher:
+        def __init__(self, target: Path, *, overwrite: bool) -> None:
+            from paic.artifacts.publication import AtomicDirectoryPublisher
+
+            self._publisher = AtomicDirectoryPublisher(
+                target, overwrite=overwrite, failure_hook=lambda point: _fail(point)
+            )
+
+        def __enter__(self) -> Path:
+            return self._publisher.__enter__()
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            self._publisher.__exit__(exc_type, exc, traceback)
+
+        def commit(self) -> object:
+            return self._publisher.commit()
+
+    def _fail(point: str) -> None:
+        if point == "payload-written":
+            raise RuntimeError("injected before commit")
+
+    monkeypatch.setattr("paic.simulator.io.AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(RuntimeError, match="injected before commit"):
+        export_dataset(rich_result, output, overwrite=True)
+    assert (output / "tables" / "customers.parquet").read_bytes() == previous
+    assert validate_dataset_directory(output).valid
+    assert not list(tmp_path.glob(".dataset.staging-*"))
+    assert not list(tmp_path.glob(".dataset.backup-*"))
+
+
+def test_overwrite_success_and_post_visibility_failure_are_explicit(
+    tmp_path: Path,
+    smoke_result: SimulationResult,
+    rich_result: SimulationResult,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "dataset"
+    export_dataset(smoke_result, output)
+
+    export_dataset(rich_result, output, overwrite=True)
+    assert validate_dataset_directory(output).valid
+    assert not list(tmp_path.glob(".dataset.staging-*"))
+    assert not list(tmp_path.glob(".dataset.backup-*"))
+
+    def _fail_after_visibility(point: str) -> None:
+        if point == "new-committed":
+            raise RuntimeError("injected after visibility")
+
+    class PostVisibilityPublisher:
+        def __init__(self, target: Path, *, overwrite: bool) -> None:
+            from paic.artifacts.publication import AtomicDirectoryPublisher
+
+            self._publisher = AtomicDirectoryPublisher(
+                target, overwrite=overwrite, failure_hook=_fail_after_visibility
+            )
+
+        def __enter__(self) -> Path:
+            return self._publisher.__enter__()
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            self._publisher.__exit__(exc_type, exc, traceback)
+
+        def commit(self) -> object:
+            return self._publisher.commit()
+
+    monkeypatch.setattr("paic.simulator.io.AtomicDirectoryPublisher", PostVisibilityPublisher)
+    with pytest.raises(DatasetIOError, match="committed but durability is uncertain"):
+        export_dataset(smoke_result, output, overwrite=True)
+    assert validate_dataset_directory(output).valid
+
+
+def test_overwrite_rejects_symlink_target(tmp_path: Path, smoke_result: SimulationResult) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "dataset"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(DatasetIOError, match="symbolic link"):
+        export_dataset(smoke_result, link, overwrite=True)

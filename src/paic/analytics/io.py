@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
-import shutil
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -26,6 +25,7 @@ from paic.analytics.quality import quality_error_count
 from paic.analytics.registry import metric_catalog
 from paic.analytics.schema import ANALYTICS_TABLE_ORDER, ANALYTICS_TABLE_SPECS
 from paic.analytics.types import AnalyticsBuildResult, AnalyticsFrameMap, LoadedAnalytics
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.io import file_sha256
 
 
@@ -80,15 +80,19 @@ def export_analytics(
     *,
     overwrite: bool = False,
 ) -> AnalyticsManifest:
-    """Write analytical tables, resolved inputs, a manifest, and success marker."""
+    """Publish complete analytics without deleting the previous valid generation first."""
 
-    root = Path(output_dir)
-    if root.exists():
-        if not overwrite:
-            raise AnalyticsIOError(f"output directory already exists: {root}")
-        if root.is_file():
-            raise AnalyticsIOError(f"output path is a file: {root}")
-        shutil.rmtree(root)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+    try:
+        with publisher as staging:
+            manifest = _export_analytics_to_root(result, staging)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise AnalyticsIOError(str(exc)) from exc
+
+
+def _export_analytics_to_root(result: AnalyticsBuildResult, root: Path) -> AnalyticsManifest:
     table_dir = root / "tables"
     table_dir.mkdir(parents=True, exist_ok=False)
 

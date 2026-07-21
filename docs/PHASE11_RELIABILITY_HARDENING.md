@@ -45,3 +45,36 @@ This helper endurance measurement is distinct from full `inspect_workspace` endu
 the latter revalidates and replays every authoritative source and is reported
 separately when a certification run exercises it. Static helper timing must not be
 presented as a substitute for real workspace inspection.
+
+## Resumable authoritative soak
+
+The long-running certification command is deliberately manual rather than a
+normal pull-request gate. First prepare the smoke artifacts, then run:
+
+```bash
+make tui-smoke
+make phase11-authoritative-soak \
+  PHASE11_SOAK_ITERATIONS=25 \
+  PHASE11_SOAK_DURATION_SECONDS=1800 \
+  PHASE11_SOAK_DIR=.artifacts/phase11-authoritative-soak
+```
+
+`scripts/phase11_authoritative_soak.py` runs full `inspect_workspace` calls,
+including its authoritative validation and replay paths. It atomically records
+source commit, raw workspace-file hash, resolved-configuration hash, resource
+baselines, and a machine-readable summary. Each completed iteration is appended
+and fsynced to `iterations.jsonl`; metadata and `summary.json` are replaced
+atomically. Re-running with the same output directory resumes at the next
+iteration. A different commit or configuration fails closed rather than mixing
+results.
+
+The command exits nonzero for an inspection error or missing stage,
+nondeterministic snapshot hash, detected publication debris, or configured FD,
+RSS, or GC growth threshold breach. It reports per-iteration duration and hash,
+status counts, FD/RSS/tracemalloc/GC deltas, and publication
+staging/backup/PID-lock debris. Persistent artifact-level control locks are
+reported separately as diagnostic context and do not count as transactional
+debris.
+The `phase11-authoritative-soak.yml` workflow is `workflow_dispatch` only and
+runs this command separately on Python 3.11 and 3.12 with uploaded results; it
+uses no credentials or external providers.

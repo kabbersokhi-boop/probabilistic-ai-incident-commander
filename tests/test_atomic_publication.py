@@ -14,6 +14,9 @@ import pytest
 
 from paic.artifacts import publication
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
+from paic.simulator.io import export_dataset
+from paic.simulator.types import SimulationResult
+from paic.simulator.validation import validate_dataset_directory
 
 
 def test_atomic_publication_replaces_complete_generation(tmp_path: Path) -> None:
@@ -327,6 +330,67 @@ def test_concurrent_readers_see_only_complete_generations(tmp_path: Path) -> Non
         thread.join(timeout=5)
     assert inspections == 30
     assert observations == []
+
+
+def test_high_frequency_dataset_validator_reads_see_complete_generations(
+    tmp_path: Path,
+    smoke_result: SimulationResult,
+    rich_result: SimulationResult,
+) -> None:
+    """Exercise the real dataset loader/validator while 100 generations publish."""
+    old_generation = tmp_path / "old-generation"
+    new_generation = tmp_path / "new-generation"
+    target = tmp_path / "dataset"
+    export_dataset(smoke_result, old_generation)
+    export_dataset(rich_result, new_generation)
+    shutil.copytree(old_generation, target)
+
+    generation_ready = Event()
+    generation_checked = Event()
+    successful_reads = 0
+    observations: list[str] = []
+
+    def reader() -> None:
+        nonlocal successful_reads
+        for _ in range(100):
+            assert generation_ready.wait(timeout=30)
+            generation_ready.clear()
+            try:
+                for _ in range(10):
+                    report = validate_dataset_directory(target)
+                    if not report.valid:
+                        observations.append("invalid")
+                        return
+                    successful_reads += 1
+            except Exception as exc:  # The assertion below retains controlled diagnostics.
+                observations.append(type(exc).__name__)
+                return
+            finally:
+                generation_checked.set()
+
+    thread = Thread(target=reader)
+    thread.start()
+    try:
+        for index in range(100):
+            source = new_generation if index % 2 else old_generation
+            publisher = AtomicDirectoryPublisher(target, overwrite=True)
+            with publisher as staging:
+                shutil.copytree(source, staging, dirs_exist_ok=True)
+                publisher.commit()
+            generation_checked.clear()
+            generation_ready.set()
+            assert generation_checked.wait(timeout=30)
+    finally:
+        generation_ready.set()
+        thread.join(timeout=120)
+
+    assert not thread.is_alive()
+    assert observations == []
+    assert successful_reads >= 1000
+    assert validate_dataset_directory(target).valid
+    assert not list(tmp_path.glob(".dataset.staging-*"))
+    assert not list(tmp_path.glob(".dataset.backup-*"))
+    assert not list(tmp_path.glob(".dataset.lock"))
 
 
 @pytest.mark.parametrize(  # type: ignore[untyped-decorator]

@@ -137,6 +137,10 @@ jobs:
             --evidence-dir .artifacts/evidence-smoke
           python -m paic investigate replay \
             --investigation-dir .artifacts/investigation-smoke \
+            --config configs/investigation/smoke.yaml \
+            --dataset-dir .artifacts/impact-source-smoke \
+            --impact-dir .artifacts/impact-smoke \
+            --evidence-dir .artifacts/evidence-smoke \
             > .artifacts/investigation-replay.json
           python -m paic tools audit validate \
             --audit-dir .artifacts/investigation-tool-audit
@@ -284,6 +288,10 @@ jobs:
             --evidence-dir .artifacts/evidence-standard
           python -m paic investigate replay \
             --investigation-dir .artifacts/investigation-standard \
+            --config configs/investigation/standard.yaml \
+            --dataset-dir .artifacts/impact-source-standard \
+            --impact-dir .artifacts/impact-standard \
+            --evidence-dir .artifacts/evidence-standard \
             > .artifacts/investigation-standard-replay.json
       - name: Build package
         if: matrix.python-version == '3.11'

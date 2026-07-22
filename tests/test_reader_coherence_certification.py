@@ -210,6 +210,7 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
                     readers, markers
                 )
                 progress.append((cycle, aggregate_count()))
+        publication_finished = time.time()
 
         read_deadline = time.monotonic() + 120
         while aggregate_count() < 1000 and time.monotonic() < read_deadline:
@@ -223,7 +224,6 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
             "readers": _diagnostics(readers, markers),
         }
 
-        publication_finished = time.time()
         for _, _, stop in markers:
             stop.write_text("stop", encoding="utf-8")
         completed: list[dict[str, Any]] = []
@@ -237,6 +237,7 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
                 "result": payload,
             }
             completed.append(payload)
+        certification_finished = time.time()
 
         assert sum(item["count"] for item in completed) >= 1000
         assert all(item["count"] > 0 for item in completed)
@@ -244,7 +245,8 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
         assert all(set(item["identities"]).issubset(expected_identities) for item in completed)
         assert all(item["first_success"] <= publication_started for item in completed)
         assert all(item["last_success"] >= publication_started for item in completed)
-        assert all(item["last_success"] <= publication_finished for item in completed)
+        assert all(item["last_success"] <= certification_finished for item in completed)
+        assert publication_started < publication_finished <= certification_finished
 
         counts = [count for _, count in progress]
         assert progress[-1][1] > progress[0][1], progress

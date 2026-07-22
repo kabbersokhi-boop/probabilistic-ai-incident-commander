@@ -8,6 +8,7 @@ from pathlib import Path
 
 import polars as pl
 
+from paic.artifacts.lease import artifact_reader
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import (
     EvidenceBuildError,
@@ -173,6 +174,7 @@ def file_sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+@artifact_reader
 def validate_evidence_directory(
     evidence_dir: str | Path,
     *,

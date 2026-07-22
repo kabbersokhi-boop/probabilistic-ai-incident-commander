@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import json
 import os
 import shutil
 import subprocess
@@ -391,6 +392,105 @@ def test_high_frequency_dataset_validator_reads_see_complete_generations(
     assert not list(tmp_path.glob(".dataset.staging-*"))
     assert not list(tmp_path.glob(".dataset.backup-*"))
     assert not list(tmp_path.glob(".dataset.lock"))
+
+
+def test_cross_process_validator_progress_overlaps_publication(
+    tmp_path: Path,
+    smoke_result: SimulationResult,
+    rich_result: SimulationResult,
+) -> None:
+    """Readers continuously validate while alternating generations are exchanged."""
+    old_generation = tmp_path / "old-generation"
+    new_generation = tmp_path / "new-generation"
+    target = tmp_path / "dataset"
+    export_dataset(smoke_result, old_generation)
+    export_dataset(rich_result, new_generation)
+    shutil.copytree(old_generation, target)
+    reader_code = """
+import json, sys, time
+from pathlib import Path
+from paic.simulator.validation import validate_dataset_directory
+target, ready, stop, result = map(Path, sys.argv[1:])
+count = 0
+errors = []
+ready.write_text('ready', encoding='utf-8')
+while not stop.exists() or count < 1000:
+    try:
+        report = validate_dataset_directory(target)
+        if not report.valid:
+            errors.append('invalid')
+            break
+        count += 1
+        if count % 10 == 0:
+            result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-8')
+    except Exception as exc:
+        errors.append(type(exc).__name__)
+        break
+result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-8')
+"""
+    readers: list[subprocess.Popen[str]] = []
+    markers: list[tuple[Path, Path, Path]] = []
+    try:
+        for index in range(2):
+            ready = tmp_path / f"reader-{index}.ready"
+            result = tmp_path / f"reader-{index}.json"
+            stop = tmp_path / f"reader-{index}.stop"
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    reader_code,
+                    str(target),
+                    str(ready),
+                    str(stop),
+                    str(result),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            readers.append(process)
+            markers.append((ready, result, stop))
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not all(item[0].exists() for item in markers):
+            time.sleep(0.01)
+        assert all(item[0].exists() for item in markers), "reader startup timed out"
+        progress: list[int] = []
+        for cycle in range(1, 101):
+            source = new_generation if cycle % 2 else old_generation
+            publisher = AtomicDirectoryPublisher(target, overwrite=True)
+            with publisher as staging:
+                shutil.copytree(source, staging, dirs_exist_ok=True)
+                publisher.commit()
+            if cycle in {1, 25, 50, 75, 100}:
+                progress.append(
+                    sum(
+                        json.loads(item[1].read_text(encoding="utf-8"))["count"]
+                        for item in markers
+                        if item[1].exists()
+                    )
+                )
+        for _, _, stop in markers:
+            stop.write_text("stop", encoding="utf-8")
+        for process in readers:
+            process.wait(timeout=120)
+        results = [json.loads(result.read_text(encoding="utf-8")) for _, result, _ in markers]
+        assert all(item["errors"] == [] for item in results), results
+        assert sum(item["count"] for item in results) >= 1000
+        assert progress[-1] > progress[0]
+        assert progress[2] > progress[1]
+        assert validate_dataset_directory(target).valid
+        assert (tmp_path / ".dataset.lease").is_file()
+        assert not list(tmp_path.glob(".dataset.staging-*"))
+        assert not list(tmp_path.glob(".dataset.backup-*"))
+        assert not (tmp_path / ".dataset.lock").exists()
+    finally:
+        for _, _, stop in markers:
+            stop.touch()
+        for process in readers:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
 
 
 @pytest.mark.parametrize(  # type: ignore[untyped-decorator]

@@ -254,6 +254,7 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
     return LoadedRecovery(manifest, config, observations, report)
 
 
+@artifact_reader
 def validate_recovery(
     path: str | Path,
     *,

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import polars as pl
 
+from paic.artifacts.lease import artifact_reader
 from paic.impact.config import ImpactConfig
 from paic.impact.engine import ImpactBuildError, build_impact
 from paic.impact.io import ImpactIOError, load_impact
@@ -29,6 +30,7 @@ class ImpactValidationReport:
     summary: dict[str, object]
 
 
+@artifact_reader
 def validate_impact_directory(
     impact_dir: str | Path, *, dataset_dir: str | Path | None = None
 ) -> ImpactValidationReport:

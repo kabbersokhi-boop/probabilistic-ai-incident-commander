@@ -265,6 +265,7 @@ def _transcript_semantic_issues(loaded: LoadedInvestigation) -> list[str]:
     return issues
 
 
+@artifact_reader
 def validate_investigation(
     path: str | Path,
     *,

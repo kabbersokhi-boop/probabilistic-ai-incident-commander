@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - unsupported non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 import os
 import stat
 from collections.abc import Callable, Iterator, Sequence
@@ -35,6 +39,9 @@ def artifact_lease(root: str | Path, *, exclusive: bool) -> Iterator[None]:
     path = _lease_path(target)
     flags = os.O_RDWR | os.O_CREAT
     flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if fcntl is None:
+        raise ArtifactLeaseError("artifact leases require POSIX flock support")
+    fd: int | None = None
     try:
         if path.is_symlink() or (path.exists() and not path.is_file()):
             raise ArtifactLeaseError("artifact coordination file must be regular")
@@ -44,8 +51,12 @@ def artifact_lease(root: str | Path, *, exclusive: bool) -> Iterator[None]:
             raise ArtifactLeaseError("artifact coordination file must be regular")
         fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
     except ArtifactLeaseError:
+        if fd is not None:
+            os.close(fd)
         raise
     except OSError as exc:
+        if fd is not None:
+            os.close(fd)
         raise ArtifactLeaseError(f"cannot acquire artifact lease: {exc}") from exc
     try:
         yield

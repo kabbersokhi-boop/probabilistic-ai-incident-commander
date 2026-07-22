@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+from itertools import pairwise
 from pathlib import Path
 from threading import Event, Thread
 
@@ -407,26 +408,47 @@ def test_cross_process_validator_progress_overlaps_publication(
     export_dataset(rich_result, new_generation)
     shutil.copytree(old_generation, target)
     reader_code = """
-import json, sys, time
+import json, os, sys, time, traceback
 from pathlib import Path
 from paic.simulator.validation import validate_dataset_directory
 target, ready, stop, result = map(Path, sys.argv[1:])
 count = 0
 errors = []
-ready.write_text('ready', encoding='utf-8')
-while not stop.exists() or count < 1000:
-    try:
-        report = validate_dataset_directory(target)
-        if not report.valid:
-            errors.append('invalid')
+first_success = None
+def record():
+    temporary = result.with_name(result.name + '.tmp')
+    temporary.write_text(json.dumps({'count': count, 'errors': errors,
+        'first_success': first_success, 'last_success': time.time()}, sort_keys=True), encoding='utf-8')
+    with temporary.open('rb') as handle:
+        os.fsync(handle.fileno())
+    os.replace(temporary, result)
+try:
+    initial = validate_dataset_directory(target)
+    if not initial.valid:
+        errors.append({'code': 'initial_invalid', 'issues': [i.code for i in initial.issues]})
+        record()
+        raise SystemExit(2)
+    count = 1
+    first_success = time.time()
+    record()
+    ready.write_text('ready', encoding='utf-8')
+    while not stop.exists():
+        try:
+            report = validate_dataset_directory(target)
+            if not report.valid:
+                errors.append({'code': 'invalid', 'issues': [i.code for i in report.issues]})
+                break
+            count += 1
+            if count % 10 == 0:
+                record()
+        except Exception as exc:
+            errors.append({'code': 'exception', 'type': type(exc).__name__, 'message': str(exc),
+                           'traceback': traceback.format_exc()})
             break
-        count += 1
-        if count % 10 == 0:
-            result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-8')
-    except Exception as exc:
-        errors.append(type(exc).__name__)
-        break
-result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-8')
+except Exception as exc:
+    errors.append({'code': 'exception', 'type': type(exc).__name__, 'message': str(exc),
+                   'traceback': traceback.format_exc()})
+record()
 """
     readers: list[subprocess.Popen[str]] = []
     markers: list[tuple[Path, Path, Path]] = []
@@ -454,8 +476,31 @@ result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline and not all(item[0].exists() for item in markers):
             time.sleep(0.01)
-        assert all(item[0].exists() for item in markers), "reader startup timed out"
-        progress: list[int] = []
+        if not all(item[0].exists() for item in markers):
+            diagnostics = []
+            for process, (ready, result, _) in zip(readers, markers, strict=True):
+                if process.poll() is None:
+                    process.kill()
+                stdout, stderr = process.communicate(timeout=5)
+                diagnostics.append(
+                    {
+                        "ready": ready.exists(),
+                        "result": result.read_text(encoding="utf-8") if result.exists() else None,
+                        "returncode": process.returncode,
+                        "stdout": stdout,
+                        "stderr": stderr,
+                    }
+                )
+            raise AssertionError(f"reader startup timed out: {diagnostics}")
+
+        def read_count(path: Path) -> int:
+            try:
+                return int(json.loads(path.read_text(encoding="utf-8"))["count"])
+            except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+                return 0
+
+        progress: list[int] = [sum(read_count(item[1]) for item in markers)]
+        checkpoints: list[tuple[int, int]] = []
         for cycle in range(1, 101):
             source = new_generation if cycle % 2 else old_generation
             publisher = AtomicDirectoryPublisher(target, overwrite=True)
@@ -463,13 +508,14 @@ result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-
                 shutil.copytree(source, staging, dirs_exist_ok=True)
                 publisher.commit()
             if cycle in {1, 25, 50, 75, 100}:
-                progress.append(
-                    sum(
-                        json.loads(item[1].read_text(encoding="utf-8"))["count"]
-                        for item in markers
-                        if item[1].exists()
-                    )
-                )
+                value = sum(read_count(item[1]) for item in markers)
+                progress.append(value)
+                checkpoints.append((cycle, value))
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and sum(read_count(item[1]) for item in markers) < 1000:
+            if any(process.poll() is not None for process in readers):
+                break
+            time.sleep(0.05)
         for _, _, stop in markers:
             stop.write_text("stop", encoding="utf-8")
         for process in readers:
@@ -477,8 +523,8 @@ result.write_text(json.dumps({'count': count, 'errors': errors}), encoding='utf-
         results = [json.loads(result.read_text(encoding="utf-8")) for _, result, _ in markers]
         assert all(item["errors"] == [] for item in results), results
         assert sum(item["count"] for item in results) >= 1000
-        assert progress[-1] > progress[0]
-        assert progress[2] > progress[1]
+        assert progress[-1] > progress[0], checkpoints
+        assert sum(after > before for before, after in pairwise(progress)) >= 2, checkpoints
         assert validate_dataset_directory(target).valid
         assert (tmp_path / ".dataset.lease").is_file()
         assert not list(tmp_path.glob(".dataset.staging-*"))

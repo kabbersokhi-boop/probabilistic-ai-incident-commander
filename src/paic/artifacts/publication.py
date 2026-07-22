@@ -170,9 +170,11 @@ class AtomicDirectoryPublisher:
     def commit(self) -> PublicationResult:
         if self.staging is None:
             raise ArtifactPublicationError("publisher has not been entered")
+        lease_entered = False
         try:
             self._lease = artifact_lease(self.target, exclusive=True)
             self._lease.__enter__()
+            lease_entered = True
             _fsync_payload_tree(self.staging)
             self._point("payload-written")
             if self.target.exists():
@@ -205,7 +207,7 @@ class AtomicDirectoryPublisher:
             state = "committed but durability is uncertain" if self.committed else "not committed"
             raise ArtifactPublicationError(f"artifact publication failed ({state}): {exc}") from exc
         finally:
-            if self._lease is not None:
+            if self._lease is not None and lease_entered:
                 self._lease.__exit__(None, None, None)
                 self._lease = None
         return PublicationResult(self.target, True, self.durability_confirmed)

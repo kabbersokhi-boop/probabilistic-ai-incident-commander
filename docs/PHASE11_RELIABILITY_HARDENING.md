@@ -30,6 +30,15 @@ controlled, non-committing publication errors; the live generation is untouched.
 Initial publication without overwrite still uses ordinary `os.replace` and is
 portable. Crash-consistent overwrite is therefore explicitly Linux-only.
 
+Readers and publishers also coordinate through a persistent per-artifact
+`.lease` inode. POSIX/Linux `flock` shared leases cover each public loader's
+complete manifest-and-payload read; publishers take the exclusive lease from
+durability checks through exchange, backup cleanup, and final parent sync. The
+inode is never unlinked or recreated during normal operation. Kernel leases are
+released automatically when a process exits. Symlinked and non-regular lease
+paths fail closed. Multi-root callers must acquire leases in canonical absolute
+path order when they need a cross-artifact snapshot.
+
 If restoration fails, the complete backup is retained and its path is included in
 the controlled error. Cleanup never deletes the only remaining complete generation.
 

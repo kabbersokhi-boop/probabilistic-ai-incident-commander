@@ -13,6 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.lease import artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.config import SimulationConfig
 from paic.simulator.manifest import (
@@ -181,6 +182,7 @@ def _safe_dataset_path(root: Path, relative_path: str) -> Path:
     return candidate
 
 
+@artifact_reader
 def load_dataset(dataset_dir: str | Path) -> tuple[DatasetManifest, FrameMap]:
     root = Path(dataset_dir)
     manifest = load_manifest(root)

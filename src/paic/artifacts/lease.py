@@ -25,7 +25,7 @@ T = TypeVar("T")
 
 
 def _canonical_root(root: str | Path) -> Path:
-    """Normalize lexical aliases without following artifact symlinks."""
+    """Normalize lexical aliases without resolving artifact symlinks."""
 
     return Path(os.path.abspath(os.fspath(root)))
 

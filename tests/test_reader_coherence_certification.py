@@ -147,8 +147,12 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
     shutil.copytree(first_generation, target)
 
     expected_identities = {
-        json.loads((first_generation / "manifest.json").read_text(encoding="utf-8"))["config_sha256"],
-        json.loads((second_generation / "manifest.json").read_text(encoding="utf-8"))["config_sha256"],
+        json.loads(
+            (first_generation / "manifest.json").read_text(encoding="utf-8")
+        )["config_sha256"],
+        json.loads(
+            (second_generation / "manifest.json").read_text(encoding="utf-8")
+        )["config_sha256"],
     }
     assert len(expected_identities) == 2
 
@@ -183,9 +187,13 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
             if all(ready.exists() for ready, _, _ in markers):
                 break
             if any(process.poll() is not None for process in readers):
-                raise AssertionError(f"reader exited during startup: {_diagnostics(readers, markers)}")
+                raise AssertionError(
+                    f"reader exited during startup: {_diagnostics(readers, markers)}"
+                )
             time.sleep(0.02)
-        assert all(ready.exists() for ready, _, _ in markers), _diagnostics(readers, markers)
+        assert all(ready.exists() for ready, _, _ in markers), _diagnostics(
+            readers, markers
+        )
 
         def aggregate_count() -> int:
             return sum(_read_result(result)["count"] for _, result, _ in markers)
@@ -208,7 +216,9 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
         read_deadline = time.monotonic() + 120
         while aggregate_count() < 1000 and time.monotonic() < read_deadline:
             if any(process.poll() is not None for process in readers):
-                raise AssertionError(f"reader exited before target: {_diagnostics(readers, markers)}")
+                raise AssertionError(
+                    f"reader exited before target: {_diagnostics(readers, markers)}"
+                )
             time.sleep(0.05)
         assert aggregate_count() >= 1000, {
             "progress": progress,
@@ -233,7 +243,9 @@ def test_continuous_cross_process_validation_certifies_reader_coherence(
         assert sum(item["count"] for item in completed) >= 1000
         assert all(item["count"] > 0 for item in completed)
         assert all(item["errors"] == [] for item in completed), completed
-        assert all(set(item["identities"]).issubset(expected_identities) for item in completed)
+        assert all(
+            set(item["identities"]).issubset(expected_identities) for item in completed
+        )
         assert all(item["first_success"] <= publication_started for item in completed)
         assert all(item["last_success"] >= publication_started for item in completed)
         assert all(item["last_success"] <= publication_finished for item in completed)

@@ -75,7 +75,9 @@ def test_killed_reader_releases_lease_for_writer(tmp_path: Path) -> None:
     assert (tmp_path / ".artifact.lease").is_file()
 
 
-@pytest.mark.parametrize("kind", ["symlink", "directory", "fifo"])  # type: ignore[untyped-decorator]
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
+    "kind", ["symlink", "directory", "fifo"]
+)
 def test_lease_rejects_unsafe_coordination_inode(tmp_path: Path, kind: str) -> None:
     target = tmp_path / "artifact"
     target.mkdir()
@@ -95,7 +97,9 @@ def test_lease_rejects_unsafe_coordination_inode(tmp_path: Path, kind: str) -> N
         pass
 
 
-@pytest.mark.parametrize("failure", ["fstat", "regular", "flock"])  # type: ignore[untyped-decorator]
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
+    "failure", ["fstat", "regular", "flock"]
+)
 def test_lease_closes_descriptor_on_acquisition_failure(
     tmp_path: Path, failure: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -112,10 +116,16 @@ def test_lease_closes_descriptor_on_acquisition_failure(
 
         monkeypatch.setattr(os, "fstat", fail_fstat)
     elif failure == "regular":
-        monkeypatch.setattr(os, "fstat", lambda fd: type("Info", (), {"st_mode": stat.S_IFIFO})())
+        monkeypatch.setattr(
+            os,
+            "fstat",
+            lambda fd: type("Info", (), {"st_mode": stat.S_IFIFO})(),
+        )
     else:
         monkeypatch.setattr(
-            os, "fstat", lambda fd: os.stat_result((stat.S_IFREG, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+            os,
+            "fstat",
+            lambda fd: os.stat_result((stat.S_IFREG, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
         )
         monkeypatch.setattr(
             "paic.artifacts.lease.fcntl.flock",
@@ -162,7 +172,9 @@ def test_shared_readers_hold_lease_concurrently(tmp_path: Path) -> None:
             acquired[index].set()
             release.wait(5)
 
-    processes = [multiprocessing.Process(target=reader, args=(index,)) for index in range(2)]
+    processes = [
+        multiprocessing.Process(target=reader, args=(index,)) for index in range(2)
+    ]
     for process in processes:
         process.start()
     assert acquired[0].wait(5)

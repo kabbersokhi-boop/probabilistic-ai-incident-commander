@@ -186,6 +186,8 @@ def test_multi_root_lease_deduplicates_equivalent_paths(
         yield
 
     monkeypatch.setattr("paic.artifacts.lease.artifact_lease", spy)
-    with artifact_reader_leases([target, target.absolute(), Path(".") / target, target]):
+    lexical_alias = target.parent / "unused" / ".." / target.name
+    with artifact_reader_leases([target, target.absolute(), lexical_alias, target]):
         pass
     assert len(calls) == 1
+    assert calls[0] == target.absolute()

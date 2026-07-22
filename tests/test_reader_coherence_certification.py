@@ -14,7 +14,6 @@ from paic.simulator.io import export_dataset
 from paic.simulator.types import SimulationResult
 from paic.simulator.validation import validate_dataset_directory
 
-
 _READER_CODE = r"""
 import json
 import os

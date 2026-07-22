@@ -172,9 +172,7 @@ def test_shared_readers_hold_lease_concurrently(tmp_path: Path) -> None:
             acquired[index].set()
             release.wait(5)
 
-    processes = [
-        multiprocessing.Process(target=reader, args=(index,)) for index in range(2)
-    ]
+    processes = [multiprocessing.Process(target=reader, args=(index,)) for index in range(2)]
     for process in processes:
         process.start()
     assert acquired[0].wait(5)

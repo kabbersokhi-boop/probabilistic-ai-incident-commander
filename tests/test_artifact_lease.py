@@ -42,6 +42,35 @@ def test_shared_leases_overlap_and_writer_waits(tmp_path: Path) -> None:
     assert (tmp_path / ".artifact.lease").is_file()
 
 
+def test_killed_reader_releases_lease_for_writer(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    ready = multiprocessing.Event()
+
+    def reader() -> None:
+        with artifact_lease(target, exclusive=False):
+            ready.set()
+            time.sleep(30)
+
+    process = multiprocessing.Process(target=reader)
+    process.start()
+    assert ready.wait(5)
+    process.kill()
+    process.join(5)
+    acquired = multiprocessing.Event()
+
+    def writer() -> None:
+        with artifact_lease(target, exclusive=True):
+            acquired.set()
+
+    writer_process = multiprocessing.Process(target=writer)
+    writer_process.start()
+    writer_process.join(5)
+    assert writer_process.exitcode == 0
+    assert acquired.is_set()
+    assert (tmp_path / ".artifact.lease").is_file()
+
+
 @pytest.mark.parametrize("kind", ["symlink", "directory"])  # type: ignore[untyped-decorator]
 def test_lease_rejects_unsafe_coordination_inode(tmp_path: Path, kind: str) -> None:
     target = tmp_path / "artifact"

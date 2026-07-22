@@ -3,11 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-
-try:
-    import fcntl
-except ImportError:  # pragma: no cover - unsupported non-POSIX platforms
-    fcntl = None  # type: ignore[assignment]
 import os
 import stat
 from collections.abc import Callable, Iterator, Sequence
@@ -15,6 +10,11 @@ from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
 from typing import Any, TypeVar, cast
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - unsupported non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 
 class ArtifactLeaseError(RuntimeError):

@@ -1,4 +1,4 @@
-name: Capture final Ruff diagnostic
+name: Apply exact Ruff import fix
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  capture:
+  fix:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -19,10 +19,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e '.[dev]'
-      - run: python -m ruff check . > .github/reader-lint-output.txt 2>&1 || true
       - run: |
+          python -m ruff check --fix tests/test_reader_coherence_certification.py
+          python -m ruff format tests/test_reader_coherence_certification.py
+      - run: |
+          rm -f .github/reader-lint-output.txt
+          rm .github/workflows/capture-reader-lint.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/reader-lint-output.txt
-          git commit -m 'Capture final Ruff diagnostic'
+          git add -A
+          git commit -m 'Apply exact Ruff import fix'
           git push origin HEAD:feat/phase11-reader-coherence

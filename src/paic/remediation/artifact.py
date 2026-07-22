@@ -13,6 +13,7 @@ from typing import TypeVar
 from uuid import uuid4
 
 from paic import __version__
+from paic.artifacts.lease import artifact_reader
 from paic.investigation.artifact import replay_investigation
 from paic.remediation.config import RemediationConfig
 from paic.remediation.executor import ExecutionError, verify_execution_transition
@@ -312,6 +313,7 @@ def _load_manifest(root: Path, expected_files: set[str]) -> RemediationArtifactM
     return manifest
 
 
+@artifact_reader
 def load_control_state(path: str | Path) -> LoadedControlState:
     root = Path(path)
     manifest = _load_manifest(root, {"state.json"})
@@ -330,6 +332,7 @@ def load_control_state(path: str | Path) -> LoadedControlState:
     return LoadedControlState(manifest, state)
 
 
+@artifact_reader
 def load_plan(path: str | Path) -> LoadedPlan:
     root = Path(path)
     expected = {"remediation.config.resolved.json", "proposal.json", "plan.json"}
@@ -368,6 +371,7 @@ def load_plan(path: str | Path) -> LoadedPlan:
     return LoadedPlan(manifest, config, proposal, plan)
 
 
+@artifact_reader
 def load_execution(path: str | Path) -> LoadedExecution:
     root = Path(path)
     manifest = _load_manifest(root, {"receipt.json"})

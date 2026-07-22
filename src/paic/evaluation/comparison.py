@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from paic.artifacts.lease import artifact_reader
 from paic.evaluation.artifact import replay_evaluation
 from paic.evaluation.benchmark import digest_value
 from paic.evaluation.models import StrictModel
@@ -265,6 +266,7 @@ def export_comparison(report: ComparisonReport, output_dir: str | Path) -> None:
         raise ComparisonArtifactError(f"cannot publish comparison artifact: {exc}") from exc
 
 
+@artifact_reader
 def load_comparison(root: str | Path) -> ComparisonReport:
     path = Path(root)
     if path.is_symlink() or not path.is_dir():

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from paic import __version__
+from paic.artifacts.lease import artifact_reader
 from paic.recovery.config import RecoveryConfig
 from paic.recovery.engine import evaluate_recovery, verify_report
 from paic.recovery.manifest import RecoveryArtifactFile, RecoveryArtifactManifest
@@ -198,6 +199,7 @@ def _load_manifest(root: Path) -> RecoveryArtifactManifest:
     return manifest
 
 
+@artifact_reader
 def load_recovery(path: str | Path) -> LoadedRecovery:
     root = Path(path)
     manifest = _load_manifest(root)
@@ -252,6 +254,7 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
     return LoadedRecovery(manifest, config, observations, report)
 
 
+@artifact_reader
 def validate_recovery(
     path: str | Path,
     *,

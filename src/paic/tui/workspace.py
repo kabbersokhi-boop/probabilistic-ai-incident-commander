@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from paic.analytics.validation import validate_analytics_directory
+from paic.artifacts.lease import artifact_reader_leases
 from paic.detection.validation import validate_detection_directory
 from paic.evaluation.artifact import replay_evaluation
 from paic.evidence.io import load_evidence
@@ -585,17 +586,24 @@ def _public_stage(stage: StageSnapshot, root: Path) -> StageSnapshot:
 
 
 def inspect_workspace(config: WorkspaceConfig) -> WorkspaceSnapshot:
-    raw_stages = [
-        _dataset(config),
-        _analytics(config),
-        _detection(config),
-        _impact(config),
-        _evidence(config),
-        _investigation(config),
-        _remediation(config),
-        _recovery(config),
-        _evaluation(config),
+    roots = [
+        value
+        for group in config.paths.model_dump(mode="python").values()
+        for value in group.values()
+        if isinstance(value, Path)
     ]
+    with artifact_reader_leases(roots):
+        raw_stages = [
+            _dataset(config),
+            _analytics(config),
+            _detection(config),
+            _impact(config),
+            _evidence(config),
+            _investigation(config),
+            _remediation(config),
+            _recovery(config),
+            _evaluation(config),
+        ]
     stages = [_public_stage(item, config.root_dir) for item in raw_stages]
     configured = [item for item in stages if item.status != "not_configured"]
     healthy = [item for item in stages if item.status == "healthy"]

@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from paic import __version__
+from paic.artifacts.lease import artifact_reader
 from paic.evaluation.benchmark import (
     digest_models,
     digest_value,
@@ -366,6 +367,7 @@ def _read_jsonl(path: Path) -> list[Any]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
+@artifact_reader
 def load_evaluation(root: str | Path) -> EvaluationRun:
     target = Path(root)
     _check_layout(target)
@@ -447,6 +449,7 @@ def load_evaluation(root: str | Path) -> EvaluationRun:
     return run
 
 
+@artifact_reader
 def replay_evaluation(
     root: str | Path,
     *,

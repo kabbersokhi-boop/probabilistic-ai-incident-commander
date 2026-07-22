@@ -8,10 +8,12 @@ import shutil
 import stat
 import tempfile
 from collections.abc import Callable
-from contextlib import suppress
+from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+
+from paic.artifacts.lease import artifact_lease
 
 PublicationPoint = Literal[
     "staging-created",
@@ -119,6 +121,7 @@ class AtomicDirectoryPublisher:
         self._rollback_failed = False
         self.committed = False
         self.durability_confirmed = False
+        self._lease: AbstractContextManager[None] | None = None
 
     def _point(self, point: PublicationPoint) -> None:
         if self.failure_hook is not None:
@@ -167,7 +170,11 @@ class AtomicDirectoryPublisher:
     def commit(self) -> PublicationResult:
         if self.staging is None:
             raise ArtifactPublicationError("publisher has not been entered")
+        lease_entered = False
         try:
+            self._lease = artifact_lease(self.target, exclusive=True)
+            self._lease.__enter__()
+            lease_entered = True
             _fsync_payload_tree(self.staging)
             self._point("payload-written")
             if self.target.exists():
@@ -182,6 +189,10 @@ class AtomicDirectoryPublisher:
             _fsync_directory(self.target.parent)
             self.durability_confirmed = True
             self._point("parent-synced")
+            if self.backup is not None:
+                shutil.rmtree(self.backup)
+                self.backup = None
+                _fsync_directory(self.target.parent)
         except Exception as exc:
             if not self.committed and self.backup is not None and not self.target.exists():
                 try:
@@ -195,10 +206,10 @@ class AtomicDirectoryPublisher:
                     ) from exc
             state = "committed but durability is uncertain" if self.committed else "not committed"
             raise ArtifactPublicationError(f"artifact publication failed ({state}): {exc}") from exc
-        if self.backup is not None:
-            shutil.rmtree(self.backup)
-            self.backup = None
-            _fsync_directory(self.target.parent)
+        finally:
+            if self._lease is not None and lease_entered:
+                self._lease.__exit__(None, None, None)
+                self._lease = None
         return PublicationResult(self.target, True, self.durability_confirmed)
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:

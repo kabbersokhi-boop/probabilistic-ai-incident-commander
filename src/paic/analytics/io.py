@@ -25,6 +25,7 @@ from paic.analytics.quality import quality_error_count
 from paic.analytics.registry import metric_catalog
 from paic.analytics.schema import ANALYTICS_TABLE_ORDER, ANALYTICS_TABLE_SPECS
 from paic.analytics.types import AnalyticsBuildResult, AnalyticsFrameMap, LoadedAnalytics
+from paic.artifacts.lease import artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.io import file_sha256
 
@@ -181,6 +182,7 @@ def _safe_analytics_path(root: Path, relative_path: str) -> Path:
     return candidate
 
 
+@artifact_reader
 def load_analytics(analytics_dir: str | Path) -> LoadedAnalytics:
     root = Path(analytics_dir)
     manifest = load_manifest(root)

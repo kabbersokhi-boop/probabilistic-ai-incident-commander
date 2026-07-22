@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 import polars as pl
 
+from paic.artifacts.lease import artifact_reader
 from paic.simulator.config import SimulationConfig
 from paic.simulator.io import (
     DatasetIOError,
@@ -89,6 +90,7 @@ def validate_tables(
     return DatasetValidationReport(tuple(issues), statistics)
 
 
+@artifact_reader
 def validate_dataset_directory(dataset_dir: str | Path) -> DatasetValidationReport:
     """Validate an exported dataset, including hashes and its resolved config."""
 

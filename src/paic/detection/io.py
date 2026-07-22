@@ -13,6 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
+from paic.artifacts.lease import artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.detection.config import DetectionConfig
 from paic.detection.engine import detection_quality_error_count
@@ -183,6 +184,7 @@ def _safe_path(root: Path, relative_path: str) -> Path:
     return candidate
 
 
+@artifact_reader
 def load_detection(detection_dir: str | Path) -> LoadedDetection:
     root = Path(detection_dir)
     manifest = load_manifest(root)

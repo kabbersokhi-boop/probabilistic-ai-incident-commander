@@ -7,12 +7,13 @@ import sys
 import time
 from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.simulator.io import export_dataset
 from paic.simulator.types import SimulationResult
 from paic.simulator.validation import validate_dataset_directory
+
 
 _READER_CODE = r"""
 import json
@@ -106,7 +107,7 @@ raise SystemExit(1 if errors else 0)
 
 
 def _read_result(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 def _diagnostics(

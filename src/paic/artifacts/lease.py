@@ -6,7 +6,8 @@ import contextlib
 import fcntl
 import os
 import stat
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -64,3 +65,17 @@ def artifact_reader(func: Callable[..., T]) -> Callable[..., T]:
             return func(root, *args, **kwargs)
 
     return cast(Callable[..., T], wrapped)
+
+
+@contextlib.contextmanager
+def artifact_reader_leases(roots: Sequence[str | Path | None]) -> Iterator[None]:
+    """Acquire shared leases in canonical absolute-path order to prevent deadlock."""
+    ordered: dict[str, Path] = {}
+    for root in roots:
+        if root is not None:
+            path = Path(root).absolute()
+            ordered.setdefault(os.fspath(path), path)
+    with ExitStack() as stack:
+        for path in (ordered[key] for key in sorted(ordered)):
+            stack.enter_context(artifact_lease(path, exclusive=False))
+        yield

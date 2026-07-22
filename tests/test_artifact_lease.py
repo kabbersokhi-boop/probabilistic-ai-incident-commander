@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from paic.artifacts.lease import ArtifactLeaseError, artifact_lease
+from paic.artifacts.lease import ArtifactLeaseError, artifact_lease, artifact_reader_leases
 
 
 def test_shared_leases_overlap_and_writer_waits(tmp_path: Path) -> None:
@@ -51,7 +51,31 @@ def test_lease_rejects_unsafe_coordination_inode(tmp_path: Path, kind: str) -> N
         lease.symlink_to(target)
     else:
         lease.mkdir()
-    with pytest.raises(ArtifactLeaseError, match="coordination"), artifact_lease(
-        target, exclusive=False
+    with (
+        pytest.raises(ArtifactLeaseError, match="coordination"),
+        artifact_lease(target, exclusive=False),
     ):
         pass
+
+
+def test_multi_root_order_is_deterministic(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    ready = multiprocessing.Event()
+
+    def acquire(roots: list[Path]) -> None:
+        with artifact_reader_leases(roots):
+            ready.set()
+            time.sleep(0.1)
+
+    left = multiprocessing.Process(target=acquire, args=([first, second],))
+    right = multiprocessing.Process(target=acquire, args=([second, first],))
+    left.start()
+    assert ready.wait(5)
+    right.start()
+    left.join(5)
+    right.join(5)
+    assert left.exitcode == 0
+    assert right.exitcode == 0

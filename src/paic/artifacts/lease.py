@@ -24,15 +24,21 @@ class ArtifactLeaseError(RuntimeError):
 T = TypeVar("T")
 
 
+def _canonical_root(root: str | Path) -> Path:
+    """Normalize lexical aliases without following artifact symlinks."""
+
+    return Path(os.path.abspath(os.fspath(root)))
+
+
 def _lease_path(root: Path) -> Path:
-    return root.absolute().parent / f".{root.name}.lease"
+    return root.parent / f".{root.name}.lease"
 
 
 @contextlib.contextmanager
 def artifact_lease(root: str | Path, *, exclusive: bool) -> Iterator[None]:
     """Hold a persistent per-root kernel lease for a complete logical read/write."""
-    target = Path(root)
-    parent = target.absolute().parent
+    target = _canonical_root(root)
+    parent = target.parent
     if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
         raise ArtifactLeaseError("artifact lease parent is unsafe")
     parent.mkdir(parents=True, exist_ok=True)
@@ -84,8 +90,8 @@ def artifact_reader_leases(roots: Sequence[str | Path | None]) -> Iterator[None]
     ordered: dict[str, Path] = {}
     for root in roots:
         if root is not None:
-            path = Path(root).absolute()
-            ordered.setdefault(os.fspath(path), path)
+            path = _canonical_root(root)
+            ordered.setdefault(os.path.normcase(os.fspath(path)), path)
     with ExitStack() as stack:
         for path in (ordered[key] for key in sorted(ordered)):
             stack.enter_context(artifact_lease(path, exclusive=False))

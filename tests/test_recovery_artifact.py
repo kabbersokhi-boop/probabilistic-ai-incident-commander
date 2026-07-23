@@ -211,3 +211,29 @@ def test_authoritative_recovery_validation_replays_observation_and_execution_bin
     assert validate_recovery(root, observations_dir=tmp_path / "observations") == [
         "authoritative recovery validation requires observations, analytics, and execution artifacts"
     ]
+
+
+def test_authoritative_validation_reports_stale_observation_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale observation generation is an invalid report, never a TUI exception."""
+    import paic.recovery.observations as observation_module
+
+    root = tmp_path / "recovery"
+    build_artifact(root)
+    monkeypatch.setattr(
+        observation_module,
+        "load_observations",
+        lambda *_, **__: (_ for _ in ()).throw(
+            observation_module.ObservationError(
+                "observation artifact is bound to another execution"
+            )
+        ),
+    )
+
+    assert validate_recovery(
+        root,
+        observations_dir=tmp_path / "observations",
+        analytics_dir=tmp_path / "analytics",
+        execution_dir=tmp_path / "execution",
+    ) == ["observation artifact is bound to another execution"]

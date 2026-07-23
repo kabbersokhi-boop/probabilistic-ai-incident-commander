@@ -216,6 +216,11 @@ jobs:
           make evaluation-smoke
           make evaluation-validate-smoke
           make evaluation-replay-smoke
+      - name: Phase 11 authoritative control-room smoke
+        run: |
+          make tui-smoke
+          python -m paic tui snapshot --workspace configs/tui/smoke.yaml --format json
+          paic-tui validate --workspace configs/tui/smoke.yaml --format json
       - name: Standard evaluation and ablation
         if: matrix.python-version == '3.11'
         run: make evaluation-compare-smoke

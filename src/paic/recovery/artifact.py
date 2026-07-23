@@ -266,6 +266,13 @@ def validate_recovery(
     analytics_dir: str | Path | None = None,
     execution_dir: str | Path | None = None,
 ) -> list[str]:
+    # Import lazily to avoid the observations module's dependency on this
+    # module's hashing helpers during import.  Observation validation is part
+    # of the authoritative recovery contract, so its controlled failures must
+    # be returned as validator issues rather than escaping to a caller such as
+    # the TUI.
+    from paic.recovery.observations import ObservationError
+
     try:
         if any(
             value is not None for value in (observations_dir, analytics_dir, execution_dir)
@@ -319,6 +326,6 @@ def validate_recovery(
             raise RecoveryArtifactError(
                 "recovery artifact execution timestamp differs from receipt"
             )
-    except (RecoveryArtifactError, OSError, ValueError) as exc:
+    except (RecoveryArtifactError, ObservationError, OSError, ValueError) as exc:
         return [str(exc)]
     return []

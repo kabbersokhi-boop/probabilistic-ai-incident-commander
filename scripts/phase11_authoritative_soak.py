@@ -7,6 +7,7 @@ import argparse
 import gc
 import hashlib
 import json
+import math
 import os
 import resource
 import subprocess
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import time
 import tracemalloc
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -104,6 +106,30 @@ def _load_iterations(path: Path) -> list[Iteration]:
         raise RuntimeError(f"cannot resume soak results: {exc}") from exc
 
 
+def _cumulative_duration(completed: Sequence[Iteration]) -> float:
+    return sum(item.duration_seconds for item in completed)
+
+
+def _validate_thresholds(min_iterations: int, min_duration_seconds: float) -> None:
+    if min_iterations < 0:
+        raise RuntimeError("iteration threshold cannot be negative")
+    if math.isnan(min_duration_seconds) or min_duration_seconds < 0:
+        raise RuntimeError("duration threshold must be non-negative")
+    if min_iterations == 0 and min_duration_seconds in {0.0, math.inf}:
+        raise RuntimeError("specify a positive iteration count or finite duration")
+
+
+def _minimums_satisfied(
+    completed: Sequence[Iteration], *, min_iterations: int, min_duration_seconds: float
+) -> bool:
+    iteration_minimum_met = min_iterations == 0 or len(completed) >= min_iterations
+    duration_minimum_met = (
+        min_duration_seconds in {0.0, math.inf}
+        or _cumulative_duration(completed) >= min_duration_seconds
+    )
+    return iteration_minimum_met and duration_minimum_met
+
+
 def _publication_debris(root: Path, results: Path) -> tuple[list[str], list[str]]:
     """Report transactional debris without misclassifying artifact control locks."""
     ignored = results.resolve()
@@ -133,8 +159,7 @@ def _publication_debris(root: Path, results: Path) -> tuple[list[str], list[str]
 
 
 def run(args: argparse.Namespace) -> int:
-    if args.iterations < 1 and args.duration_seconds <= 0:
-        raise RuntimeError("specify a positive iteration count or duration")
+    _validate_thresholds(args.iterations, args.duration_seconds)
     workspace = Path(args.workspace)
     config = load_workspace_config(workspace)
     output = Path(args.output_dir)
@@ -167,8 +192,10 @@ def run(args: argparse.Namespace) -> int:
     baseline_trace, _ = tracemalloc.get_traced_memory()
     started = time.perf_counter()
     failed = any(item.status in {"error", "missing"} for item in completed)
-    while (
-        len(completed) < args.iterations and time.perf_counter() - started < args.duration_seconds
+    while not _minimums_satisfied(
+        completed,
+        min_iterations=args.iterations,
+        min_duration_seconds=args.duration_seconds,
     ):
         begun = time.perf_counter()
         try:
@@ -197,11 +224,19 @@ def run(args: argparse.Namespace) -> int:
         failed |= item.status in {"error", "missing"}
         _atomic_json(metadata_path, metadata)
 
+    run_elapsed_seconds = time.perf_counter() - started
+    cumulative_inspection_seconds = _cumulative_duration(completed)
+    minimums_satisfied = _minimums_satisfied(
+        completed,
+        min_iterations=args.iterations,
+        min_duration_seconds=args.duration_seconds,
+    )
     gc.collect()
     final_fd = _fd_count()
     final_rss = _rss_bytes()
     final_objects = len(gc.get_objects())
     final_trace, peak_trace = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
     hashes = sorted({item.snapshot_sha256 for item in completed})
     counts: dict[str, int] = {}
     for item in completed:
@@ -210,8 +245,13 @@ def run(args: argparse.Namespace) -> int:
     report = {
         **metadata,
         "warmup_iterations": args.warmup,
+        "minimum_iterations": args.iterations,
+        "minimum_duration_seconds": args.duration_seconds,
         "iterations": len(completed),
-        "elapsed_seconds": time.perf_counter() - started,
+        "elapsed_seconds": cumulative_inspection_seconds,
+        "cumulative_inspection_seconds": cumulative_inspection_seconds,
+        "run_elapsed_seconds": run_elapsed_seconds,
+        "minimums_satisfied": minimums_satisfied,
         "unique_snapshot_hashes": hashes,
         "status_counts": counts,
         "fd_delta": None if baseline_fd is None or final_fd is None else final_fd - baseline_fd,
@@ -226,7 +266,8 @@ def run(args: argparse.Namespace) -> int:
     }
     _atomic_json(output / "summary.json", report)
     threshold_failure = (
-        (report["fd_delta"] is not None and report["fd_delta"] > args.max_fd_delta)
+        not minimums_satisfied
+        or (report["fd_delta"] is not None and report["fd_delta"] > args.max_fd_delta)
         or report["gc_object_delta"] > args.max_gc_delta
         or (
             report["rss_delta_bytes"] is not None and report["rss_delta_bytes"] > args.max_rss_delta

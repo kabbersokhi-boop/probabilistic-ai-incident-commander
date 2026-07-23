@@ -55,16 +55,10 @@ the latter revalidates and replays every authoritative source and is reported
 separately when a certification run exercises it. Static helper timing must not be
 presented as a substitute for real workspace inspection.
 
-## Phase 11 inspection and authoritative soak
+## Resumable authoritative soak
 
-The workflow has two deliberately different modes:
-
-- Pull requests run a fast inspection gate requiring at least 25 complete authoritative workspace inspections on Python 3.11 and 3.12.
-- Manual `workflow_dispatch` runs the final endurance certification, requiring both at least 25 inspections and at least 1,800 cumulative inspection seconds on each Python version.
-
-Both modes require deterministic snapshot hashes, a healthy authoritative workspace on every iteration, bounded FD/RSS/GC growth, no transactional publication debris, and uploaded machine-readable evidence. The count-only pull-request gate is not a substitute for the manual time-based certification.
-
-For the final local certification, first prepare the smoke artifacts, then run:
+The long-running certification command is deliberately manual rather than a
+normal pull-request gate. First prepare the smoke artifacts, then run:
 
 ```bash
 make tui-smoke
@@ -94,5 +88,8 @@ status counts, FD/RSS/tracemalloc/GC deltas, and publication
 staging/backup/PID-lock debris. Persistent artifact-level control locks are
 reported separately as diagnostic context and do not count as transactional
 debris.
-
-`.github/workflows/phase11-authoritative-soak.yml` runs the 25-inspection gate on pull requests and the 25-inspection plus 1,800-second certification on manual dispatch. Both modes execute separately on Python 3.11 and 3.12, upload evidence, and use no credentials or external providers.
+The `phase11-authoritative-soak.yml` workflow has two explicit modes. Pull
+requests run a count-only inspection gate (25 complete inspections), while
+`workflow_dispatch` runs the final endurance certification (25 inspections and
+1,800 cumulative inspection seconds). Both run separately on Python 3.11 and
+3.12 with uploaded results; they use no credentials or external providers.

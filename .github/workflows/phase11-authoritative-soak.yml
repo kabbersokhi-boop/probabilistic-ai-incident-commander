@@ -14,10 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  phase11-certification:
-    name: ${{ github.event_name == 'workflow_dispatch' && 'authoritative-soak' || 'inspection-gate' }} (${{ matrix.python-version }})
+  authoritative-soak:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'authoritative endurance certification' || 'pull-request inspection gate' }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -28,14 +28,19 @@ jobs:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
-      SOAK_MODE: ${{ github.event_name == 'workflow_dispatch' && 'authoritative' || 'inspection' }}
-      SOAK_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
-      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'authoritative-soak' || 'inspection-gate' }}-${{ matrix.python-version }}
+      CERTIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}
+      MIN_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
+      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
       - uses: actions/setup-python@v6
         with:
@@ -53,13 +58,14 @@ jobs:
       - name: Build authoritative workspace
         run: make tui-smoke
 
-      - name: Run Phase 11 inspection workload
+      - name: Run authoritative soak
         run: >-
           python scripts/phase11_authoritative_soak.py
           --workspace configs/tui/smoke.yaml
           --output-dir "$SOAK_DIR"
           --iterations 25
-          --duration-seconds "$SOAK_DURATION_SECONDS"
+          --duration-seconds "$MIN_DURATION_SECONDS"
+          --mode "$CERTIFICATION_MODE"
           --warmup 10
           --max-fd-delta 0
           --max-gc-delta 2048
@@ -74,29 +80,30 @@ jobs:
 
           summary_path = Path(os.environ["SOAK_DIR"]) / "summary.json"
           summary = json.loads(summary_path.read_text(encoding="utf-8"))
-          expected_duration = float(os.environ["SOAK_DURATION_SECONDS"])
           errors = []
           if summary["iterations"] < 25:
               errors.append(f"iterations={summary['iterations']}")
-          if summary["minimum_iterations"] != 25:
-              errors.append(f"minimum_iterations={summary['minimum_iterations']}")
+          expected_duration = float(os.environ["MIN_DURATION_SECONDS"])
           if summary["minimum_duration_seconds"] != expected_duration:
               errors.append(
                   "minimum_duration_seconds="
                   f"{summary['minimum_duration_seconds']} expected={expected_duration}"
               )
-          if expected_duration > 0 and summary["cumulative_inspection_seconds"] < expected_duration:
+          if summary["cumulative_inspection_seconds"] < expected_duration:
               errors.append(
                   "cumulative_inspection_seconds="
                   f"{summary['cumulative_inspection_seconds']} expected>={expected_duration}"
               )
           if summary["minimums_satisfied"] is not True:
               errors.append("minimums_satisfied is not true")
+          for key in ("configured_stage_counts", "healthy_stage_counts", "authoritative_stage_counts"):
+              if summary[key] != [9]:
+                  errors.append(f"{key}={summary[key]}")
           if len(summary["unique_snapshot_hashes"]) != 1:
               errors.append(
                   f"unique_snapshot_hashes={summary['unique_snapshot_hashes']}"
               )
-          if summary["status_counts"] != {"healthy": summary["iterations"]}:
+          if set(summary["status_counts"]) != {"healthy"}:
               errors.append(f"status_counts={summary['status_counts']}")
           if summary["publication_debris"]:
               errors.append(f"publication_debris={summary['publication_debris']}")
@@ -114,11 +121,11 @@ jobs:
           print(json.dumps(summary, indent=2, sort_keys=True))
           PY
 
-      - name: Upload Phase 11 evidence
+      - name: Upload authoritative soak evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase11-${{ env.SOAK_MODE }}-python-${{ matrix.python-version }}
+          name: phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-python-${{ matrix.python-version }}
           path: ${{ env.SOAK_DIR }}
           if-no-files-found: warn
           retention-days: 90

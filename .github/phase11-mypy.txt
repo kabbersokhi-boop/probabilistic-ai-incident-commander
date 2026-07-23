@@ -1,4 +1,0 @@
-tests/test_phase11_authoritative_soak.py:62: error: Untyped decorator makes function "test_invalid_thresholds_fail_closed" untyped  [untyped-decorator]
-pyproject.toml: note: unused section(s): module = ['pydantic', 'pydantic.*']
-Found 1 error in 1 file (checked 2 source files)
-exit_code=1

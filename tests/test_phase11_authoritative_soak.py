@@ -11,6 +11,7 @@ SCRIPT = Path(__file__).parents[1] / "scripts" / "phase11_authoritative_soak.py"
 
 
 def _load_module() -> ModuleType:
+    """Load the script as a registered module so dataclass metadata resolves."""
     spec = importlib.util.spec_from_file_location("phase11_authoritative_soak", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

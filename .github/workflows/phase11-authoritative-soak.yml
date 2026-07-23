@@ -1,4 +1,4 @@
-name: Phase 11 authoritative soak
+name: Phase 11 inspection and authoritative soak
 
 on:
   workflow_dispatch:
@@ -14,10 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  authoritative-soak:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.head_ref == 'agent/phase11-authoritative-soak-certification'
+  phase11-certification:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'authoritative-soak' || 'inspection-gate' }} (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
@@ -30,7 +28,9 @@ jobs:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
-      SOAK_DIR: .artifacts/phase11-authoritative-soak-${{ matrix.python-version }}
+      SOAK_MODE: ${{ github.event_name == 'workflow_dispatch' && 'authoritative' || 'inspection' }}
+      SOAK_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
+      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'authoritative-soak' || 'inspection-gate' }}-${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v6
@@ -53,13 +53,13 @@ jobs:
       - name: Build authoritative workspace
         run: make tui-smoke
 
-      - name: Run authoritative soak
+      - name: Run Phase 11 inspection workload
         run: >-
           python scripts/phase11_authoritative_soak.py
           --workspace configs/tui/smoke.yaml
           --output-dir "$SOAK_DIR"
           --iterations 25
-          --duration-seconds 0
+          --duration-seconds "$SOAK_DURATION_SECONDS"
           --warmup 10
           --max-fd-delta 0
           --max-gc-delta 2048
@@ -74,19 +74,30 @@ jobs:
 
           summary_path = Path(os.environ["SOAK_DIR"]) / "summary.json"
           summary = json.loads(summary_path.read_text(encoding="utf-8"))
+          expected_duration = float(os.environ["SOAK_DURATION_SECONDS"])
           errors = []
           if summary["iterations"] < 25:
               errors.append(f"iterations={summary['iterations']}")
+          if summary["minimum_iterations"] != 25:
+              errors.append(f"minimum_iterations={summary['minimum_iterations']}")
+          if summary["minimum_duration_seconds"] != expected_duration:
+              errors.append(
+                  "minimum_duration_seconds="
+                  f"{summary['minimum_duration_seconds']} expected={expected_duration}"
+              )
+          if expected_duration > 0 and summary["cumulative_inspection_seconds"] < expected_duration:
+              errors.append(
+                  "cumulative_inspection_seconds="
+                  f"{summary['cumulative_inspection_seconds']} expected>={expected_duration}"
+              )
           if summary["minimums_satisfied"] is not True:
               errors.append("minimums_satisfied is not true")
           if len(summary["unique_snapshot_hashes"]) != 1:
               errors.append(
                   f"unique_snapshot_hashes={summary['unique_snapshot_hashes']}"
               )
-          if summary["status_counts"].get("error", 0):
-              errors.append(f"error statuses={summary['status_counts']['error']}")
-          if summary["status_counts"].get("missing", 0):
-              errors.append(f"missing statuses={summary['status_counts']['missing']}")
+          if summary["status_counts"] != {"healthy": summary["iterations"]}:
+              errors.append(f"status_counts={summary['status_counts']}")
           if summary["publication_debris"]:
               errors.append(f"publication_debris={summary['publication_debris']}")
           if summary["fd_delta"] is not None and summary["fd_delta"] > 0:
@@ -103,11 +114,11 @@ jobs:
           print(json.dumps(summary, indent=2, sort_keys=True))
           PY
 
-      - name: Upload authoritative soak evidence
+      - name: Upload Phase 11 evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase11-authoritative-soak-python-${{ matrix.python-version }}
+          name: phase11-${{ env.SOAK_MODE }}-python-${{ matrix.python-version }}
           path: ${{ env.SOAK_DIR }}
           if-no-files-found: warn
           retention-days: 90

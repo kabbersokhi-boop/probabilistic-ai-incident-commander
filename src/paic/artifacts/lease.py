@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 import os
 import stat
 from collections.abc import Callable, Iterator, Sequence
@@ -76,10 +77,21 @@ def artifact_lease(root: str | Path, *, exclusive: bool) -> Iterator[None]:
 def artifact_reader(func: Callable[..., T]) -> Callable[..., T]:
     """Protect a public loader's complete multi-file read with a shared lease."""
 
+    signature = inspect.signature(func)
+    parameters = tuple(signature.parameters.values())
+    if not parameters:
+        raise TypeError("artifact_reader requires a function with an artifact-root parameter")
+    root_name = parameters[0].name
+
     @wraps(func)
-    def wrapped(root: str | Path, *args: Any, **kwargs: Any) -> T:
+    def wrapped(*args: Any, **kwargs: Any) -> T:
+        # Binding first gives callers the wrapped function's normal Python
+        # argument behavior, including keyword names and duplicate-argument
+        # errors.  Forward the original call unchanged after leasing.
+        bound = signature.bind(*args, **kwargs)
+        root = bound.arguments[root_name]
         with artifact_lease(root, exclusive=False):
-            return func(root, *args, **kwargs)
+            return func(*args, **kwargs)
 
     return cast(Callable[..., T], wrapped)
 

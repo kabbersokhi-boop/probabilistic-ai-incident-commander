@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from paic.analytics.validation import validate_analytics_directory
-from paic.artifacts.lease import artifact_reader_leases
+from paic.artifacts.lease import ArtifactLeaseError, artifact_reader_leases
 from paic.detection.validation import validate_detection_directory
 from paic.evaluation.artifact import replay_evaluation
 from paic.evidence.io import load_evidence
@@ -592,17 +592,46 @@ def inspect_workspace(config: WorkspaceConfig) -> WorkspaceSnapshot:
         for value in group.values()
         if isinstance(value, Path)
     ]
-    with artifact_reader_leases(roots):
+    try:
+        with artifact_reader_leases(roots):
+            raw_stages = [
+                _dataset(config),
+                _analytics(config),
+                _detection(config),
+                _impact(config),
+                _evidence(config),
+                _investigation(config),
+                _remediation(config),
+                _recovery(config),
+                _evaluation(config),
+            ]
+    except ArtifactLeaseError as exc:
+        message = f"Workspace artifact leases could not be acquired safely: {exc}"
+        configured_paths = {
+            "dataset": config.paths.metrics.dataset_dir or config.paths.incident.dataset_dir,
+            "analytics": config.paths.metrics.analytics_dir,
+            "detection": config.paths.metrics.detection_dir,
+            "impact": config.paths.incident.impact_dir,
+            "evidence": config.paths.incident.evidence_dir,
+            "investigation": config.paths.incident.investigation_dir,
+            "remediation": config.paths.remediation.plan_dir,
+            "recovery": config.paths.recovery.report_dir,
+            "evaluation": config.paths.evaluation.run_dir,
+        }
         raw_stages = [
-            _dataset(config),
-            _analytics(config),
-            _detection(config),
-            _impact(config),
-            _evidence(config),
-            _investigation(config),
-            _remediation(config),
-            _recovery(config),
-            _evaluation(config),
+            (
+                StageSnapshot(
+                    key=key,
+                    title=_STAGE_TITLES[key],
+                    status="error",
+                    summary="Workspace coordination failed before artifact inspection.",
+                    path=None if path is None else str(path),
+                    issues=[message],
+                )
+                if path is not None
+                else _missing(key, None)
+            )
+            for key, path in configured_paths.items()
         ]
     stages = [_public_stage(item, config.root_dir) for item in raw_stages]
     configured = [item for item in stages if item.status != "not_configured"]

@@ -5,12 +5,84 @@ import multiprocessing
 import os
 import stat
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from paic.artifacts.lease import ArtifactLeaseError, artifact_lease, artifact_reader_leases
+from paic.artifacts.lease import (
+    ArtifactLeaseError,
+    artifact_lease,
+    artifact_reader,
+    artifact_reader_leases,
+)
+
+
+def test_artifact_reader_preserves_keyword_binding_and_metadata(tmp_path: Path) -> None:
+    calls: list[tuple[Path, int]] = []
+
+    @artifact_reader
+    def load_dataset(dataset_dir: str | Path, limit: int = 3) -> tuple[Path, int]:
+        calls.append((Path(dataset_dir), limit))
+        return Path(dataset_dir), limit
+
+    assert load_dataset(tmp_path, 4) == (tmp_path, 4)
+    assert load_dataset(dataset_dir=tmp_path, limit=5) == (tmp_path, 5)
+    assert load_dataset(tmp_path, limit=6) == (tmp_path, 6)
+    assert load_dataset.__name__ == "load_dataset"
+    assert "dataset_dir" in str(__import__("inspect").signature(load_dataset))
+    with pytest.raises(TypeError, match="multiple values"):
+        load_dataset(tmp_path, dataset_dir=tmp_path)
+    assert calls == [(tmp_path, 4), (tmp_path, 5), (tmp_path, 6)]
+
+
+def test_all_decorated_public_roots_accept_documented_keyword_names(tmp_path: Path) -> None:
+    """Every reader wrapper binds its module-specific first parameter, not ``root``."""
+    from paic.analytics.validation import validate_analytics_directory
+    from paic.detection.io import load_detection
+    from paic.detection.validation import validate_detection_directory
+    from paic.evaluation.artifact import load_evaluation
+    from paic.evaluation.comparison import load_comparison
+    from paic.evidence.io import load_evidence
+    from paic.evidence.validation import validate_evidence_directory
+    from paic.impact.io import load_impact
+    from paic.impact.validation import validate_impact_directory
+    from paic.investigation.artifact import load_investigation, validate_investigation
+    from paic.recovery.artifact import load_recovery, validate_recovery
+    from paic.remediation.artifact import load_control_state, load_execution, load_plan
+    from paic.simulator.io import load_dataset
+    from paic.simulator.validation import validate_dataset_directory
+
+    calls: list[Callable[[], object]] = [
+        lambda: load_dataset(dataset_dir=tmp_path / "dataset"),
+        lambda: validate_dataset_directory(dataset_dir=tmp_path / "dataset"),
+        lambda: validate_analytics_directory(analytics_dir=tmp_path / "analytics"),
+        lambda: load_detection(detection_dir=tmp_path / "detection"),
+        lambda: validate_detection_directory(detection_dir=tmp_path / "detection"),
+        lambda: load_impact(impact_dir=tmp_path / "impact"),
+        lambda: validate_impact_directory(impact_dir=tmp_path / "impact"),
+        lambda: load_evidence(evidence_dir=tmp_path / "evidence"),
+        lambda: validate_evidence_directory(evidence_dir=tmp_path / "evidence"),
+        lambda: load_investigation(path=tmp_path / "investigation"),
+        lambda: validate_investigation(path=tmp_path / "investigation"),
+        lambda: load_control_state(path=tmp_path / "state"),
+        lambda: load_plan(path=tmp_path / "plan"),
+        lambda: load_execution(path=tmp_path / "execution"),
+        lambda: load_recovery(path=tmp_path / "recovery"),
+        lambda: validate_recovery(path=tmp_path / "recovery"),
+        lambda: load_evaluation(root=tmp_path / "evaluation"),
+        lambda: load_comparison(root=tmp_path / "comparison"),
+    ]
+    for call in calls:
+        try:
+            call()
+        except TypeError as exc:
+            pytest.fail(f"keyword binding raised an argument error: {exc}")
+        except Exception:
+            # The paths are intentionally absent; artifact-level failures are
+            # expected after the wrapper has successfully bound the keyword.
+            pass
 
 
 def test_shared_leases_overlap_and_writer_waits(tmp_path: Path) -> None:
@@ -134,6 +206,31 @@ def test_lease_closes_descriptor_on_acquisition_failure(
     with pytest.raises(ArtifactLeaseError), artifact_lease(target, exclusive=False):
         pass
     assert closed == [opened]
+
+
+def test_lease_rejects_unavailable_fcntl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    monkeypatch.setattr("paic.artifacts.lease.fcntl", None)
+    with (
+        pytest.raises(ArtifactLeaseError, match="POSIX flock"),
+        artifact_lease(target, exclusive=False),
+    ):
+        pass
+
+
+def test_lease_wraps_open_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    monkeypatch.setattr(
+        "paic.artifacts.lease.os.open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("open failed")),
+    )
+    with (
+        pytest.raises(ArtifactLeaseError, match="open failed"),
+        artifact_lease(target, exclusive=False),
+    ):
+        pass
 
 
 def test_multi_root_order_is_deterministic(tmp_path: Path) -> None:

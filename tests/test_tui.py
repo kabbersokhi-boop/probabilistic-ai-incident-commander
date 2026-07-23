@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from paic.artifacts.lease import ArtifactLeaseError
 from paic.tui import workspace as workspace_module
 from paic.tui.app import TUIApplication
 from paic.tui.cli import dispatch_tui
@@ -475,6 +476,59 @@ def test_recovery_stage_exposes_authoritative_binding_failure(
     assert not stage.authoritative
     assert stage.summary == "Recovery evidence failed validation."
     assert stage.issues == ["observation artifact is bound to another execution"]
+
+
+def test_workspace_lease_failure_is_a_controlled_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    config = WorkspaceConfig(
+        workspace_id="lease-room",
+        display_name="Lease room",
+        root_dir=tmp_path,
+        paths=WorkspacePaths.model_validate({"metrics": {"dataset_dir": artifact}}),
+    )
+    monkeypatch.setattr(
+        workspace_module,
+        "artifact_reader_leases",
+        lambda _: (_ for _ in ()).throw(
+            ArtifactLeaseError("artifact coordination file must be regular")
+        ),
+    )
+    snapshot = inspect_workspace(config)
+    assert snapshot.overall_status == "error"
+    assert snapshot.healthy_stage_count == 0
+    assert snapshot.stages[0].status == "error"
+    assert "coordination file" in snapshot.stages[0].issues[0]
+
+
+@pytest.mark.parametrize("command", ["run", "snapshot", "validate"])  # type: ignore[untyped-decorator]
+def test_cli_lease_failure_has_no_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    monkeypatch.setattr(
+        "paic.tui.cli._load_snapshot",
+        lambda _: (_ for _ in ()).throw(ArtifactLeaseError("flock unavailable")),
+    )
+    args: Any = type(
+        "Args",
+        (),
+        {
+            "tui_command": command,
+            "workspace": tmp_path / "unused.yaml",
+            "format": "json",
+            "no_color": True,
+            "ascii": True,
+        },
+    )()
+    assert dispatch_tui(args) == 2
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert '"error": "flock unavailable"' in captured.err
 
 
 def test_tui_snapshot_json_returns_success_for_healthy_workspace(

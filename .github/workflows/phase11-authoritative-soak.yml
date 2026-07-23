@@ -30,6 +30,7 @@ jobs:
       NUMEXPR_NUM_THREADS: "1"
       CERTIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}
       MIN_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
+      EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
       SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
 
     steps:
@@ -79,8 +80,20 @@ jobs:
           from pathlib import Path
 
           summary_path = Path(os.environ["SOAK_DIR"]) / "summary.json"
+          metadata = json.loads(
+              (Path(os.environ["SOAK_DIR"]) / "metadata.json").read_text(encoding="utf-8")
+          )
           summary = json.loads(summary_path.read_text(encoding="utf-8"))
           errors = []
+          expected_commit = os.environ["EXPECTED_COMMIT"]
+          if metadata.get("commit") != expected_commit or summary.get("commit") != expected_commit:
+              errors.append(
+                  f"commit metadata={metadata.get('commit')} summary={summary.get('commit')} expected={expected_commit}"
+              )
+          if metadata.get("mode") != os.environ["CERTIFICATION_MODE"]:
+              errors.append(f"mode={metadata.get('mode')}")
+          if not metadata.get("workspace_sha256") or not metadata.get("resolved_configuration_sha256"):
+              errors.append("missing workspace/configuration hash")
           if summary["iterations"] < 25:
               errors.append(f"iterations={summary['iterations']}")
           expected_duration = float(os.environ["MIN_DURATION_SECONDS"])
@@ -105,6 +118,18 @@ jobs:
               )
           if set(summary["status_counts"]) != {"healthy"}:
               errors.append(f"status_counts={summary['status_counts']}")
+          iterations = [
+              json.loads(line)
+              for line in (Path(os.environ["SOAK_DIR"]) / "iterations.jsonl")
+              .read_text(encoding="utf-8")
+              .splitlines()
+          ]
+          if [item["index"] for item in iterations] != list(range(1, len(iterations) + 1)):
+              errors.append("iteration indexes are not contiguous")
+          if len({item["snapshot_sha256"] for item in iterations}) != 1:
+              errors.append("iteration snapshot hashes are not deterministic")
+          if any(item["status"] != "healthy" for item in iterations):
+              errors.append("iteration status is not healthy")
           if summary["publication_debris"]:
               errors.append(f"publication_debris={summary['publication_debris']}")
           if summary["fd_delta"] is not None and summary["fd_delta"] > 0:

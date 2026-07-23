@@ -59,7 +59,7 @@ def test_single_threshold_modes_remain_supported() -> None:
     assert module._minimums_satisfied(completed, min_iterations=0, min_duration_seconds=2.0)
 
 
-@pytest.mark.parametrize(
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
     ("iterations", "duration"),
     [(-1, 0.0), (0, -1.0), (0, float("inf")), (0, 0.0)],
 )

@@ -67,13 +67,17 @@ def test_single_threshold_modes_remain_supported() -> None:
         completed, min_iterations=1, min_duration_seconds=0.0
     )
     assert module._minimums_satisfied(
+        completed, min_iterations=1, min_duration_seconds=float("inf")
+    )
+    assert module._minimums_satisfied(
         completed, min_iterations=0, min_duration_seconds=2.0
     )
+    module._validate_thresholds(1, float("inf"))
 
 
 @pytest.mark.parametrize(
     ("iterations", "duration"),
-    [(-1, 0.0), (0, -1.0), (0, float("inf")), (0, 0.0)],
+    [(-1, 0.0), (0, -1.0), (0, float("nan")), (0, float("inf")), (0, 0.0)],
 )
 def test_invalid_thresholds_fail_closed(iterations: int, duration: float) -> None:
     module = _load_module()

@@ -113,10 +113,10 @@ def _cumulative_duration(completed: Sequence[Iteration]) -> float:
 def _validate_thresholds(min_iterations: int, min_duration_seconds: float) -> None:
     if min_iterations < 0:
         raise RuntimeError("iteration threshold cannot be negative")
-    if not math.isfinite(min_duration_seconds) or min_duration_seconds < 0:
-        raise RuntimeError("duration threshold must be a finite non-negative number")
-    if min_iterations == 0 and min_duration_seconds == 0:
-        raise RuntimeError("specify a positive iteration count or duration")
+    if math.isnan(min_duration_seconds) or min_duration_seconds < 0:
+        raise RuntimeError("duration threshold must be non-negative")
+    if min_iterations == 0 and min_duration_seconds in {0.0, math.inf}:
+        raise RuntimeError("specify a positive iteration count or finite duration")
 
 
 def _minimums_satisfied(
@@ -124,7 +124,7 @@ def _minimums_satisfied(
 ) -> bool:
     iteration_minimum_met = min_iterations == 0 or len(completed) >= min_iterations
     duration_minimum_met = (
-        min_duration_seconds == 0
+        min_duration_seconds in {0.0, math.inf}
         or _cumulative_duration(completed) >= min_duration_seconds
     )
     return iteration_minimum_met and duration_minimum_met
@@ -282,7 +282,7 @@ def main() -> int:
     parser.add_argument("--workspace", default="configs/tui/smoke.yaml")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--iterations", type=int, default=25)
-    parser.add_argument("--duration-seconds", type=float, default=0.0)
+    parser.add_argument("--duration-seconds", type=float, default=float("inf"))
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--max-fd-delta", type=int, default=0)
     parser.add_argument("--max-gc-delta", type=int, default=2048)

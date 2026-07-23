@@ -7,7 +7,6 @@ from types import ModuleType
 
 import pytest
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts" / "phase11_authoritative_soak.py"
 
 
@@ -28,17 +27,13 @@ def test_combined_thresholds_require_count_and_cumulative_duration() -> None:
         iteration(index=index, duration_seconds=10.0, snapshot_sha256="same", status="healthy")
         for index in range(1, 26)
     ]
-    assert not module._minimums_satisfied(
-        completed, min_iterations=25, min_duration_seconds=300.0
-    )
+    assert not module._minimums_satisfied(completed, min_iterations=25, min_duration_seconds=300.0)
 
     completed.extend(
         iteration(index=index, duration_seconds=10.0, snapshot_sha256="same", status="healthy")
         for index in range(26, 31)
     )
-    assert module._minimums_satisfied(
-        completed, min_iterations=25, min_duration_seconds=300.0
-    )
+    assert module._minimums_satisfied(completed, min_iterations=25, min_duration_seconds=300.0)
 
 
 def test_resume_uses_prior_iteration_durations() -> None:
@@ -50,27 +45,17 @@ def test_resume_uses_prior_iteration_durations() -> None:
     ]
 
     assert module._cumulative_duration(completed) == 1800.0
-    assert module._minimums_satisfied(
-        completed, min_iterations=2, min_duration_seconds=1800.0
-    )
-    assert not module._minimums_satisfied(
-        completed, min_iterations=3, min_duration_seconds=1800.0
-    )
+    assert module._minimums_satisfied(completed, min_iterations=2, min_duration_seconds=1800.0)
+    assert not module._minimums_satisfied(completed, min_iterations=3, min_duration_seconds=1800.0)
 
 
 def test_single_threshold_modes_remain_supported() -> None:
     module = _load_module()
     iteration = module.Iteration
-    completed = [
-        iteration(index=1, duration_seconds=2.0, snapshot_sha256="same", status="healthy")
-    ]
+    completed = [iteration(index=1, duration_seconds=2.0, snapshot_sha256="same", status="healthy")]
 
-    assert module._minimums_satisfied(
-        completed, min_iterations=1, min_duration_seconds=0.0
-    )
-    assert module._minimums_satisfied(
-        completed, min_iterations=0, min_duration_seconds=2.0
-    )
+    assert module._minimums_satisfied(completed, min_iterations=1, min_duration_seconds=0.0)
+    assert module._minimums_satisfied(completed, min_iterations=0, min_duration_seconds=2.0)
 
 
 @pytest.mark.parametrize(

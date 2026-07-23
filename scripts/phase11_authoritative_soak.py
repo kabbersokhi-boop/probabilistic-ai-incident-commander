@@ -270,8 +270,7 @@ def run(args: argparse.Namespace) -> int:
         or (report["fd_delta"] is not None and report["fd_delta"] > args.max_fd_delta)
         or report["gc_object_delta"] > args.max_gc_delta
         or (
-            report["rss_delta_bytes"] is not None
-            and report["rss_delta_bytes"] > args.max_rss_delta
+            report["rss_delta_bytes"] is not None and report["rss_delta_bytes"] > args.max_rss_delta
         )
     )
     return 1 if failed or len(hashes) > 1 or publication_debris or threshold_failure else 0

@@ -19,12 +19,14 @@ compatibility, but safety does not depend on its pathname remaining stable.
 from __future__ import annotations
 
 import contextlib
+import asyncio
 import contextvars
 import errno
 import hashlib
 import inspect
 import os
 import stat
+import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import ExitStack
@@ -45,17 +47,87 @@ class ArtifactLeaseError(RuntimeError):
 T = TypeVar("T")
 P = ParamSpec("P")
 
-_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, tuple[bool, int]] | None] = (
-    contextvars.ContextVar("paic_active_artifact_lease_domains", default=None)
+Owner = tuple[int, int | None]
+ActiveDomain = tuple[bool, int, Owner]
+
+_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, ActiveDomain] | None] = contextvars.ContextVar(
+    "paic_active_artifact_lease_domains", default=None
+)
+_ACTIVE_PARENTS: contextvars.ContextVar[dict[str, tuple[int, int, int, Owner]] | None] = (
+    contextvars.ContextVar("paic_active_artifact_lease_parents", default=None)
+)
+_ACTIVE_ROOT_FDS: contextvars.ContextVar[dict[int, Owner] | None] = contextvars.ContextVar(
+    "paic_active_artifact_root_fds", default=None
 )
 
 
-def _active_domains() -> dict[str, tuple[bool, int]]:
-    state = _ACTIVE_DOMAINS.get()
-    if state is None:
-        state = {}
-        _ACTIVE_DOMAINS.set(state)
-    return state
+def _execution_owner() -> Owner:
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        task = None
+    return threading.get_ident(), None if task is None else id(task)
+
+
+def _active_domains() -> dict[str, ActiveDomain]:
+    return _ACTIVE_DOMAINS.get() or {}
+
+
+def _set_active_domain(key: str, value: ActiveDomain | None) -> None:
+    state = dict(_active_domains())
+    if value is None:
+        state.pop(key, None)
+    else:
+        state[key] = value
+    _ACTIVE_DOMAINS.set(state)
+
+
+def _active_parents() -> dict[str, tuple[int, int, int, Owner]]:
+    return _ACTIVE_PARENTS.get() or {}
+
+
+def _set_active_parent(key: str, value: tuple[int, int, int, Owner] | None) -> None:
+    state = dict(_active_parents())
+    if value is None:
+        state.pop(key, None)
+    else:
+        state[key] = value
+    _ACTIVE_PARENTS.set(state)
+
+
+def _active_root_fds() -> dict[int, Owner]:
+    return _ACTIVE_ROOT_FDS.get() or {}
+
+
+def _set_active_root_fd(fd: int, owner: Owner | None) -> None:
+    state = dict(_active_root_fds())
+    if owner is None:
+        state.pop(fd, None)
+    else:
+        state[fd] = owner
+    _ACTIVE_ROOT_FDS.set(state)
+
+
+def _descriptor_fd(value: object) -> int | None:
+    try:
+        parts = Path(os.fspath(value)).parts
+    except TypeError:
+        return None
+    if len(parts) == 5 and parts[:4] == ("/", "proc", "self", "fd"):
+        candidate = parts[4]
+    elif len(parts) == 4 and parts[:3] == ("/", "dev", "fd"):
+        candidate = parts[3]
+    else:
+        return None
+    try:
+        return int(candidate)
+    except ValueError:
+        return None
+
+
+def _is_active_descriptor_root(value: object) -> bool:
+    fd = _descriptor_fd(value)
+    return fd is not None and _active_root_fds().get(fd) == _execution_owner()
 
 
 def _canonical_root(root: str | Path) -> Path:
@@ -408,28 +480,86 @@ class _ArtifactLease:
                 return base / str(self.root_fd)
         raise ArtifactLeaseError("descriptor-backed artifact paths are unavailable")
 
+    def _parent_key(self) -> str:
+        return os.path.normcase(os.fspath(self.parent))
+
+    def _check_active_parent(self) -> None:
+        if self.parent_info is None:
+            raise ArtifactLeaseError("artifact lease parent was not acquired")
+        current = _active_parents().get(self._parent_key())
+        if current is None:
+            return
+        dev, ino, _count, owner = current
+        if owner == _execution_owner() and (dev, ino) != (
+            self.parent_info.st_dev,
+            self.parent_info.st_ino,
+        ):
+            raise ArtifactLeaseError("artifact lease parent changed before nested acquisition")
+
+    def _record_active_parent(self) -> None:
+        if self.parent_info is None:
+            raise ArtifactLeaseError("artifact lease parent was not acquired")
+        key = self._parent_key()
+        owner = _execution_owner()
+        current = _active_parents().get(key)
+        if current is None:
+            _set_active_parent(key, (self.parent_info.st_dev, self.parent_info.st_ino, 1, owner))
+            return
+        dev, ino, count, current_owner = current
+        if current_owner != owner or (dev, ino) != (
+            self.parent_info.st_dev,
+            self.parent_info.st_ino,
+        ):
+            raise ArtifactLeaseError("artifact lease parent changed during nested acquisition")
+        _set_active_parent(key, (dev, ino, count + 1, owner))
+
+    def _release_active_parent(self) -> None:
+        key = self._parent_key()
+        current = _active_parents().get(key)
+        if current is None:
+            return
+        dev, ino, count, owner = current
+        if owner == _execution_owner():
+            _set_active_parent(key, None if count <= 1 else (dev, ino, count - 1, owner))
+
     def _enter_reentrant_if_safe(self) -> bool:
         assert self.domain_key is not None
         current = _active_domains().get(self.domain_key)
         if current is None:
             return False
-        active_exclusive, count = current
+        active_exclusive, count, owner = current
+        if owner != _execution_owner():
+            return False
         if self.exclusive and not active_exclusive:
             raise ArtifactLeaseError("cannot acquire nested exclusive artifact lease")
-        self.parent_fd, self.parent_info = _open_parent(self.parent)
-        self._open_root_anchor()
+        if self.parent_fd is None or self.parent_info is None:
+            self.parent_fd, self.parent_info = _open_parent(self.parent)
+        self._check_active_parent()
+        if self.root_fd is None:
+            self._open_root_anchor()
         self._reentrant = True
         self._active = True
-        _active_domains()[self.domain_key] = (active_exclusive, count + 1)
+        self._record_active_parent()
+        if self.root_fd is not None:
+            _set_active_root_fd(self.root_fd, owner)
+        _set_active_domain(self.domain_key, (active_exclusive, count + 1, owner))
         return True
 
     def _mark_active(self) -> None:
         assert self.domain_key is not None
+        owner = _execution_owner()
         current = _active_domains().get(self.domain_key)
         if current is None:
-            _active_domains()[self.domain_key] = (self.exclusive, 1)
+            _set_active_domain(self.domain_key, (self.exclusive, 1, owner))
         else:
-            _active_domains()[self.domain_key] = (current[0] or self.exclusive, current[1] + 1)
+            if current[2] != owner:
+                raise ArtifactLeaseError("artifact lease context owner changed")
+            _set_active_domain(
+                self.domain_key, (current[0] or self.exclusive, current[1] + 1, owner)
+            )
+        self._record_active_parent()
+        if self.root_fd is not None:
+            _set_active_root_fd(self.root_fd, owner)
         self._active = True
 
     def _unmark_active(self) -> None:
@@ -439,10 +569,13 @@ class _ArtifactLease:
         if current is None:
             self._active = False
             return
+        if self.root_fd is not None:
+            _set_active_root_fd(self.root_fd, None)
+        self._release_active_parent()
         if current[1] <= 1:
-            _active_domains().pop(self.domain_key, None)
+            _set_active_domain(self.domain_key, None)
         else:
-            _active_domains()[self.domain_key] = (current[0], current[1] - 1)
+            _set_active_domain(self.domain_key, (current[0], current[1] - 1, current[2]))
         self._active = False
 
     def validate_current_parent(self) -> None:
@@ -455,12 +588,22 @@ class _ArtifactLease:
             message="artifact lease parent changed while the lease was active",
         )
 
+    def prepare_anchor(self) -> None:
+        if self.domain is None:
+            self._prepare_domain()
+        if self.parent_fd is None or self.parent_info is None:
+            self.parent_fd, self.parent_info = _open_parent(self.parent)
+        if self.root_fd is None:
+            self._open_root_anchor()
+
     def acquire_intent(self) -> None:
-        self._prepare_domain()
+        if self.domain is None:
+            self._prepare_domain()
         if self._enter_reentrant_if_safe():
             return
         assert self.domain is not None and self.gate is not None
-        self.parent_fd, self.parent_info = _open_parent(self.parent)
+        if self.parent_fd is None or self.parent_info is None:
+            self.parent_fd, self.parent_info = _open_parent(self.parent)
         self.domain_fd, self.domain_info = _open_directory(self.domain, private=False)
         self.gate_fd, self.gate_info = _open_directory(self.gate, private=False)
         try:
@@ -700,7 +843,7 @@ def _reader_wrapper(
         with artifact_reader_leases(roots) as anchored:
             for name in root_names:
                 value = bound.arguments.get(name)
-                if value is not None:
+                if value is not None and not _is_active_descriptor_root(value):
                     key = os.path.normcase(os.fspath(_canonical_root(value)))
                     bound.arguments[name] = anchored.get(key, value)
             return func(*bound.args, **bound.kwargs)
@@ -737,10 +880,18 @@ def artifact_reader_leases(
 
     ordered: dict[str, Path] = {}
     for root in roots:
-        if root is not None:
+        if root is not None and not _is_active_descriptor_root(root):
             path = _canonical_root(root)
             ordered.setdefault(os.path.normcase(os.fspath(path)), path)
     leases = [(key, _ArtifactLease(ordered[key], exclusive=False)) for key in sorted(ordered)]
+    try:
+        for _key, lease in leases:
+            lease.prepare_anchor()
+    except Exception:
+        for _key, lease in reversed(leases):
+            with contextlib.suppress(ArtifactLeaseError):
+                lease.release()
+        raise
     with ExitStack() as stack:
         anchored: dict[str, Path] = {}
         for key, lease in leases:

@@ -1,8 +1,0 @@
-'import contextvars\n' 1
-'import time\n' 1
-'_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, tuple[bool, int]] | None]' 1
-'    def _enter_reentrant_if_safe(self) -> bool:\n' 1
-'    def _mark_active(self) -> None:\n' 1
-'    def acquire_intent(self) -> None:\n' 1
-'    ordered: dict[str, Path] = {}\n' 1
-trigger corrected owner repair

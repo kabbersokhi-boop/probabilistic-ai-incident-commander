@@ -1,0 +1,59 @@
+........F.FF...F.F........                                               [100%]
+=================================== FAILURES ===================================
+_______ test_failed_rollback_preserves_backup_and_reports_recovery_path ________
+tests/test_atomic_publication.py:139: in test_failed_rollback_preserves_backup_and_reports_recovery_path
+    with pytest.raises(ArtifactPublicationError, match="backup preserved"):
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: 'backup preserved'
+E     Actual message: 'publisher lease parent was not acquired'
+___________ test_atomic_exchange_unavailable_fails_closed[failure0] ____________
+tests/test_atomic_publication.py:170: in test_atomic_exchange_unavailable_fails_closed
+    monkeypatch.setattr(publication, "_rename_exchange", unavailable)
+E   AttributeError: <module 'paic.artifacts.publication' from '/home/runner/work/probabilistic-ai-incident-commander/probabilistic-ai-incident-commander/src/paic/artifacts/publication.py'> has no attribute '_rename_exchange'
+___________ test_atomic_exchange_unavailable_fails_closed[failure1] ____________
+tests/test_atomic_publication.py:170: in test_atomic_exchange_unavailable_fails_closed
+    monkeypatch.setattr(publication, "_rename_exchange", unavailable)
+E   AttributeError: <module 'paic.artifacts.publication' from '/home/runner/work/probabilistic-ai-incident-commander/probabilistic-ai-incident-commander/src/paic/artifacts/publication.py'> has no attribute '_rename_exchange'
+_________________ test_lock_acquisition_oserror_is_controlled __________________
+tests/test_atomic_publication.py:251: in <lambda>
+    os, "open", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied"))
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_atomic_publication.py:251: in <genexpr>
+    os, "open", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied"))
+E   OSError: denied
+
+The above exception was the direct cause of the following exception:
+tests/test_atomic_publication.py:254: in test_lock_acquisition_oserror_is_controlled
+    AtomicDirectoryPublisher(target, overwrite=True).__enter__()
+src/paic/artifacts/publication.py:179: in __enter__
+    self._lease.__enter__()
+src/paic/artifacts/lease.py:814: in __enter__
+    self.acquire_intent()
+src/paic/artifacts/lease.py:683: in acquire_intent
+    self.parent_fd, self.parent_info = _open_parent(self.parent)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+src/paic/artifacts/lease.py:328: in _open_parent
+    return _open_directory(parent, private=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/paic/artifacts/lease.py:319: in _open_directory
+    raise ArtifactLeaseError(f"cannot open artifact lease directory: {exc}") from exc
+E   paic.artifacts.lease.ArtifactLeaseError: cannot open artifact lease directory: denied
+__________ test_commit_failure_restores_backup_when_target_is_missing __________
+tests/test_atomic_publication.py:278: in test_commit_failure_restores_backup_when_target_is_missing
+    with pytest.raises(ArtifactPublicationError, match="not committed"):
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: 'not committed'
+E     Actual message: 'publisher lease parent was not acquired'
+=========================== short test summary info ============================
+FAILED tests/test_atomic_publication.py::test_failed_rollback_preserves_backup_and_reports_recovery_path - AssertionError: Regex pattern did not match.
+  Expected regex: 'backup preserved'
+  Actual message: 'publisher lease parent was not acquired'
+FAILED tests/test_atomic_publication.py::test_atomic_exchange_unavailable_fails_closed[failure0] - AttributeError: <module 'paic.artifacts.publication' from '/home/runner/work/probabilistic-ai-incident-commander/probabilistic-ai-incident-commander/src/paic/artifacts/publication.py'> has no attribute '_rename_exchange'
+FAILED tests/test_atomic_publication.py::test_atomic_exchange_unavailable_fails_closed[failure1] - AttributeError: <module 'paic.artifacts.publication' from '/home/runner/work/probabilistic-ai-incident-commander/probabilistic-ai-incident-commander/src/paic/artifacts/publication.py'> has no attribute '_rename_exchange'
+FAILED tests/test_atomic_publication.py::test_lock_acquisition_oserror_is_controlled - paic.artifacts.lease.ArtifactLeaseError: cannot open artifact lease directory: denied
+FAILED tests/test_atomic_publication.py::test_commit_failure_restores_backup_when_target_is_missing - AssertionError: Regex pattern did not match.
+  Expected regex: 'not committed'
+  Actual message: 'publisher lease parent was not acquired'
+5 failed, 21 passed in 83.41s (0:01:23)
+
+pytest_exit=1

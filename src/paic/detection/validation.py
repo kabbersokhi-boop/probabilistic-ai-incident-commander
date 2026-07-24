@@ -11,7 +11,7 @@ from typing import Any
 import polars as pl
 
 from paic.analytics.io import load_manifest as load_analytics_manifest
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_readers
 from paic.detection.config import DetectionConfig
 from paic.detection.engine import detection_quality_error_count
 from paic.detection.io import DetectionIOError, load_detection
@@ -145,7 +145,7 @@ def _validate_alert_explanations(
         _issue(issues, "alerts.reason_codes", f"{invalid_reasons} invalid alert reason codes")
 
 
-@artifact_reader
+@artifact_readers("detection_dir", "analytics_dir")
 def validate_detection_directory(
     detection_dir: str | Path,
     *,

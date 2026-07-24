@@ -10,7 +10,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest
@@ -265,7 +265,9 @@ def _transcript_semantic_issues(loaded: LoadedInvestigation) -> list[str]:
     return issues
 
 
-@artifact_reader
+@artifact_readers(
+    "path", "dataset_dir", "analytics_dir", "detection_dir", "impact_dir", "evidence_dir"
+)
 def validate_investigation(
     path: str | Path,
     *,
@@ -483,6 +485,9 @@ def _replay_governed_tool_trace(
         )
 
 
+@artifact_readers(
+    "path", "dataset_dir", "analytics_dir", "detection_dir", "impact_dir", "evidence_dir"
+)
 def replay_investigation(
     path: str | Path,
     *,

@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.artifact import file_sha256
 from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
@@ -75,6 +75,7 @@ def _write(path: Path, content: str) -> None:
     os.chmod(path, 0o600)
 
 
+@artifact_readers("analytics_dir", "execution_dir")
 def _derive_observations(
     scenario: ObservationScenario,
     analytics_dir: str | Path,
@@ -101,8 +102,6 @@ def _derive_observations(
             (pl.col("metric_name") == series.metric_id) & (pl.col("cohort_name") == series.cohort)
         ).sort("period_start")
         if "time_grain" in selected.columns:
-            # Analytics may publish multiple grains at the same timestamp.  A
-            # recovery series has one deterministic grain: the coarsest one.
             grain = max(
                 selected.get_column("time_grain").unique().to_list(),
                 key=lambda value: (_GRAIN_RANK.get(str(value), 0), str(value)),
@@ -157,7 +156,6 @@ def build_observations(
     *,
     overwrite: bool = False,
 ) -> RecoveryObservationSet:
-    """Derive baseline rows from validated analytics and post rows from a strict scenario."""
     observation_set = _derive_observations(scenario, analytics_dir, execution_dir)
     publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
     try:
@@ -195,7 +193,7 @@ def build_observations(
     return observation_set
 
 
-@artifact_reader
+@artifact_readers("path", "analytics_dir", "execution_dir")
 def load_observations(
     path: str | Path,
     *,
@@ -280,6 +278,7 @@ def load_observations(
     return observations
 
 
+@artifact_reader
 def observation_manifest_sha256(path: str | Path) -> str:
     return file_sha256(Path(path) / "manifest.json")
 

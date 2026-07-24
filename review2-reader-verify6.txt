@@ -1,0 +1,53 @@
+191 files already formatted
+ruff_format_exit=0
+All checks passed!
+ruff_check_exit=0
+.......................F.................F..F...................         [100%]
+=================================== FAILURES ===================================
+________________ test_decorated_reader_uses_anchored_generation ________________
+tests/test_artifact_lease_nested.py:57: in test_decorated_reader_uses_anchored_generation
+    assert read_value(root) == "old"
+E   AssertionError: assert 'new' == 'old'
+E     
+E     - old
+E     + new
+__________ test_invalid_prediction_and_benchmark_inputs_are_rejected ___________
+tests/test_evaluation.py:468: in test_invalid_prediction_and_benchmark_inputs_are_rejected
+    with pytest.raises(BenchmarkError, match="unavailable"):
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: 'unavailable'
+E     Actual message: 'predictions must be a regular non-symlink file'
+___ test_benchmark_rejects_invalid_json_duplicate_ids_symlinks_and_bad_roots ___
+src/paic/artifacts/lease.py:538: in _open_root_anchor
+    self.root_fd = os.open(self.root.name, flags, dir_fd=self.parent_fd)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   NotADirectoryError: [Errno 20] Not a directory: 'not-directory'
+
+The above exception was the direct cause of the following exception:
+tests/test_evaluation.py:596: in test_benchmark_rejects_invalid_json_duplicate_ids_symlinks_and_bad_roots
+    load_benchmark(file_root, answers)
+src/paic/artifacts/lease.py:920: in wrapped
+    with artifact_reader_leases(roots):
+/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+src/paic/artifacts/lease.py:961: in artifact_reader_leases
+    lease.prepare_anchor()
+src/paic/artifacts/lease.py:674: in prepare_anchor
+    self._open_root_anchor()
+src/paic/artifacts/lease.py:544: in _open_root_anchor
+    raise ArtifactLeaseError(f"cannot anchor artifact root: {exc}") from exc
+E   paic.artifacts.lease.ArtifactLeaseError: cannot anchor artifact root: [Errno 20] Not a directory: 'not-directory'
+=========================== short test summary info ============================
+FAILED tests/test_artifact_lease_nested.py::test_decorated_reader_uses_anchored_generation - AssertionError: assert 'new' == 'old'
+  
+  - old
+  + new
+FAILED tests/test_evaluation.py::test_invalid_prediction_and_benchmark_inputs_are_rejected - AssertionError: Regex pattern did not match.
+  Expected regex: 'unavailable'
+  Actual message: 'predictions must be a regular non-symlink file'
+FAILED tests/test_evaluation.py::test_benchmark_rejects_invalid_json_duplicate_ids_symlinks_and_bad_roots - paic.artifacts.lease.ArtifactLeaseError: cannot anchor artifact root: [Errno 20] Not a directory: 'not-directory'
+3 failed, 61 passed in 63.37s (0:01:03)
+pytest_exit=1
+Success: no issues found in 191 source files
+mypy_exit=0

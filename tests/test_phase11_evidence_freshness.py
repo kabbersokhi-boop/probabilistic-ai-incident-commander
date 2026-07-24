@@ -79,7 +79,7 @@ def test_resumed_requires_exact_boolean_false(tmp_path: Path, value: object) -> 
     summary = json.loads((root / "summary.json").read_text())
     summary["resumed"] = value
     (root / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
-    with pytest.raises(module.EvidenceValidationError, match="explicit boolean|fresh"):
+    with pytest.raises(module.EvidenceValidationError, match=r"explicit boolean|fresh"):
         module.validate_bundle(root, expected_commit="a" * 40, expected_mode="inspection")
 
 

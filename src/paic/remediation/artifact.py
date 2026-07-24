@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.artifact import replay_investigation
 from paic.remediation.config import RemediationConfig
@@ -217,7 +217,7 @@ def _safe_path(root: Path, relative: str) -> Path:
 
 def _layout_issues(root: Path, expected: set[str]) -> list[str]:
     try:
-        if not root.is_dir() or root.is_symlink():
+        if not artifact_root_is_regular(root):
             return ["artifact root is not a regular directory"]
         entries = list(root.iterdir())
     except OSError as exc:
@@ -262,7 +262,7 @@ def _load_manifest(root: Path, expected_files: set[str]) -> RemediationArtifactM
 
 @artifact_reader
 def load_control_state(path: str | Path) -> LoadedControlState:
-    root = Path(path)
+    root = artifact_path(path)
     manifest = _load_manifest(root, {"state.json"})
     if manifest.artifact_type != "control_state":
         raise RemediationArtifactError("artifact is not a control-state export")
@@ -281,7 +281,7 @@ def load_control_state(path: str | Path) -> LoadedControlState:
 
 @artifact_reader
 def load_plan(path: str | Path) -> LoadedPlan:
-    root = Path(path)
+    root = artifact_path(path)
     expected = {"remediation.config.resolved.json", "proposal.json", "plan.json"}
     manifest = _load_manifest(root, expected)
     if manifest.artifact_type != "remediation_plan":
@@ -320,7 +320,7 @@ def load_plan(path: str | Path) -> LoadedPlan:
 
 @artifact_reader
 def load_execution(path: str | Path) -> LoadedExecution:
-    root = Path(path)
+    root = artifact_path(path)
     manifest = _load_manifest(root, {"receipt.json"})
     if manifest.artifact_type != "execution_receipt":
         raise RemediationArtifactError("artifact is not an execution export")
@@ -353,7 +353,7 @@ def load_execution(path: str | Path) -> LoadedExecution:
 
 @artifact_reader
 def manifest_sha256(path: str | Path) -> str:
-    return str(file_sha256(Path(path) / "manifest.json"))
+    return str(file_sha256(artifact_path(Path(path) / "manifest.json")))
 
 
 def validate_control_state(path: str | Path) -> list[str]:

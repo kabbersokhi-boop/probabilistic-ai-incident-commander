@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 import polars as pl
 
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
 from paic.simulator.config import SimulationConfig
 from paic.simulator.io import (
     DatasetIOError,
@@ -94,7 +94,7 @@ def validate_tables(
 def validate_dataset_directory(dataset_dir: str | Path) -> DatasetValidationReport:
     """Validate an exported dataset, including hashes and its resolved config."""
 
-    root = Path(dataset_dir)
+    root = artifact_path(dataset_dir)
     try:
         manifest, tables = load_dataset(root)
     except DatasetIOError as exc:

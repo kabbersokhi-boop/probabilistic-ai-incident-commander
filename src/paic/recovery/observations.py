@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
-from paic.artifacts.lease import artifact_reader, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.artifact import file_sha256
 from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
@@ -138,7 +138,7 @@ def _derive_observations(
             "incident_id": execution.receipt.incident_id,
             "execution_receipt_sha256": execution.receipt.receipt_sha256,
             "execution_manifest_sha256": manifest_sha256(execution_dir),
-            "analytics_manifest_sha256": file_sha256(Path(analytics_dir) / "manifest.json"),
+            "analytics_manifest_sha256": file_sha256(artifact_path(Path(analytics_dir) / "manifest.json")),
             "source_simulation_id": analytics_manifest.source_simulation_id,
             "generator_config_sha256": _digest(scenario.model_dump(mode="json")),
             "executed_at": execution.receipt.executed_at,
@@ -200,8 +200,8 @@ def load_observations(
     analytics_dir: str | Path | None = None,
     execution_dir: str | Path | None = None,
 ) -> RecoveryObservationSet:
-    root = Path(path)
-    if root.is_symlink() or not root.is_dir() or {item.name for item in root.iterdir()} != EXPECTED:
+    root = artifact_path(path)
+    if not artifact_root_is_regular(root) or {item.name for item in root.iterdir()} != EXPECTED:
         raise ObservationError("observation artifact contains missing or undeclared paths")
     if any(item.is_symlink() or not item.is_file() for item in root.iterdir()):
         raise ObservationError("observation artifact contains non-regular paths")
@@ -256,7 +256,7 @@ def load_observations(
         analytics = load_analytics(analytics_dir)
         analytics_manifest = load_manifest(analytics_dir)
         if observations.analytics_manifest_sha256 != file_sha256(
-            Path(analytics_dir) / "manifest.json"
+            artifact_path(Path(analytics_dir) / "manifest.json")
         ):
             raise ObservationError("observation artifact is bound to another analytics manifest")
         if observations.source_simulation_id != analytics_manifest.source_simulation_id:
@@ -280,7 +280,7 @@ def load_observations(
 
 @artifact_reader
 def observation_manifest_sha256(path: str | Path) -> str:
-    return file_sha256(Path(path) / "manifest.json")
+    return file_sha256(artifact_path(Path(path) / "manifest.json"))
 
 
 def validate_observations(

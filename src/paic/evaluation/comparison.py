@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from paic.artifacts.lease import artifact_reader, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.artifact import replay_evaluation
 from paic.evaluation.benchmark import digest_value
@@ -253,8 +253,8 @@ def export_comparison(report: ComparisonReport, output_dir: str | Path) -> None:
 
 @artifact_reader
 def load_comparison(root: str | Path) -> ComparisonReport:
-    path = Path(root)
-    if path.is_symlink() or not path.is_dir():
+    path = artifact_path(root)
+    if not artifact_root_is_regular(path):
         raise ComparisonArtifactError("comparison root must be a regular directory")
     entries = list(path.iterdir())
     if {item.name for item in entries} != {"comparison.json", "manifest.json", "_SUCCESS"}:

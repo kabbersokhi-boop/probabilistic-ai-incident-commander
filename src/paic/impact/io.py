@@ -13,7 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.impact.config import ImpactConfig
 from paic.impact.engine import impact_quality_error_count
@@ -142,7 +142,7 @@ def _export_impact_to_root(result: ImpactBuildResult, root: Path) -> ImpactManif
 
 
 def load_manifest(impact_dir: str | Path) -> ImpactManifest:
-    path = Path(impact_dir) / "manifest.json"
+    path = artifact_path(Path(impact_dir) / "manifest.json")
     try:
         return ImpactManifest.model_validate_json(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -161,7 +161,7 @@ def _safe_path(root: Path, relative_path: str) -> Path:
 
 @artifact_reader
 def load_impact(impact_dir: str | Path) -> LoadedImpact:
-    root = Path(impact_dir)
+    root = artifact_path(impact_dir)
     manifest = load_manifest(root)
     tables: ImpactFrameMap = {}
     for table in manifest.tables:

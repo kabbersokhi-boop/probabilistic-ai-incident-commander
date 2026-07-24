@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.config import RecoveryConfig
 from paic.recovery.engine import evaluate_recovery, verify_report
@@ -49,7 +49,7 @@ def file_sha256(path: Path) -> str:
 
 @artifact_reader
 def manifest_sha256(path: str | Path) -> str:
-    return file_sha256(Path(path) / "manifest.json")
+    return file_sha256(artifact_path(Path(path) / "manifest.json"))
 
 
 def _write(path: Path, content: str) -> RecoveryArtifactFile:
@@ -125,7 +125,7 @@ def export_recovery(
 
 
 def _load_manifest(root: Path) -> RecoveryArtifactManifest:
-    if not root.is_dir() or root.is_symlink():
+    if not artifact_root_is_regular(root):
         raise RecoveryArtifactError("recovery artifact root is not a regular directory")
     entries = list(root.iterdir())
     names = {item.name for item in entries}
@@ -158,7 +158,7 @@ def _load_manifest(root: Path) -> RecoveryArtifactManifest:
 
 @artifact_reader
 def load_recovery(path: str | Path) -> LoadedRecovery:
-    root = Path(path)
+    root = artifact_path(path)
     manifest = _load_manifest(root)
     try:
         config = RecoveryConfig.model_validate_json(

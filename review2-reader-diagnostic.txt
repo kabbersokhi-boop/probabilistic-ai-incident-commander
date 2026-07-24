@@ -1,0 +1,42 @@
+
+exit_code=0
+
+--- git diff --stat ---
+ src/paic/analytics/io.py           |  6 +--
+ src/paic/analytics/validation.py   |  6 +--
+ src/paic/artifacts/lease.py        | 88 +++++++++++++++++++++++++++++++++-----
+ src/paic/detection/io.py           |  6 +--
+ src/paic/detection/validation.py   |  6 +--
+ src/paic/evaluation/artifact.py    | 12 +++---
+ src/paic/evaluation/comparison.py  |  6 +--
+ src/paic/evidence/io.py            |  6 +--
+ src/paic/evidence/validation.py    |  4 +-
+ src/paic/impact/io.py              |  6 +--
+ src/paic/impact/validation.py      |  6 +--
+ src/paic/investigation/artifact.py |  8 ++--
+ src/paic/recovery/artifact.py      |  8 ++--
+ src/paic/recovery/observations.py  | 12 +++---
+ src/paic/remediation/artifact.py   | 12 +++---
+ src/paic/simulator/io.py           |  6 +--
+ src/paic/simulator/validation.py   |  4 +-
+ 17 files changed, 135 insertions(+), 67 deletions(-)
+
+--- git status --short ---
+ M src/paic/analytics/io.py
+ M src/paic/analytics/validation.py
+ M src/paic/artifacts/lease.py
+ M src/paic/detection/io.py
+ M src/paic/detection/validation.py
+ M src/paic/evaluation/artifact.py
+ M src/paic/evaluation/comparison.py
+ M src/paic/evidence/io.py
+ M src/paic/evidence/validation.py
+ M src/paic/impact/io.py
+ M src/paic/impact/validation.py
+ M src/paic/investigation/artifact.py
+ M src/paic/recovery/artifact.py
+ M src/paic/recovery/observations.py
+ M src/paic/remediation/artifact.py
+ M src/paic/simulator/io.py
+ M src/paic/simulator/validation.py
+?? review2-reader-diagnostic.txt

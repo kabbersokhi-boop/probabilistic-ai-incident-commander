@@ -13,7 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import evidence_quality_error_count
@@ -151,7 +151,7 @@ def _export_evidence_to_root(result: EvidenceBuildResult, root: Path) -> Evidenc
 
 
 def load_manifest(evidence_dir: str | Path) -> EvidenceManifest:
-    path = Path(evidence_dir) / "manifest.json"
+    path = artifact_path(Path(evidence_dir) / "manifest.json")
     try:
         return EvidenceManifest.model_validate_json(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -170,7 +170,7 @@ def _safe_path(root: Path, relative_path: str) -> Path:
 
 @artifact_reader
 def load_evidence(evidence_dir: str | Path) -> LoadedEvidence:
-    root = Path(evidence_dir)
+    root = artifact_path(evidence_dir)
     manifest = load_manifest(root)
     tables: EvidenceFrameMap = {}
     for table in manifest.tables:

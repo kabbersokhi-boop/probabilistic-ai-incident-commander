@@ -8,7 +8,7 @@ from pathlib import Path
 
 import polars as pl
 
-from paic.artifacts.lease import artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_readers
 from paic.impact.config import ImpactConfig
 from paic.impact.engine import ImpactBuildError, build_impact
 from paic.impact.io import ImpactIOError, load_impact
@@ -34,7 +34,7 @@ class ImpactValidationReport:
 def validate_impact_directory(
     impact_dir: str | Path, *, dataset_dir: str | Path | None = None
 ) -> ImpactValidationReport:
-    root = Path(impact_dir)
+    root = artifact_path(impact_dir)
     issues: list[ImpactValidationIssue] = []
     try:
         loaded = load_impact(root)
@@ -74,7 +74,7 @@ def validate_impact_directory(
     ):
         issues.append(ImpactValidationIssue("impact.success_marker", "success marker mismatch"))
     if dataset_dir is not None:
-        source_manifest = Path(dataset_dir) / "manifest.json"
+        source_manifest = artifact_path(Path(dataset_dir) / "manifest.json")
         if (
             not source_manifest.is_file()
             or file_sha256(source_manifest) != manifest.source_manifest_sha256

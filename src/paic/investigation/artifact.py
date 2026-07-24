@@ -10,7 +10,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest
@@ -145,7 +145,7 @@ def _closed_world_issues(root: Path) -> list[str]:
 
     issues: list[str] = []
     try:
-        if not root.is_dir() or root.is_symlink():
+        if not artifact_root_is_regular(root):
             return ["investigation artifact root is not a regular directory"]
         entries = list(root.iterdir())
     except OSError as exc:
@@ -163,7 +163,7 @@ def _closed_world_issues(root: Path) -> list[str]:
 
 @artifact_reader
 def load_investigation(path: str | Path) -> LoadedInvestigation:
-    root = Path(path)
+    root = artifact_path(path)
     layout_issues = _closed_world_issues(root)
     if layout_issues:
         raise InvestigationArtifactError("; ".join(layout_issues))
@@ -277,7 +277,7 @@ def validate_investigation(
     impact_dir: str | Path | None = None,
     evidence_dir: str | Path | None = None,
 ) -> list[str]:
-    root = Path(path)
+    root = artifact_path(path)
     issues: list[str] = []
     issues.extend(_closed_world_issues(root))
     if issues:

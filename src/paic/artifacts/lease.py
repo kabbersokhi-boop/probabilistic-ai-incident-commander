@@ -59,6 +59,9 @@ _ACTIVE_PARENTS: contextvars.ContextVar[dict[str, tuple[int, int, int, Owner]] |
 _ACTIVE_ROOT_FDS: contextvars.ContextVar[dict[int, Owner] | None] = contextvars.ContextVar(
     "paic_active_artifact_root_fds", default=None
 )
+_ACTIVE_ROOT_PATHS: contextvars.ContextVar[
+    dict[str, tuple[tuple[int, Owner], ...]] | None
+] = contextvars.ContextVar("paic_active_artifact_root_paths", default=None)
 
 
 def _execution_owner() -> Owner:
@@ -106,6 +109,76 @@ def _set_active_root_fd(fd: int, owner: Owner | None) -> None:
     else:
         state[fd] = owner
     _ACTIVE_ROOT_FDS.set(state)
+
+
+def _active_root_paths() -> dict[str, tuple[tuple[int, Owner], ...]]:
+    return _ACTIVE_ROOT_PATHS.get() or {}
+
+
+def _push_active_root(path: Path, fd: int, owner: Owner) -> None:
+    state = dict(_active_root_paths())
+    key = os.path.normcase(os.fspath(_canonical_root(path)))
+    state[key] = (*state.get(key, ()), (fd, owner))
+    _ACTIVE_ROOT_PATHS.set(state)
+
+
+def _pop_active_root(path: Path, fd: int, owner: Owner) -> None:
+    state = dict(_active_root_paths())
+    key = os.path.normcase(os.fspath(_canonical_root(path)))
+    current = list(state.get(key, ()))
+    for index in range(len(current) - 1, -1, -1):
+        if current[index] == (fd, owner):
+            current.pop(index)
+            break
+    if current:
+        state[key] = tuple(current)
+    else:
+        state.pop(key, None)
+    _ACTIVE_ROOT_PATHS.set(state)
+
+
+def _descriptor_root(fd: int) -> Path | None:
+    for base in (Path("/proc/self/fd"), Path("/dev/fd")):
+        if base.is_dir():
+            return base / str(fd)
+    return None
+
+
+def artifact_path(path: str | Path) -> Path:
+    """Return an owner-scoped descriptor-relative path for an active artifact root."""
+
+    candidate = _canonical_root(path)
+    candidate_text = os.path.normcase(os.fspath(candidate))
+    owner = _execution_owner()
+    for root_text, entries in sorted(
+        _active_root_paths().items(), key=lambda item: len(item[0]), reverse=True
+    ):
+        if not entries or entries[-1][1] != owner:
+            continue
+        try:
+            relative = candidate.relative_to(Path(root_text))
+        except ValueError:
+            continue
+        descriptor = _descriptor_root(entries[-1][0])
+        if descriptor is None:
+            return candidate
+        return descriptor / relative
+    return candidate
+
+
+def artifact_root_is_regular(path: str | Path) -> bool:
+    """Check an artifact root without rejecting an internal descriptor anchor."""
+
+    candidate = _canonical_root(path)
+    key = os.path.normcase(os.fspath(candidate))
+    entries = _active_root_paths().get(key, ())
+    owner = _execution_owner()
+    if entries and entries[-1][1] == owner:
+        try:
+            return stat.S_ISDIR(os.fstat(entries[-1][0]).st_mode)
+        except OSError:
+            return False
+    return not candidate.is_symlink() and candidate.is_dir()
 
 
 def _descriptor_fd(value: object) -> int | None:
@@ -474,10 +547,7 @@ class _ArtifactLease:
     def anchored_root(self) -> Path:
         if self.root_fd is None:
             return self.root
-        for base in (Path("/proc/self/fd"), Path("/dev/fd")):
-            if base.is_dir():
-                return base / str(self.root_fd)
-        raise ArtifactLeaseError("descriptor-backed artifact paths are unavailable")
+        return _descriptor_root(self.root_fd) or self.root
 
     def _parent_key(self) -> str:
         return os.path.normcase(os.fspath(self.parent))
@@ -559,6 +629,7 @@ class _ArtifactLease:
         self._record_active_parent()
         if self.root_fd is not None:
             _set_active_root_fd(self.root_fd, owner)
+            _push_active_root(self.root, self.root_fd, owner)
         self._active = True
 
     def _unmark_active(self) -> None:
@@ -569,6 +640,8 @@ class _ArtifactLease:
             self._active = False
             return
         if self.root_fd is not None:
+            owner = _execution_owner()
+            _pop_active_root(self.root, self.root_fd, owner)
             _set_active_root_fd(self.root_fd, None)
         self._release_active_parent()
         if current[1] <= 1:
@@ -839,12 +912,7 @@ def _reader_wrapper(
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
         roots = [bound.arguments.get(name) for name in root_names]
-        with artifact_reader_leases(roots) as anchored:
-            for name in root_names:
-                value = bound.arguments.get(name)
-                if value is not None and not _is_active_descriptor_root(value):
-                    key = os.path.normcase(os.fspath(_canonical_root(value)))
-                    bound.arguments[name] = anchored.get(key, value)
+        with artifact_reader_leases(roots):
             return func(*bound.args, **bound.kwargs)
 
     return wrapped

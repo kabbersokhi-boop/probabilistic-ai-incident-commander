@@ -8,7 +8,7 @@ from pathlib import Path
 
 import polars as pl
 
-from paic.artifacts.lease import artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_readers
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import (
     EvidenceBuildError,
@@ -183,7 +183,7 @@ def validate_evidence_directory(
     detection_dir: str | Path | None = None,
     impact_dir: str | Path | None = None,
 ) -> EvidenceValidationReport:
-    root = Path(evidence_dir)
+    root = artifact_path(evidence_dir)
     issues: list[EvidenceValidationIssue] = []
     try:
         loaded = load_evidence(root)

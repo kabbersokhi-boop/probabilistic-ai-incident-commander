@@ -11,7 +11,7 @@ from typing import Any
 import polars as pl
 
 from paic.analytics.io import load_manifest as load_analytics_manifest
-from paic.artifacts.lease import artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_readers
 from paic.detection.config import DetectionConfig
 from paic.detection.engine import detection_quality_error_count
 from paic.detection.io import DetectionIOError, load_detection
@@ -151,7 +151,7 @@ def validate_detection_directory(
     *,
     analytics_dir: str | Path | None = None,
 ) -> DetectionValidationReport:
-    root = Path(detection_dir)
+    root = artifact_path(detection_dir)
     issues: list[DetectionValidationIssue] = []
     try:
         loaded = load_detection(root)
@@ -276,7 +276,7 @@ def validate_detection_directory(
                 _issue(issues, "manifest.benchmark_summary", f"{field_name} differs from table")
 
     if analytics_dir is not None:
-        analytics_root = Path(analytics_dir)
+        analytics_root = artifact_path(analytics_dir)
         try:
             source_manifest = load_analytics_manifest(analytics_root)
         except Exception as exc:

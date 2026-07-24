@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.config import SimulationConfig
 from paic.simulator.manifest import (
@@ -166,7 +166,7 @@ def _export_dataset_to_root(result: SimulationResult, root: Path) -> DatasetMani
 
 @artifact_reader
 def load_manifest(dataset_dir: str | Path) -> DatasetManifest:
-    path = Path(dataset_dir) / "manifest.json"
+    path = artifact_path(artifact_path(Path(dataset_dir) / "manifest.json"))
     try:
         return DatasetManifest.model_validate_json(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -185,7 +185,7 @@ def _safe_dataset_path(root: Path, relative_path: str) -> Path:
 
 @artifact_reader
 def load_dataset(dataset_dir: str | Path) -> tuple[DatasetManifest, FrameMap]:
-    root = Path(dataset_dir)
+    root = artifact_path(dataset_dir)
     manifest = load_manifest(root)
     tables: FrameMap = {}
     for table in manifest.tables:

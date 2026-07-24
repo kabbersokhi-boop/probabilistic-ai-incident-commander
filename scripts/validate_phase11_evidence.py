@@ -34,6 +34,12 @@ def _hash(value: Any, name: str) -> None:
         raise EvidenceValidationError(f"{name} must be a lowercase SHA-256 digest")
 
 
+def _exact_bool(mapping: dict[str, Any], key: str, source: str) -> bool:
+    if key not in mapping or type(mapping[key]) is not bool:
+        raise EvidenceValidationError(f"{source}.{key} must be an explicit boolean")
+    return mapping[key]
+
+
 def validate_bundle(
     output_dir: str | Path,
     *,
@@ -57,6 +63,13 @@ def validate_bundle(
         _hash(metadata.get(key), f"metadata.{key}")
         if summary.get(key) != metadata.get(key):
             raise EvidenceValidationError(f"summary.{key} does not match metadata")
+
+    metadata_fresh = _exact_bool(metadata, "fresh", "metadata")
+    if summary.get("fresh") is not metadata_fresh:
+        raise EvidenceValidationError("summary.fresh does not match metadata")
+    resumed = _exact_bool(summary, "resumed", "summary")
+    if reject_resumed_endurance and (metadata_fresh is not True or resumed is not False):
+        raise EvidenceValidationError("release evidence must be an explicit fresh, non-resumed run")
 
     iterations_path = root / "iterations.jsonl"
     try:
@@ -93,7 +106,12 @@ def validate_bundle(
     durations: list[float] = []
     for record in records:
         duration = record.get("duration_seconds")
-        if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+        if (
+            not isinstance(duration, (int, float))
+            or isinstance(duration, bool)
+            or not math.isfinite(duration)
+            or duration < 0
+        ):
             raise EvidenceValidationError("iteration duration is invalid")
         durations.append(float(duration))
         for field in ("configured_stage_count", "healthy_stage_count", "authoritative_stage_count"):
@@ -114,8 +132,11 @@ def validate_bundle(
 
     cumulative = sum(durations)
     reported = summary.get("cumulative_inspection_seconds")
-    if not isinstance(reported, (int, float)) or not math.isclose(
-        cumulative, float(reported), rel_tol=1e-9, abs_tol=1e-6
+    if (
+        not isinstance(reported, (int, float))
+        or isinstance(reported, bool)
+        or not math.isfinite(float(reported))
+        or not math.isclose(cumulative, float(reported), rel_tol=1e-9, abs_tol=1e-6)
     ):
         raise EvidenceValidationError("cumulative duration does not match JSONL")
     if summary.get("minimum_iterations") != min_iterations:
@@ -127,8 +148,6 @@ def validate_bundle(
         raise EvidenceValidationError("minimum thresholds are not satisfied")
     if summary.get("publication_debris") != []:
         raise EvidenceValidationError("publication debris is present")
-    if summary.get("resumed") is True and reject_resumed_endurance:
-        raise EvidenceValidationError("release evidence must be a fresh run")
 
     limits = (
         ("fd_delta", max_fd_delta),

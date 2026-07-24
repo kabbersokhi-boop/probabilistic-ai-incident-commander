@@ -13,7 +13,9 @@ def test_nested_same_domain_parent_replacement_fails_closed(tmp_path: Path) -> N
     first.mkdir(parents=True)
     second.mkdir()
 
-    with pytest.raises(ArtifactLeaseError, match="parent changed"):
-        with artifact_reader_leases([first, second]):
-            second.parent.rename(tmp_path / "artifacts-old")
-            second.mkdir(parents=True)
+    with (
+        pytest.raises(ArtifactLeaseError, match="parent changed"),
+        artifact_reader_leases([first, second]),
+    ):
+        second.parent.rename(tmp_path / "artifacts-old")
+        second.mkdir(parents=True)

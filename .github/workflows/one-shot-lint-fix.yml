@@ -22,7 +22,7 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Apply safe Ruff fixes
         run: |
-          ruff check --fix .
+          ruff check --fix . || true
           ruff format .
       - name: Remove one-shot workflow
         run: rm .github/workflows/one-shot-lint-fix.yml

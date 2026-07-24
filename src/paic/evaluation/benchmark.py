@@ -12,6 +12,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from paic.artifacts.lease import artifact_path, artifact_readers, artifact_root_is_regular
 from paic.evaluation.models import EvaluationConfig, HiddenAnswerKey, Prediction, VisibleCase
 
 
@@ -61,13 +62,13 @@ def tool_policy_digest(cases: list[VisibleCase], config: EvaluationConfig) -> st
 
 
 def _regular_file(path: Path, label: str) -> Path:
+    anchored = artifact_path(path)
     try:
-        resolved = path.resolve(strict=True)
+        if anchored.is_symlink() or not anchored.is_file():
+            raise BenchmarkError(f"{label} must be a regular non-symlink file")
     except OSError as exc:
         raise BenchmarkError(f"{label} is unavailable: {path}") from exc
-    if path.is_symlink() or not resolved.is_file():
-        raise BenchmarkError(f"{label} must be a regular non-symlink file")
-    return resolved
+    return anchored
 
 
 def _load_model_list(path: Path, model: type[_ModelT], label: str) -> list[_ModelT]:
@@ -89,7 +90,7 @@ def _validate_distinct_roots(visible_root: Path, answer_root: Path) -> None:
         raise BenchmarkError("benchmark roots must exist") from exc
     if visible_root.is_symlink() or answer_root.is_symlink():
         raise BenchmarkError("benchmark roots must not be symlinks")
-    if not visible.is_dir() or not answers.is_dir():
+    if not artifact_root_is_regular(visible_root) or not artifact_root_is_regular(answer_root):
         raise BenchmarkError("benchmark roots must be directories")
     if visible == answers or visible in answers.parents or answers in visible.parents:
         raise BenchmarkError("visible and hidden roots must be separate and non-nested")
@@ -136,12 +137,15 @@ def _validate_hidden_label_isolation(
                 )
 
 
+@artifact_readers("visible_dir", "answers_dir")
 def load_benchmark(
     visible_dir: str | Path, answers_dir: str | Path
 ) -> tuple[list[VisibleCase], list[HiddenAnswerKey], str, str]:
-    visible_root = Path(visible_dir)
-    answer_root = Path(answers_dir)
-    _validate_distinct_roots(visible_root, answer_root)
+    visible_lexical = Path(visible_dir)
+    answer_lexical = Path(answers_dir)
+    _validate_distinct_roots(visible_lexical, answer_lexical)
+    visible_root = artifact_path(visible_lexical)
+    answer_root = artifact_path(answer_lexical)
     visible = _load_model_list(visible_root / "cases.json", VisibleCase, "visible cases")
     answers = _load_model_list(answer_root / "answer-keys.json", HiddenAnswerKey, "answer keys")
     visible_ids = _validate_case_ids(visible, "visible benchmark")

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from paic.artifacts.lease import ArtifactLeaseError, artifact_reader_leases
+from paic.artifacts.lease import artifact_path, ArtifactLeaseError, artifact_reader_leases
 
 
 def test_nested_same_domain_parent_replacement_fails_closed(tmp_path: Path) -> None:

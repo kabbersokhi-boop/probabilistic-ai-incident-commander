@@ -1,0 +1,6 @@
+
+exit_code=0
+ src/paic/artifacts/lease.py         | 42 +------------------------------------
+ src/paic/evaluation/benchmark.py    | 20 +++++++++++-------
+ tests/test_artifact_lease_nested.py |  2 +-
+ 3 files changed, 14 insertions(+), 50 deletions(-)

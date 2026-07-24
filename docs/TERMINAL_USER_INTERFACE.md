@@ -27,6 +27,13 @@ The standalone package entry point is equivalent:
 paic-tui run --workspace configs/tui/smoke.yaml
 ```
 
+`make tui-smoke` is the authoritative smoke build: it regenerates the remediation
+execution and then regenerates and validates the recovery observations/report
+against that exact execution. Do not treat a recovery report from a previous
+execution generation as reusable. The validator fails closed when any receipt,
+execution-manifest, incident, execution-time, or observation-manifest binding
+differs.
+
 Create a starter configuration with:
 
 ```bash
@@ -57,7 +64,10 @@ Select a number for plain-language details. Refresh reruns all configured valida
 
 - `0`: no configured stage has an error or missing artifact;
 - `1`: at least one configured stage is invalid or missing;
-- `2`: the workspace configuration itself is invalid.
+- `2`: the workspace configuration or artifact-coordination layer is invalid or unavailable.
+
+Lease and permission failures are reported as sanitized JSON errors on stderr and
+never bypass locking or appear as authoritative health.
 
 Warnings intentionally return `0`: they describe incomplete provenance configuration, not a corrupted artifact. CI environments that require every stage to be authoritative should additionally inspect the JSON `authoritative` fields.
 

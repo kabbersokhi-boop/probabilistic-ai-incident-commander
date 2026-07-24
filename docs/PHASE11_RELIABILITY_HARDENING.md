@@ -12,7 +12,11 @@ The primitive distinguishes:
 - failure after the new generation becomes visible: the operation reports that commit occurred but durability confirmation is uncertain;
 - successful commit and parent-directory sync: the new generation is authoritative and the backup is removed.
 
-The first migration targets the simulator dataset and analytics artifact exporters. Remaining exporters should migrate in small reviewed groups.
+All overwritable artifact exporters use this primitive (including remediation,
+recovery observations/reports, evaluation, comparison, analytics, detection,
+impact, evidence, simulator, and investigation outputs). A writer holds the
+matching artifact lease for the complete transaction; readers use that same
+lease root.
 
 The publisher now serializes writers with a per-target exclusive lock. Lock files
 are never broken automatically; an operator must verify the recorded writer is
@@ -30,14 +34,24 @@ controlled, non-committing publication errors; the live generation is untouched.
 Initial publication without overwrite still uses ordinary `os.replace` and is
 portable. Crash-consistent overwrite is therefore explicitly Linux-only.
 
-Readers and publishers also coordinate through a persistent per-artifact
-`.lease` inode. POSIX/Linux `flock` shared leases cover each public loader's
-complete manifest-and-payload read; publishers take the exclusive lease from
-durability checks through exchange, backup cleanup, and final parent sync. The
-inode is never unlinked or recreated during normal operation. Kernel leases are
-released automatically when a process exits. Symlinked and non-regular lease
-paths fail closed. Multi-root callers must acquire leases in canonical absolute
-path order when they need a cross-artifact snapshot.
+Readers and publishers also coordinate through persistent per-artifact lease
+and intent inodes. Every entrant takes the exclusive intent turnstile first and
+retains it for the complete lease. This deliberately serializes artifact
+readers: it closes the pathname-replacement race that could otherwise create a
+second active lock domain while preserving a shared data-lock check and a
+strict writer boundary. Thus a declared writer gates all later readers and
+existing readers drain deterministically. The lock order is **intent -> verified parent directory -> data lease**;
+multi-root callers sort canonical roots and acquire every intent before any
+data lease. Kernel locks are released automatically when a process exits, so
+abandoned intent is recoverable. Lease paths are never recreated automatically;
+symlinked, replaced, non-regular, multiply-linked, or incorrectly-owned paths
+fail closed.
+
+The threat model assumes the artifact parent is owned by the current effective
+user and is not group/world writable. Accidental replacement by another
+application process is detected by descriptor/path identity revalidation. A
+privileged process able to replace the verified parent directory is outside the
+model; such a process can defeat filesystem locking itself.
 
 If restoration fails, the complete backup is retained and its path is included in
 the controlled error. Cleanup never deletes the only remaining complete generation.
@@ -73,9 +87,11 @@ including its authoritative validation and replay paths. It atomically records
 source commit, raw workspace-file hash, resolved-configuration hash, resource
 baselines, and a machine-readable summary. Each completed iteration is appended
 and fsynced to `iterations.jsonl`; metadata and `summary.json` are replaced
-atomically. Re-running with the same output directory resumes at the next
-iteration. A different commit or configuration fails closed rather than mixing
-results.
+atomically. Local diagnostic runs may resume with the same commit and
+configuration, but release certification is always invoked with `--fresh` and
+the evidence validator rejects resumed release evidence: resource deltas must
+cover one complete process/run, never just the final resumed segment. A
+different commit or configuration fails closed rather than mixing results.
 
 The default GC-object allowance is 2,048 objects after warm-up and an explicit
 garbage collection. It is a deliberately generous leak-regression ceiling, not
@@ -88,6 +104,8 @@ status counts, FD/RSS/tracemalloc/GC deltas, and publication
 staging/backup/PID-lock debris. Persistent artifact-level control locks are
 reported separately as diagnostic context and do not count as transactional
 debris.
-The `phase11-authoritative-soak.yml` workflow is `workflow_dispatch` only and
-runs this command separately on Python 3.11 and 3.12 with uploaded results; it
-uses no credentials or external providers.
+The `phase11-authoritative-soak.yml` workflow has two explicit modes. Pull
+requests run a count-only inspection gate (25 complete inspections), while
+`workflow_dispatch` runs the final endurance certification (25 inspections and
+1,800 cumulative inspection seconds). Both run separately on Python 3.11 and
+3.12 with uploaded results; they use no credentials or external providers.

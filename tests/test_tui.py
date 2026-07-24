@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from paic.artifacts.lease import ArtifactLeaseError
 from paic.tui import workspace as workspace_module
 from paic.tui.app import TUIApplication
 from paic.tui.cli import dispatch_tui
@@ -430,6 +431,176 @@ def test_workspace_safety_helpers_report_unsafe_and_failed_inspection(tmp_path: 
     )
     assert failed.status == "error"
     assert "boom" in failed.issues
+
+
+def test_recovery_stage_exposes_authoritative_binding_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Recovery validation failures remain visible rather than becoming generic TUI errors."""
+    observations = tmp_path / "observations"
+    analytics = tmp_path / "analytics"
+    execution = tmp_path / "execution"
+    report = tmp_path / "report"
+    for path in (observations, analytics, execution, report):
+        path.mkdir()
+    monkeypatch.setattr(
+        "paic.tui.workspace.validate_recovery",
+        lambda *_, **__: ["observation artifact is bound to another execution"],
+    )
+    monkeypatch.setattr(
+        "paic.tui.workspace.load_recovery",
+        lambda _: SimpleNamespace(
+            report=SimpleNamespace(
+                decision="recovered", metric_evaluations=[1], recovery_id="recovery-1"
+            )
+        ),
+    )
+    config = WorkspaceConfig(
+        workspace_id="recovery-room",
+        display_name="Recovery room",
+        root_dir=tmp_path,
+        paths=WorkspacePaths.model_validate(
+            {
+                "remediation": {"execution_dir": execution},
+                "recovery": {
+                    "observations_dir": observations,
+                    "analytics_dir": analytics,
+                    "report_dir": report,
+                },
+            }
+        ),
+    )
+
+    stage = next(item for item in inspect_workspace(config).stages if item.key == "recovery")
+    assert stage.status == "error"
+    assert not stage.authoritative
+    assert stage.summary == "Recovery evidence failed validation."
+    assert stage.issues == ["observation artifact is bound to another execution"]
+
+
+def test_workspace_lease_failure_is_a_controlled_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    config = WorkspaceConfig(
+        workspace_id="lease-room",
+        display_name="Lease room",
+        root_dir=tmp_path,
+        paths=WorkspacePaths.model_validate({"metrics": {"dataset_dir": artifact}}),
+    )
+    monkeypatch.setattr(
+        workspace_module,
+        "artifact_reader_leases",
+        lambda _: (_ for _ in ()).throw(
+            ArtifactLeaseError("artifact coordination file must be regular")
+        ),
+    )
+    snapshot = inspect_workspace(config)
+    assert snapshot.overall_status == "error"
+    assert snapshot.healthy_stage_count == 0
+    assert snapshot.stages[0].status == "error"
+    assert "coordination file" in snapshot.stages[0].issues[0]
+
+
+def test_subordinate_only_recovery_configuration_is_not_reported_unconfigured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    observations = tmp_path / "observations"
+    observations.mkdir()
+    config = WorkspaceConfig(
+        workspace_id="subordinate-recovery",
+        display_name="Subordinate recovery",
+        root_dir=tmp_path,
+        paths=WorkspacePaths.model_validate({"recovery": {"observations_dir": observations}}),
+    )
+    monkeypatch.setattr(
+        workspace_module,
+        "artifact_reader_leases",
+        lambda _: (_ for _ in ()).throw(ArtifactLeaseError("unsafe lease")),
+    )
+    snapshot = inspect_workspace(config)
+    recovery = next(stage for stage in snapshot.stages if stage.key == "recovery")
+    assert recovery.status == "error"
+    assert "leases could not be acquired" in recovery.issues[0].lower()
+    assert snapshot.overall_status == "error"
+    assert snapshot.configured_stage_count == 1
+
+
+def test_interactive_run_refuses_start_after_coordination_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = WorkspaceConfig(
+        workspace_id="subordinate-recovery",
+        display_name="Subordinate recovery",
+        root_dir=tmp_path,
+        paths=WorkspacePaths(),
+    )
+    failed = WorkspaceSnapshot(
+        workspace_id=config.workspace_id,
+        display_name=config.display_name,
+        root_dir=".",
+        overall_status="error",
+        configured_stage_count=1,
+        healthy_stage_count=0,
+        stages=[
+            StageSnapshot(
+                key="recovery",
+                title="Recovery verification",
+                status="error",
+                summary="coordination failed",
+                issues=["Workspace artifact leases could not be acquired safely: unsafe lease"],
+            )
+        ],
+    )
+    monkeypatch.setattr("paic.tui.cli._load_snapshot", lambda _: (config, failed))
+    monkeypatch.setattr(
+        "paic.tui.cli.TUIApplication",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("UI started")),
+    )
+    args: Any = type(
+        "Args",
+        (),
+        {
+            "tui_command": "run",
+            "workspace": tmp_path / "unused.yaml",
+            "format": "json",
+            "no_color": True,
+            "ascii": True,
+        },
+    )()
+    assert dispatch_tui(args) == 2
+    assert "interactive UI was not started" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", ["run", "snapshot", "validate"])  # type: ignore[untyped-decorator]
+def test_cli_lease_failure_has_no_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    monkeypatch.setattr(
+        "paic.tui.cli._load_snapshot",
+        lambda _: (_ for _ in ()).throw(ArtifactLeaseError("flock unavailable")),
+    )
+    args: Any = type(
+        "Args",
+        (),
+        {
+            "tui_command": command,
+            "workspace": tmp_path / "unused.yaml",
+            "format": "json",
+            "no_color": True,
+            "ascii": True,
+        },
+    )()
+    assert dispatch_tui(args) == 2
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert '"error": "flock unavailable"' in captured.err
 
 
 def test_tui_snapshot_json_returns_success_for_healthy_workspace(

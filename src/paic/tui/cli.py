@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from paic.artifacts.lease import ArtifactLeaseError
 from paic.tui.app import TUIApplication
 from paic.tui.config import (
     TUIConfigError,
@@ -77,6 +78,25 @@ def dispatch_tui(args: argparse.Namespace) -> int:
             return 0
         config, snapshot = _load_snapshot(args.workspace)
         if args.tui_command == "run":
+            coordination_failure = any(
+                any(
+                    "Workspace artifact leases could not be acquired safely" in issue
+                    for issue in stage.issues
+                )
+                for stage in snapshot.stages
+            )
+            if coordination_failure:
+                print(
+                    json.dumps(
+                        {
+                            "success": False,
+                            "error": "workspace artifact coordination failed; interactive UI was not started",
+                        },
+                        indent=2,
+                    ),
+                    file=sys.stderr,
+                )
+                return 2
             return int(
                 TUIApplication(
                     config,
@@ -93,7 +113,7 @@ def dispatch_tui(args: argparse.Namespace) -> int:
             )
             print(renderer.overview(snapshot))
         return 1 if snapshot.overall_status in {"error", "missing"} else 0
-    except TUIConfigError as exc:
+    except (TUIConfigError, ArtifactLeaseError) as exc:
         print(json.dumps({"success": False, "error": str(exc)}, indent=2), file=sys.stderr)
         return 2
 

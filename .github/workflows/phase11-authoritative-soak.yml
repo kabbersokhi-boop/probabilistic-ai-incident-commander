@@ -1,4 +1,4 @@
-name: Phase 11 authoritative soak
+name: Phase 11 inspection and authoritative soak
 
 on:
   workflow_dispatch:
@@ -15,11 +15,9 @@ concurrency:
 
 jobs:
   authoritative-soak:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.head_ref == 'agent/phase11-authoritative-soak-certification'
+    name: ${{ github.event_name == 'workflow_dispatch' && 'authoritative endurance certification' || 'pull-request inspection gate' }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -30,12 +28,20 @@ jobs:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
-      SOAK_DIR: .artifacts/phase11-authoritative-soak-${{ matrix.python-version }}
+      CERTIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}
+      MIN_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
+      EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
       - uses: actions/setup-python@v6
         with:
@@ -59,60 +65,31 @@ jobs:
           --workspace configs/tui/smoke.yaml
           --output-dir "$SOAK_DIR"
           --iterations 25
-          --duration-seconds 1800
+          --duration-seconds "$MIN_DURATION_SECONDS"
+          --mode "$CERTIFICATION_MODE"
+          --fresh
           --warmup 10
           --max-fd-delta 0
           --max-gc-delta 2048
           --max-rss-delta 67108864
 
-      - name: Validate certification summary
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          summary_path = Path(os.environ["SOAK_DIR"]) / "summary.json"
-          summary = json.loads(summary_path.read_text(encoding="utf-8"))
-          errors = []
-          if summary["iterations"] < 25:
-              errors.append(f"iterations={summary['iterations']}")
-          if summary["cumulative_inspection_seconds"] < 1800:
-              errors.append(
-                  "cumulative_inspection_seconds="
-                  f"{summary['cumulative_inspection_seconds']}"
-              )
-          if summary["minimums_satisfied"] is not True:
-              errors.append("minimums_satisfied is not true")
-          if len(summary["unique_snapshot_hashes"]) != 1:
-              errors.append(
-                  f"unique_snapshot_hashes={summary['unique_snapshot_hashes']}"
-              )
-          if summary["status_counts"].get("error", 0):
-              errors.append(f"error statuses={summary['status_counts']['error']}")
-          if summary["status_counts"].get("missing", 0):
-              errors.append(f"missing statuses={summary['status_counts']['missing']}")
-          if summary["publication_debris"]:
-              errors.append(f"publication_debris={summary['publication_debris']}")
-          if summary["fd_delta"] is not None and summary["fd_delta"] > 0:
-              errors.append(f"fd_delta={summary['fd_delta']}")
-          if summary["gc_object_delta"] > 2048:
-              errors.append(f"gc_object_delta={summary['gc_object_delta']}")
-          if (
-              summary["rss_delta_bytes"] is not None
-              and summary["rss_delta_bytes"] > 67108864
-          ):
-              errors.append(f"rss_delta_bytes={summary['rss_delta_bytes']}")
-          if errors:
-              raise SystemExit("; ".join(errors))
-          print(json.dumps(summary, indent=2, sort_keys=True))
-          PY
+      - name: Validate certification evidence
+        run: >-
+          python scripts/validate_phase11_evidence.py
+          --output-dir "$SOAK_DIR"
+          --expected-commit "$EXPECTED_COMMIT"
+          --mode "$CERTIFICATION_MODE"
+          --min-iterations 25
+          --min-duration-seconds "$MIN_DURATION_SECONDS"
+          --max-fd-delta 0
+          --max-gc-delta 2048
+          --max-rss-delta 67108864
 
       - name: Upload authoritative soak evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase11-authoritative-soak-python-${{ matrix.python-version }}
+          name: phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-python-${{ matrix.python-version }}
           path: ${{ env.SOAK_DIR }}
           if-no-files-found: warn
           retention-days: 90

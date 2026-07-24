@@ -24,6 +24,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -216,6 +222,11 @@ jobs:
           make evaluation-smoke
           make evaluation-validate-smoke
           make evaluation-replay-smoke
+      - name: Phase 11 authoritative control-room smoke
+        run: |
+          make tui-smoke
+          python -m paic tui snapshot --workspace configs/tui/smoke.yaml --format json
+          paic-tui validate --workspace configs/tui/smoke.yaml --format json
       - name: Standard evaluation and ablation
         if: matrix.python-version == '3.11'
         run: make evaluation-compare-smoke

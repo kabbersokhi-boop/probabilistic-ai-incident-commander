@@ -1,16 +1,89 @@
 from __future__ import annotations
 
-import contextlib
+import inspect
 import multiprocessing
 import os
 import stat
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from paic.artifacts.lease import ArtifactLeaseError, artifact_lease, artifact_reader_leases
+from paic.artifacts.lease import (
+    ArtifactLeaseError,
+    _ArtifactLease,
+    artifact_lease,
+    artifact_reader,
+    artifact_reader_leases,
+)
+
+
+def test_artifact_reader_preserves_keyword_binding_and_metadata(tmp_path: Path) -> None:
+    calls: list[tuple[Path, int]] = []
+
+    @artifact_reader
+    def load_dataset(dataset_dir: str | Path, limit: int = 3) -> tuple[Path, int]:
+        calls.append((Path(dataset_dir), limit))
+        return Path(dataset_dir), limit
+
+    assert load_dataset(tmp_path, 4) == (tmp_path, 4)
+    assert load_dataset(dataset_dir=tmp_path, limit=5) == (tmp_path, 5)
+    assert load_dataset(tmp_path, limit=6) == (tmp_path, 6)
+    assert load_dataset.__name__ == "load_dataset"
+    assert "dataset_dir" in str(__import__("inspect").signature(load_dataset))
+    with pytest.raises(TypeError, match="multiple values"):
+        load_dataset(tmp_path, dataset_dir=tmp_path)  # type: ignore[misc]
+    assert calls == [(tmp_path, 4), (tmp_path, 5), (tmp_path, 6)]
+
+
+def test_all_decorated_public_roots_accept_documented_keyword_names(tmp_path: Path) -> None:
+    """Every reader wrapper binds its module-specific first parameter, not ``root``."""
+    from paic.analytics.validation import validate_analytics_directory
+    from paic.detection.io import load_detection
+    from paic.detection.validation import validate_detection_directory
+    from paic.evaluation.artifact import load_evaluation
+    from paic.evaluation.comparison import load_comparison
+    from paic.evidence.io import load_evidence
+    from paic.evidence.validation import validate_evidence_directory
+    from paic.impact.io import load_impact
+    from paic.impact.validation import validate_impact_directory
+    from paic.investigation.artifact import load_investigation, validate_investigation
+    from paic.recovery.artifact import load_recovery, validate_recovery
+    from paic.remediation.artifact import load_control_state, load_execution, load_plan
+    from paic.simulator.io import load_dataset
+    from paic.simulator.validation import validate_dataset_directory
+
+    calls: list[Callable[[], object]] = [
+        lambda: load_dataset(dataset_dir=tmp_path / "dataset"),
+        lambda: validate_dataset_directory(dataset_dir=tmp_path / "dataset"),
+        lambda: validate_analytics_directory(analytics_dir=tmp_path / "analytics"),
+        lambda: load_detection(detection_dir=tmp_path / "detection"),
+        lambda: validate_detection_directory(detection_dir=tmp_path / "detection"),
+        lambda: load_impact(impact_dir=tmp_path / "impact"),
+        lambda: validate_impact_directory(impact_dir=tmp_path / "impact"),
+        lambda: load_evidence(evidence_dir=tmp_path / "evidence"),
+        lambda: validate_evidence_directory(evidence_dir=tmp_path / "evidence"),
+        lambda: load_investigation(path=tmp_path / "investigation"),
+        lambda: validate_investigation(path=tmp_path / "investigation"),
+        lambda: load_control_state(path=tmp_path / "state"),
+        lambda: load_plan(path=tmp_path / "plan"),
+        lambda: load_execution(path=tmp_path / "execution"),
+        lambda: load_recovery(path=tmp_path / "recovery"),
+        lambda: validate_recovery(path=tmp_path / "recovery"),
+        lambda: load_evaluation(root=tmp_path / "evaluation"),
+        lambda: load_comparison(root=tmp_path / "comparison"),
+    ]
+    for call in calls:
+        try:
+            call()
+        except TypeError as exc:
+            pytest.fail(f"keyword binding raised an argument error: {exc}")
+        except Exception:
+            # The paths are intentionally absent; artifact-level failures are
+            # expected after the wrapper has successfully bound the keyword.
+            pass
 
 
 def test_shared_leases_overlap_and_writer_waits(tmp_path: Path) -> None:
@@ -136,6 +209,31 @@ def test_lease_closes_descriptor_on_acquisition_failure(
     assert closed == [opened]
 
 
+def test_lease_rejects_unavailable_fcntl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    monkeypatch.setattr("paic.artifacts.lease.fcntl", None)
+    with (
+        pytest.raises(ArtifactLeaseError, match="POSIX flock"),
+        artifact_lease(target, exclusive=False),
+    ):
+        pass
+
+
+def test_lease_wraps_open_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    monkeypatch.setattr(
+        "paic.artifacts.lease.os.open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("open failed")),
+    )
+    with (
+        pytest.raises(ArtifactLeaseError, match="open failed"),
+        artifact_lease(target, exclusive=False),
+    ):
+        pass
+
+
 def test_multi_root_order_is_deterministic(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"
@@ -186,18 +284,219 @@ def test_shared_readers_hold_lease_concurrently(tmp_path: Path) -> None:
 def test_multi_root_lease_deduplicates_equivalent_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    import paic.artifacts.lease as lease_module
+
     target = tmp_path / "artifact"
     target.mkdir()
     calls: list[Path] = []
 
-    @contextlib.contextmanager
-    def spy(root: str | Path, *, exclusive: bool) -> Any:
-        calls.append(Path(root))
-        yield
+    class SpyLease(_ArtifactLease):
+        def __init__(self, root: str | Path, *, exclusive: bool) -> None:
+            calls.append(Path(root))
+            super().__init__(root, exclusive=exclusive)
 
-    monkeypatch.setattr("paic.artifacts.lease.artifact_lease", spy)
+    monkeypatch.setattr(lease_module, "_ArtifactLease", SpyLease)
     lexical_alias = target.parent / "unused" / ".." / target.name
     with artifact_reader_leases([target, target.absolute(), lexical_alias, target]):
         pass
     assert len(calls) == 1
     assert calls[0] == target.absolute()
+
+
+def test_artifact_reader_rejects_unsupported_shapes() -> None:
+    with pytest.raises(TypeError, match="artifact-root"):
+        artifact_reader(lambda: None)
+    with pytest.raises(TypeError, match="concrete"):
+        artifact_reader(lambda *roots: None)
+    with pytest.raises(TypeError, match="method receivers"):
+        artifact_reader(lambda self: None)
+    with pytest.raises(TypeError, match="non-optional"):
+        artifact_reader(lambda root=None: None)
+
+
+def test_artifact_reader_preserves_runtime_signature() -> None:
+    @artifact_reader
+    def load(root: Path, *, flag: bool = False) -> bool:
+        return flag
+
+    assert inspect.signature(load) == inspect.signature(load.__wrapped__)  # type: ignore[attr-defined]
+    assert load.__doc__ is None
+
+
+def test_path_replacement_cannot_bypass_active_writer_lease(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    ready = multiprocessing.Event()
+    release = multiprocessing.Event()
+
+    def holder() -> None:
+        with artifact_lease(target, exclusive=True):
+            ready.set()
+            release.wait(10)
+
+    process = multiprocessing.Process(target=holder)
+    process.start()
+    contender: multiprocessing.Process | None = None
+    try:
+        assert ready.wait(5)
+        lease_path = tmp_path / ".artifact.lease"
+        replacement = tmp_path / "replacement"
+        replacement.write_text("replacement", encoding="utf-8")
+        os.replace(replacement, lease_path)
+        acquired = multiprocessing.Event()
+
+        def writer() -> None:
+            with artifact_lease(target, exclusive=True):
+                acquired.set()
+
+        contender = multiprocessing.Process(target=writer)
+        contender.start()
+        time.sleep(0.2)
+        assert not acquired.is_set()
+        release.set()
+        contender.join(5)
+        assert contender.exitcode == 0
+        assert acquired.is_set()
+    finally:
+        release.set()
+        if contender is not None and contender.is_alive():
+            contender.terminate()
+        if process.is_alive():
+            process.terminate()
+        if contender is not None:
+            contender.join(5)
+        process.join(5)
+        assert not process.is_alive()
+
+
+def test_symlink_replacement_fails_closed_after_turnstile_wait(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    ready = multiprocessing.Event()
+    release = multiprocessing.Event()
+
+    def holder() -> None:
+        with artifact_lease(target, exclusive=False):
+            ready.set()
+            release.wait(10)
+
+    process = multiprocessing.Process(target=holder)
+    process.start()
+    contender: multiprocessing.Process | None = None
+    try:
+        assert ready.wait(5)
+        lease_path = tmp_path / ".artifact.lease"
+        replacement = tmp_path / "replacement"
+        replacement.write_text("replacement", encoding="utf-8")
+        lease_path.unlink()
+        lease_path.symlink_to(replacement)
+        errors: Any = multiprocessing.Queue()
+
+        def writer() -> None:
+            try:
+                with artifact_lease(target, exclusive=True):
+                    pass
+            except Exception as exc:
+                errors.put(str(exc))
+
+        contender = multiprocessing.Process(target=writer)
+        contender.start()
+        time.sleep(0.2)
+        assert contender.is_alive()
+        release.set()
+        contender.join(5)
+        assert contender.exitcode == 0
+        assert "coordination" in errors.get(timeout=2)
+    finally:
+        release.set()
+        if contender is not None and contender.is_alive():
+            contender.terminate()
+        if process.is_alive():
+            process.terminate()
+        if contender is not None:
+            contender.join(5)
+        process.join(5)
+        assert not process.is_alive()
+
+
+def test_data_lock_replacement_cannot_overlap_active_reader(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    ready = multiprocessing.Event()
+    release = multiprocessing.Event()
+    acquired = multiprocessing.Event()
+
+    def holder() -> None:
+        with artifact_lease(target, exclusive=False):
+            ready.set()
+            release.wait(10)
+
+    def contender() -> None:
+        with artifact_lease(target, exclusive=False):
+            acquired.set()
+
+    process = multiprocessing.Process(target=holder)
+    process.start()
+    replacement_process: multiprocessing.Process | None = None
+    try:
+        assert ready.wait(5)
+        lease_path = tmp_path / ".artifact.lease"
+        replacement = tmp_path / "replacement"
+        replacement.write_text("replacement", encoding="utf-8")
+        os.replace(replacement, lease_path)
+        replacement_process = multiprocessing.Process(target=contender)
+        replacement_process.start()
+        time.sleep(0.2)
+        assert not acquired.is_set()
+        release.set()
+        replacement_process.join(5)
+        assert replacement_process.exitcode == 0
+        assert acquired.is_set()
+    finally:
+        release.set()
+        if replacement_process is not None and replacement_process.is_alive():
+            replacement_process.terminate()
+        if process.is_alive():
+            process.terminate()
+        if replacement_process is not None:
+            replacement_process.join(5)
+        process.join(5)
+        assert not process.is_alive()
+
+
+def test_writer_intent_gates_continuous_new_readers(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    stop = multiprocessing.Event()
+    started = [multiprocessing.Event(), multiprocessing.Event()]
+    acquired = multiprocessing.Event()
+
+    def reader(index: int) -> None:
+        started[index].set()
+        while not stop.is_set():
+            with artifact_lease(target, exclusive=False):
+                time.sleep(0.01)
+
+    def writer() -> None:
+        with artifact_lease(target, exclusive=True, timeout_seconds=5):
+            acquired.set()
+            time.sleep(0.05)
+
+    readers = [multiprocessing.Process(target=reader, args=(i,)) for i in range(2)]
+    writer_process = multiprocessing.Process(target=writer)
+    for process in readers:
+        process.start()
+    assert all(event.wait(5) for event in started)
+    writer_process.start()
+    try:
+        writer_process.join(5)
+        assert not writer_process.is_alive()
+        assert writer_process.exitcode == 0
+        assert acquired.is_set()
+    finally:
+        stop.set()
+        for process in readers:
+            if process.is_alive():
+                process.terminate()
+            process.join(5)
+            assert not process.is_alive()

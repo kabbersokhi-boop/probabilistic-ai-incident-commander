@@ -5,9 +5,11 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.recovery.artifact import (
     RecoveryArtifactError,
     export_recovery,
@@ -123,19 +125,19 @@ def test_artifact_overwrite_survives_post_commit_fsync_failure(
 
     root = tmp_path / "recovery"
     original_report = build_artifact(root)
-    original_fsync = artifact_module._fsync_dir
-    calls = 0
 
-    def fail_only_parent(path: Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("post-commit fsync unavailable")
-        original_fsync(path)
+    class FailingPublisher(AtomicDirectoryPublisher):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["failure_hook"] = lambda point: (
+                (_ for _ in ()).throw(OSError("post-commit fsync unavailable"))
+                if point == "new-committed"
+                else None
+            )
+            super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(artifact_module, "_fsync_dir", fail_only_parent)
-    manifest = export_recovery(config(), observations(), original_report, root, overwrite=True)
-    assert manifest.payload_sha256 == original_report.report_sha256
+    monkeypatch.setattr(artifact_module, "AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(RecoveryArtifactError, match="committed but durability"):
+        export_recovery(config(), observations(), original_report, root, overwrite=True)
     assert load_recovery(root).report == original_report
 
 
@@ -211,3 +213,29 @@ def test_authoritative_recovery_validation_replays_observation_and_execution_bin
     assert validate_recovery(root, observations_dir=tmp_path / "observations") == [
         "authoritative recovery validation requires observations, analytics, and execution artifacts"
     ]
+
+
+def test_authoritative_validation_reports_stale_observation_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale observation generation is an invalid report, never a TUI exception."""
+    import paic.recovery.observations as observation_module
+
+    root = tmp_path / "recovery"
+    build_artifact(root)
+    monkeypatch.setattr(
+        observation_module,
+        "load_observations",
+        lambda *_, **__: (_ for _ in ()).throw(
+            observation_module.ObservationError(
+                "observation artifact is bound to another execution"
+            )
+        ),
+    )
+
+    assert validate_recovery(
+        root,
+        observations_dir=tmp_path / "observations",
+        analytics_dir=tmp_path / "analytics",
+        execution_dir=tmp_path / "execution",
+    ) == ["observation artifact is bound to another execution"]

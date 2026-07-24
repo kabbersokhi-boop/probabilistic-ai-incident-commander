@@ -9,8 +9,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
-import tempfile
 from datetime import timedelta
 from pathlib import Path
 from typing import Annotated
@@ -21,6 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
+from paic.artifacts.lease import artifact_reader
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.artifact import file_sha256
 from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
 from paic.recovery.models import Identifier, RecoveryObservationSet
@@ -65,14 +65,6 @@ def _digest(value: object) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
-
-
-def _fsync_dir(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
 def _write(path: Path, content: str) -> None:
@@ -167,76 +159,43 @@ def build_observations(
 ) -> RecoveryObservationSet:
     """Derive baseline rows from validated analytics and post rows from a strict scenario."""
     observation_set = _derive_observations(scenario, analytics_dir, execution_dir)
-    destination = Path(output_dir)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists() and not overwrite:
-        raise ObservationError(f"output directory already exists: {destination}")
-    staged = Path(tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=destination.parent))
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
     try:
-        _write(
-            staged / "observation.config.resolved.json",
-            json.dumps(scenario.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
-        )
-        _write(staged / "observation-set.json", observation_set.model_dump_json(indent=2) + "\n")
-        manifest = ObservationArtifactManifest(
-            observation_set_id=observation_set.observation_set_id,
-            incident_id=observation_set.incident_id,
-            generator_version=__version__,
-            analytics_manifest_sha256=observation_set.analytics_manifest_sha256,
-            execution_manifest_sha256=observation_set.execution_manifest_sha256,
-            execution_receipt_sha256=observation_set.execution_receipt_sha256,
-            generator_config_sha256=observation_set.generator_config_sha256,
-            files=[
-                ObservationArtifactFile(
-                    relative_path=name,
-                    byte_size=(staged / name).stat().st_size,
-                    sha256=file_sha256(staged / name),
-                )
-                for name in ("observation.config.resolved.json", "observation-set.json")
-            ],
-        )
-        _write(
-            staged / "manifest.json",
-            manifest.model_dump_json(indent=2) + "\n",
-        )
-        _write(staged / "_SUCCESS", file_sha256(staged / "manifest.json") + "\n")
-        _fsync_dir(staged)
-        backup: Path | None = None
-        committed = False
-        if destination.exists():
-            backup = Path(
-                tempfile.mkdtemp(prefix=f".{destination.name}.backup-", dir=destination.parent)
+        with publisher as staged:
+            _write(
+                staged / "observation.config.resolved.json",
+                json.dumps(scenario.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
             )
-            backup.rmdir()
-            os.replace(destination, backup)
-        try:
-            os.replace(staged, destination)
-            committed = True
-            try:
-                _fsync_dir(destination.parent)
-            except OSError:
-                # Rename is the visibility point; a readable artifact is committed.
-                load_observations(
-                    destination, analytics_dir=analytics_dir, execution_dir=execution_dir
-                )
-            if backup is not None:
-                shutil.rmtree(backup, ignore_errors=True)
-        except Exception:
-            if (
-                not committed
-                and backup is not None
-                and backup.exists()
-                and not destination.exists()
-            ):
-                os.replace(backup, destination)
-            raise
-    except Exception:
-        if staged.exists():
-            shutil.rmtree(staged)
-        raise
+            _write(
+                staged / "observation-set.json", observation_set.model_dump_json(indent=2) + "\n"
+            )
+            manifest = ObservationArtifactManifest(
+                observation_set_id=observation_set.observation_set_id,
+                incident_id=observation_set.incident_id,
+                generator_version=__version__,
+                analytics_manifest_sha256=observation_set.analytics_manifest_sha256,
+                execution_manifest_sha256=observation_set.execution_manifest_sha256,
+                execution_receipt_sha256=observation_set.execution_receipt_sha256,
+                generator_config_sha256=observation_set.generator_config_sha256,
+                files=[
+                    ObservationArtifactFile(
+                        relative_path=name,
+                        byte_size=(staged / name).stat().st_size,
+                        sha256=file_sha256(staged / name),
+                    )
+                    for name in ("observation.config.resolved.json", "observation-set.json")
+                ],
+            )
+            _write(staged / "manifest.json", manifest.model_dump_json(indent=2) + "\n")
+            _write(staged / "_SUCCESS", file_sha256(staged / "manifest.json") + "\n")
+            load_observations(staged, analytics_dir=analytics_dir, execution_dir=execution_dir)
+            publisher.commit()
+    except ArtifactPublicationError as exc:
+        raise ObservationError(str(exc)) from exc
     return observation_set
 
 
+@artifact_reader
 def load_observations(
     path: str | Path,
     *,

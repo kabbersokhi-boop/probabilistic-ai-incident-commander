@@ -5,8 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
-import uuid
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,6 +12,7 @@ from pydantic import Field, model_validator
 
 from paic import __version__
 from paic.artifacts.lease import artifact_reader
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.benchmark import (
     digest_models,
     digest_value,
@@ -286,77 +285,44 @@ def export_evaluation(
     replayed = recompute_evaluation(run)
     if replayed.results != run.results or replayed.aggregate != run.aggregate:
         raise EvaluationArtifactError("evaluation run is not semantically self-consistent")
-    target = Path(output_dir)
-    parent = target.parent
-    parent.mkdir(parents=True, exist_ok=True)
-    if parent.is_symlink() or not parent.is_dir():
-        raise EvaluationArtifactError("output parent must be a regular non-symlink directory")
-    if target.is_symlink():
-        raise EvaluationArtifactError("output path must not be a symlink")
-    if target.exists() and not overwrite:
-        raise EvaluationArtifactError(f"output already exists: {target}")
-    token = uuid.uuid4().hex
-    staging = parent / f".{target.name}.staging-{token}"
-    backup = parent / f".{target.name}.backup-{token}"
-    staging.mkdir(mode=0o700)
-    committed = False
-    old_moved = False
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
     try:
-        payloads = _payload_bytes(run)
-        for name in sorted(payloads):
-            _write_durable(staging / name, payloads[name])
-        files = [
-            EvaluationFile(
-                relative_path=name,
-                byte_size=(staging / name).stat().st_size,
-                sha256=_sha(staging / name),
+        with publisher as staging:
+            payloads = _payload_bytes(run)
+            for name in sorted(payloads):
+                _write_durable(staging / name, payloads[name])
+            files = [
+                EvaluationFile(
+                    relative_path=name,
+                    byte_size=(staging / name).stat().st_size,
+                    sha256=_sha(staging / name),
+                )
+                for name in sorted(_PAYLOADS)
+            ]
+            manifest = EvaluationManifest(
+                run_id=run.config.run_id,
+                package_version=__version__,
+                benchmark_manifest_sha256=run.benchmark_manifest_sha256,
+                answer_key_manifest_sha256=run.answer_key_manifest_sha256,
+                effective_benchmark_sha256=run.effective_benchmark_sha256,
+                prediction_sha256=run.prediction_sha256,
+                resolved_ablation_sha256=run.resolved_ablation_sha256,
+                provider_config_sha256=run.provider_config_sha256,
+                tool_policy_sha256=run.tool_policy_sha256,
+                files=files,
             )
-            for name in sorted(_PAYLOADS)
-        ]
-        manifest = EvaluationManifest(
-            run_id=run.config.run_id,
-            package_version=__version__,
-            benchmark_manifest_sha256=run.benchmark_manifest_sha256,
-            answer_key_manifest_sha256=run.answer_key_manifest_sha256,
-            effective_benchmark_sha256=run.effective_benchmark_sha256,
-            prediction_sha256=run.prediction_sha256,
-            resolved_ablation_sha256=run.resolved_ablation_sha256,
-            provider_config_sha256=run.provider_config_sha256,
-            tool_policy_sha256=run.tool_policy_sha256,
-            files=files,
-        )
-        manifest_bytes = _canonical_json(manifest.model_dump(mode="json"))
-        _write_durable(staging / "manifest.json", manifest_bytes)
-        _write_durable(staging / "_SUCCESS", (_sha_bytes(manifest_bytes) + "\n").encode())
-        _fsync_directory(staging)
-        if target.exists():
-            os.replace(target, backup)
-            old_moved = True
-        os.replace(staging, target)
-        committed = True
-        _fsync_directory(parent)
-        if old_moved:
-            shutil.rmtree(backup, ignore_errors=True)
-            _fsync_directory(parent)
-        return manifest
-    except Exception as exc:
-        if committed:
-            # A rename has already published the new generation.  Reporting this as
-            # ordinary failure would encourage an unsafe destructive retry.
+            manifest_bytes = _canonical_json(manifest.model_dump(mode="json"))
+            _write_durable(staging / "manifest.json", manifest_bytes)
+            _write_durable(staging / "_SUCCESS", (_sha_bytes(manifest_bytes) + "\n").encode())
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        if publisher.committed:
             raise EvaluationPublicationCommittedError(
                 "evaluation artifact was committed but post-commit durability or cleanup "
                 "failed; do not retry automatically"
             ) from exc
-        if not committed and old_moved and backup.exists():
-            if target.exists():
-                shutil.rmtree(target, ignore_errors=True)
-            os.replace(backup, target)
-            _fsync_directory(parent)
-        if staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
-        if isinstance(exc, EvaluationArtifactError):
-            raise
-        raise EvaluationArtifactError(f"cannot publish evaluation artifact: {exc}") from exc
+        raise EvaluationArtifactError(str(exc)) from exc
 
 
 def _read_json(path: Path) -> Any:

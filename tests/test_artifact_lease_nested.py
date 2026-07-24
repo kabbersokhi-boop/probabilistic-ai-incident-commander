@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from paic.artifacts.lease import ArtifactLeaseError, artifact_reader_leases
+from paic.artifacts.lease import ArtifactLeaseError, artifact_path, artifact_reader_leases
 
 
 def test_nested_same_domain_parent_replacement_fails_closed(tmp_path: Path) -> None:
@@ -52,6 +52,6 @@ def test_decorated_reader_uses_anchored_generation(tmp_path: Path) -> None:
         replacement = parent / "artifact"
         replacement.mkdir(parents=True)
         (replacement / "value.txt").write_text("new", encoding="utf-8")
-        return (Path(path) / "value.txt").read_text(encoding="utf-8")
+        return (artifact_path(path) / "value.txt").read_text(encoding="utf-8")
 
     assert read_value(root) == "old"

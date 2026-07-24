@@ -536,7 +536,7 @@ class _ArtifactLease:
         flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
         try:
             self.root_fd = os.open(self.root.name, flags, dir_fd=self.parent_fd)
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             self.root_fd = None
             self.root_info = None
             return

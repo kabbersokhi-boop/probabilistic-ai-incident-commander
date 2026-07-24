@@ -1,0 +1,9 @@
+191 files already formatted
+ruff_format_exit=0
+All checks passed!
+ruff_check_exit=0
+................................................................         [100%]
+64 passed in 57.22s
+pytest_exit=0
+Success: no issues found in 191 source files
+mypy_exit=0

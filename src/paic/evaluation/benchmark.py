@@ -64,6 +64,8 @@ def tool_policy_digest(cases: list[VisibleCase], config: EvaluationConfig) -> st
 def _regular_file(path: Path, label: str) -> Path:
     anchored = artifact_path(path)
     try:
+        if not anchored.exists():
+            raise BenchmarkError(f"{label} is unavailable: {path}")
         if anchored.is_symlink() or not anchored.is_file():
             raise BenchmarkError(f"{label} must be a regular non-symlink file")
     except OSError as exc:

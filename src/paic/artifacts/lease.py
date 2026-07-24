@@ -144,6 +144,39 @@ def _descriptor_root(fd: int) -> Path | None:
     return None
 
 
+class _AnchoredRoot(os.PathLike[str]):
+    """Transparent root argument whose operations use a descriptor anchor."""
+
+    def __init__(self, lexical: Path, anchored: Path):
+        self.lexical = lexical
+        self.anchored = anchored
+
+    def __fspath__(self) -> str:
+        return os.fspath(self.anchored)
+
+    def __str__(self) -> str:
+        return os.fspath(self.lexical)
+
+    def __repr__(self) -> str:
+        return repr(self.lexical)
+
+    def __hash__(self) -> int:
+        return hash(self.lexical)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, _AnchoredRoot):
+            return self.lexical == other.lexical
+        if isinstance(other, (str, os.PathLike)):
+            return self.lexical == Path(os.fspath(other))
+        return False
+
+    def __truediv__(self, key: str | os.PathLike[str]) -> Path:
+        return self.anchored / key
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self.anchored, name)
+
+
 def artifact_path(path: str | Path) -> Path:
     """Return an owner-scoped descriptor-relative path for an active artifact root."""
 
@@ -825,13 +858,13 @@ class _ArtifactLease:
                 self.validate_current_parent()
             except ArtifactLeaseError as exc:
                 error = exc
+            self._unmark_active()
             root_error = _release_descriptor("artifact root", self.root_fd, False)
             close_error = _release_descriptor("artifact parent", self.parent_fd, False)
             self.root_fd = None
             self.root_info = None
             self.parent_fd = None
             self.parent_info = None
-            self._unmark_active()
             self._reentrant = False
             if error is not None:
                 raise error
@@ -841,6 +874,7 @@ class _ArtifactLease:
                 raise close_error
             return
         errors: list[ArtifactLeaseError] = []
+        self._unmark_active()
         for name, fd, locked in (
             ("artifact root", self.root_fd, False),
             ("artifact data", self.lease_fd, self.lease_locked),
@@ -857,7 +891,6 @@ class _ArtifactLease:
         ) = None
         self.root_info = None
         self.lease_locked = self.domain_locked = self.gate_locked = False
-        self._unmark_active()
         if errors:
             raise errors[0]
 
@@ -917,7 +950,14 @@ def _reader_wrapper(
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
         roots = [bound.arguments.get(name) for name in root_names]
-        with artifact_reader_leases(roots):
+        with artifact_reader_leases(roots) as anchored:
+            for name in root_names:
+                value = bound.arguments.get(name)
+                if value is not None and not _is_active_descriptor_root(value):
+                    key = os.path.normcase(os.fspath(_canonical_root(value)))
+                    replacement = anchored.get(key)
+                    if replacement is not None:
+                        bound.arguments[name] = _AnchoredRoot(_canonical_root(value), replacement)
             return func(*bound.args, **bound.kwargs)
 
     return wrapped

@@ -1,4 +1,4 @@
-name: one-shot lease owner repair
+name: one-shot lease owner diagnostic
 
 on:
   push:
@@ -8,117 +8,36 @@ permissions:
   contents: write
 
 jobs:
-  repair:
+  diagnose:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Apply owner-scoped anchors
+      - name: Capture source anchors
         run: |
-          python - <<'PY'
+          python - <<'PY' > owner-repair-diagnostic.txt 2>&1
           from pathlib import Path
-
-          p = Path("src/paic/artifacts/lease.py")
-          text = p.read_text()
-
-          def rep(old: str, new: str) -> None:
-              global text
-              if old not in text:
-                  raise SystemExit(f"missing lease source: {old[:120]!r}")
-              text = text.replace(old, new, 1)
-
-          rep("import contextvars\n", "import asyncio\nimport contextvars\n")
-          rep("import time\n", "import threading\nimport time\n")
-          rep(
-              '_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, tuple[bool, int]] | None] = (\n    contextvars.ContextVar("paic_active_artifact_lease_domains", default=None)\n)\n\n\ndef _active_domains() -> dict[str, tuple[bool, int]]:\n    state = _ACTIVE_DOMAINS.get()\n    if state is None:\n        state = {}\n        _ACTIVE_DOMAINS.set(state)\n    return state\n',
-              '''Owner = tuple[int, int | None]\nActiveDomain = tuple[bool, int, Owner]\n\n_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, ActiveDomain] | None] = (\n    contextvars.ContextVar("paic_active_artifact_lease_domains", default=None)\n)\n_ACTIVE_PARENTS: contextvars.ContextVar[dict[str, tuple[int, int, int, Owner]] | None] = (\n    contextvars.ContextVar("paic_active_artifact_lease_parents", default=None)\n)\n_ACTIVE_ROOT_FDS: contextvars.ContextVar[dict[int, Owner] | None] = contextvars.ContextVar(\n    "paic_active_artifact_root_fds", default=None\n)\n\n\ndef _execution_owner() -> Owner:\n    try:\n        task = asyncio.current_task()\n    except RuntimeError:\n        task = None\n    return threading.get_ident(), None if task is None else id(task)\n\n\ndef _active_domains() -> dict[str, ActiveDomain]:\n    return _ACTIVE_DOMAINS.get() or {}\n\n\ndef _set_active_domain(key: str, value: ActiveDomain | None) -> None:\n    state = dict(_active_domains())\n    if value is None:\n        state.pop(key, None)\n    else:\n        state[key] = value\n    _ACTIVE_DOMAINS.set(state)\n\n\ndef _active_parents() -> dict[str, tuple[int, int, int, Owner]]:\n    return _ACTIVE_PARENTS.get() or {}\n\n\ndef _set_active_parent(key: str, value: tuple[int, int, int, Owner] | None) -> None:\n    state = dict(_active_parents())\n    if value is None:\n        state.pop(key, None)\n    else:\n        state[key] = value\n    _ACTIVE_PARENTS.set(state)\n\n\ndef _active_root_fds() -> dict[int, Owner]:\n    return _ACTIVE_ROOT_FDS.get() or {}\n\n\ndef _set_active_root_fd(fd: int, owner: Owner | None) -> None:\n    state = dict(_active_root_fds())\n    if owner is None:\n        state.pop(fd, None)\n    else:\n        state[fd] = owner\n    _ACTIVE_ROOT_FDS.set(state)\n\n\ndef _descriptor_fd(value: object) -> int | None:\n    try:\n        path = Path(os.fspath(value))\n    except TypeError:\n        return None\n    parts = path.parts\n    if len(parts) == 5 and parts[:4] == ("/", "proc", "self", "fd"):\n        candidate = parts[4]\n    elif len(parts) == 4 and parts[:3] == ("/", "dev", "fd"):\n        candidate = parts[3]\n    else:\n        return None\n    try:\n        return int(candidate)\n    except ValueError:\n        return None\n\n\ndef _is_active_descriptor_root(value: object) -> bool:\n    fd = _descriptor_fd(value)\n    return fd is not None and _active_root_fds().get(fd) == _execution_owner()\n''',
-          )
-          rep(
-              '    def _enter_reentrant_if_safe(self) -> bool:\n        assert self.domain_key is not None\n        current = _active_domains().get(self.domain_key)\n        if current is None:\n            return False\n        active_exclusive, count = current\n        if self.exclusive and not active_exclusive:\n            raise ArtifactLeaseError("cannot acquire nested exclusive artifact lease")\n        self.parent_fd, self.parent_info = _open_parent(self.parent)\n        self._open_root_anchor()\n        self._reentrant = True\n        self._active = True\n        _active_domains()[self.domain_key] = (active_exclusive, count + 1)\n        return True\n',
-              '''    def _parent_key(self) -> str:\n        return os.path.normcase(os.fspath(self.parent))\n\n    def _check_active_parent(self) -> None:\n        if self.parent_info is None:\n            raise ArtifactLeaseError("artifact lease parent was not acquired")\n        current = _active_parents().get(self._parent_key())\n        if current is None:\n            return\n        dev, ino, _count, owner = current\n        if owner == _execution_owner() and (dev, ino) != (self.parent_info.st_dev, self.parent_info.st_ino):\n            raise ArtifactLeaseError("artifact lease parent changed before nested acquisition")\n\n    def _record_active_parent(self) -> None:\n        if self.parent_info is None:\n            raise ArtifactLeaseError("artifact lease parent was not acquired")\n        key = self._parent_key()\n        owner = _execution_owner()\n        current = _active_parents().get(key)\n        if current is None:\n            _set_active_parent(key, (self.parent_info.st_dev, self.parent_info.st_ino, 1, owner))\n            return\n        dev, ino, count, current_owner = current\n        if current_owner != owner or (dev, ino) != (self.parent_info.st_dev, self.parent_info.st_ino):\n            raise ArtifactLeaseError("artifact lease parent changed during nested acquisition")\n        _set_active_parent(key, (dev, ino, count + 1, owner))\n\n    def _release_active_parent(self) -> None:\n        key = self._parent_key()\n        current = _active_parents().get(key)\n        if current is None:\n            return\n        dev, ino, count, owner = current\n        if owner != _execution_owner():\n            return\n        _set_active_parent(key, None if count <= 1 else (dev, ino, count - 1, owner))\n\n    def _enter_reentrant_if_safe(self) -> bool:\n        assert self.domain_key is not None\n        current = _active_domains().get(self.domain_key)\n        if current is None:\n            return False\n        active_exclusive, count, owner = current\n        if owner != _execution_owner():\n            return False\n        if self.exclusive and not active_exclusive:\n            raise ArtifactLeaseError("cannot acquire nested exclusive artifact lease")\n        if self.parent_fd is None or self.parent_info is None:\n            self.parent_fd, self.parent_info = _open_parent(self.parent)\n        self._check_active_parent()\n        if self.root_fd is None:\n            self._open_root_anchor()\n        self._reentrant = True\n        self._active = True\n        self._record_active_parent()\n        if self.root_fd is not None:\n            _set_active_root_fd(self.root_fd, owner)\n        _set_active_domain(self.domain_key, (active_exclusive, count + 1, owner))\n        return True\n''',
-          )
-          rep(
-              '    def _mark_active(self) -> None:\n        assert self.domain_key is not None\n        current = _active_domains().get(self.domain_key)\n        if current is None:\n            _active_domains()[self.domain_key] = (self.exclusive, 1)\n        else:\n            _active_domains()[self.domain_key] = (current[0] or self.exclusive, current[1] + 1)\n        self._active = True\n',
-              '''    def _mark_active(self) -> None:\n        assert self.domain_key is not None\n        owner = _execution_owner()\n        current = _active_domains().get(self.domain_key)\n        if current is None:\n            _set_active_domain(self.domain_key, (self.exclusive, 1, owner))\n        else:\n            if current[2] != owner:\n                raise ArtifactLeaseError("artifact lease context owner changed")\n            _set_active_domain(\n                self.domain_key, (current[0] or self.exclusive, current[1] + 1, owner)\n            )\n        self._record_active_parent()\n        if self.root_fd is not None:\n            _set_active_root_fd(self.root_fd, owner)\n        self._active = True\n''',
-          )
-          rep(
-              '        if current[1] <= 1:\n            _active_domains().pop(self.domain_key, None)\n        else:\n            _active_domains()[self.domain_key] = (current[0], current[1] - 1)\n        self._active = False\n',
-              '''        if self.root_fd is not None:\n            _set_active_root_fd(self.root_fd, None)\n        self._release_active_parent()\n        if current[1] <= 1:\n            _set_active_domain(self.domain_key, None)\n        else:\n            _set_active_domain(self.domain_key, (current[0], current[1] - 1, current[2]))\n        self._active = False\n''',
-          )
-          rep(
-              '    def acquire_intent(self) -> None:\n        self._prepare_domain()\n',
-              '''    def prepare_anchor(self) -> None:\n        if self.domain is None:\n            self._prepare_domain()\n        if self.parent_fd is None or self.parent_info is None:\n            self.parent_fd, self.parent_info = _open_parent(self.parent)\n        if self.root_fd is None:\n            self._open_root_anchor()\n\n    def acquire_intent(self) -> None:\n        if self.domain is None:\n            self._prepare_domain()\n''',
-          )
-          rep(
-              '        self.parent_fd, self.parent_info = _open_parent(self.parent)\n        self.domain_fd, self.domain_info = _open_directory(self.domain, private=False)\n',
-              '        if self.parent_fd is None or self.parent_info is None:\n            self.parent_fd, self.parent_info = _open_parent(self.parent)\n        self.domain_fd, self.domain_info = _open_directory(self.domain, private=False)\n',
-          )
-          rep(
-              '    ordered: dict[str, Path] = {}\n    for root in roots:\n        if root is not None:\n            path = _canonical_root(root)\n            ordered.setdefault(os.path.normcase(os.fspath(path)), path)\n',
-              '''    ordered: dict[str, Path] = {}\n    for root in roots:\n        if root is not None and not _is_active_descriptor_root(root):\n            path = _canonical_root(root)\n            ordered.setdefault(os.path.normcase(os.fspath(path)), path)\n''',
-          )
-          rep(
-              '    leases = [(key, _ArtifactLease(ordered[key], exclusive=False)) for key in sorted(ordered)]\n    with ExitStack() as stack:\n        anchored: dict[str, Path] = {}\n        for key, lease in leases:\n            stack.enter_context(lease)\n            anchored[key] = lease.anchored_root()\n        yield anchored\n',
-              '''    leases = [(key, _ArtifactLease(ordered[key], exclusive=False)) for key in sorted(ordered)]\n    try:\n        for _key, lease in leases:\n            lease.prepare_anchor()\n    except Exception:\n        for _key, lease in reversed(leases):\n            with contextlib.suppress(ArtifactLeaseError):\n                lease.release()\n        raise\n    with ExitStack() as stack:\n        anchored: dict[str, Path] = {}\n        for key, lease in leases:\n            stack.enter_context(lease)\n            anchored[key] = lease.anchored_root()\n        yield anchored\n''',
-          )
-          rep(
-              '                if value is not None:\n                    key = os.path.normcase(os.fspath(_canonical_root(value)))\n                    bound.arguments[name] = anchored.get(key, value)\n',
-              '''                if value is not None and not _is_active_descriptor_root(value):\n                    key = os.path.normcase(os.fspath(_canonical_root(value)))\n                    bound.arguments[name] = anchored.get(key, value)\n''',
-          )
-          p.write_text(text)
+          text = Path('src/paic/artifacts/lease.py').read_text()
+          checks = [
+              'import contextvars\n',
+              'import time\n',
+              '_ACTIVE_DOMAINS: contextvars.ContextVar[dict[str, tuple[bool, int]] | None]',
+              '    def _enter_reentrant_if_safe(self) -> bool:\n',
+              '    def _mark_active(self) -> None:\n',
+              '    def acquire_intent(self) -> None:\n',
+              '    ordered: dict[str, Path] = {}\n',
+          ]
+          for item in checks:
+              print(repr(item), text.count(item))
           PY
-      - name: Add regressions
+      - name: Remove workflow and trigger marker
         run: |
-          cat >> tests/test_artifact_lease_nested.py <<'PY'
-
-          def test_direct_nested_sibling_parent_replacement_fails_closed(tmp_path: Path) -> None:
-              from paic.artifacts.lease import artifact_lease
-
-              first = tmp_path / "artifacts" / "first"
-              second = tmp_path / "artifacts" / "second"
-              first.mkdir(parents=True)
-              second.mkdir()
-              with artifact_lease(first, exclusive=False):
-                  second.parent.rename(tmp_path / "artifacts-old")
-                  second.mkdir(parents=True)
-                  with pytest.raises(ArtifactLeaseError, match="parent changed"):
-                      with artifact_lease(second, exclusive=False):
-                          pass
-
-
-          def test_decorated_reader_uses_anchored_generation(tmp_path: Path) -> None:
-              from paic.artifacts.lease import artifact_reader
-
-              parent = tmp_path / "artifacts"
-              root = parent / "artifact"
-              root.mkdir(parents=True)
-              (root / "value.txt").write_text("old", encoding="utf-8")
-
-              @artifact_reader
-              def read_value(path: str | Path) -> str:
-                  parent.rename(tmp_path / "artifacts-old")
-                  replacement = parent / "artifact"
-                  replacement.mkdir(parents=True)
-                  (replacement / "value.txt").write_text("new", encoding="utf-8")
-                  return (Path(path) / "value.txt").read_text(encoding="utf-8")
-
-              assert read_value(root) == "old"
-          PY
-      - name: Install and format
+          rm .github/workflows/one-shot-lease-owner-fix.yml .review2-trigger
+      - name: Commit diagnostics
         run: |
-          python -m pip install -e ".[dev]"
-          ruff format .
-          ruff check --fix .
-          ruff format .
-      - name: Remove workflow and commit
-        run: |
-          rm .github/workflows/one-shot-lease-owner-fix.yml
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Harden nested lease ownership and anchored reads"
+          git commit -m "Capture owner repair diagnostics"
           git push origin HEAD:agent/phase11-fix-review2

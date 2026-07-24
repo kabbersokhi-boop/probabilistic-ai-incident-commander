@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.config import RecoveryConfig
 from paic.recovery.engine import evaluate_recovery, verify_report
@@ -47,6 +47,7 @@ def file_sha256(path: Path) -> str:
     return value.hexdigest()
 
 
+@artifact_reader
 def manifest_sha256(path: str | Path) -> str:
     return file_sha256(Path(path) / "manifest.json")
 
@@ -210,7 +211,7 @@ def load_recovery(path: str | Path) -> LoadedRecovery:
     return LoadedRecovery(manifest, config, observations, report)
 
 
-@artifact_reader
+@artifact_readers("path", "observations_dir", "analytics_dir", "execution_dir")
 def validate_recovery(
     path: str | Path,
     *,
@@ -222,11 +223,6 @@ def validate_recovery(
     analytics_dir: str | Path | None = None,
     execution_dir: str | Path | None = None,
 ) -> list[str]:
-    # Import lazily to avoid the observations module's dependency on this
-    # module's hashing helpers during import.  Observation validation is part
-    # of the authoritative recovery contract, so its controlled failures must
-    # be returned as validator issues rather than escaping to a caller such as
-    # the TUI.
     from paic.recovery.observations import ObservationError
 
     try:

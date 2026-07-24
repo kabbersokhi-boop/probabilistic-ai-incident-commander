@@ -164,6 +164,7 @@ def _export_analytics_to_root(result: AnalyticsBuildResult, root: Path) -> Analy
     return manifest
 
 
+@artifact_reader
 def load_manifest(analytics_dir: str | Path) -> AnalyticsManifest:
     path = Path(analytics_dir) / "manifest.json"
     try:

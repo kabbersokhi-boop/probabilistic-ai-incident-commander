@@ -109,10 +109,9 @@ def _set_active_root_fd(fd: int, owner: Owner | None) -> None:
 
 
 def _descriptor_fd(value: object) -> int | None:
-    try:
-        parts = Path(os.fspath(value)).parts
-    except TypeError:
+    if not isinstance(value, (str, os.PathLike)):
         return None
+    parts = Path(os.fspath(value)).parts
     if len(parts) == 5 and parts[:4] == ("/", "proc", "self", "fd"):
         candidate = parts[4]
     elif len(parts) == 4 and parts[:3] == ("/", "dev", "fd"):
@@ -345,7 +344,7 @@ def _read_identity(fd: int) -> tuple[int, int, int, int] | None:
         raise ArtifactLeaseError("artifact coordination identity is invalid") from exc
     if len(parts) != 4 or any(part < 0 for part in parts):
         raise ArtifactLeaseError("artifact coordination identity is invalid")
-    return cast(tuple[int, int, int, int], parts)
+    return parts[0], parts[1], parts[2], parts[3]
 
 
 def _write_identity(fd: int, value: tuple[int, int, int, int]) -> None:

@@ -1,4 +1,0 @@
-tests/test_phase11_evidence_freshness.py: strict typing fixes pending
-src/paic/artifacts/lease.py: descriptor typing fixes pending
-src/paic/artifacts/publication.py: optional backup fix pending
-tests/test_atomic_publication.py: renameat2 test fixes pending

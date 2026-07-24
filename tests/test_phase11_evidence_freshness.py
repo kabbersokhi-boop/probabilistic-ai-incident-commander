@@ -3,13 +3,14 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_phase11_evidence.py"
 
 
-def _module():
+def _module() -> ModuleType:
     spec = importlib.util.spec_from_file_location("phase11_evidence_freshness", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -72,7 +73,7 @@ def _bundle(tmp_path: Path) -> Path:
     return root
 
 
-@pytest.mark.parametrize("value", [None, 0, 1, "false", [], {}])
+@pytest.mark.parametrize("value", [None, 0, 1, "false", [], {}])  # type: ignore[untyped-decorator]
 def test_resumed_requires_exact_boolean_false(tmp_path: Path, value: object) -> None:
     module = _module()
     root = _bundle(tmp_path)

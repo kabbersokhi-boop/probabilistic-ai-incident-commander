@@ -253,9 +253,10 @@ class AtomicDirectoryPublisher:
             self._lease.validate_current_parent()
         except Exception as exc:
             if not self.committed and self.backup is not None and not self._target_exists():
+                backup = self.backup
                 try:
                     os.replace(
-                        self.backup.name,
+                        backup.name,
                         self._root.name,
                         src_dir_fd=self._parent_fd(),
                         dst_dir_fd=self._parent_fd(),
@@ -265,7 +266,7 @@ class AtomicDirectoryPublisher:
                     self._rollback_failed = True
                     raise ArtifactPublicationError(
                         "artifact publication rollback failed; backup preserved at "
-                        f"{self._root.parent / self.backup.name}: {restore_exc}"
+                        f"{self._root.parent / backup.name}: {restore_exc}"
                     ) from exc
             if self.committed and self.durability_confirmed:
                 state = "committed and durable; post-commit cleanup failed"

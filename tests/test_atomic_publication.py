@@ -196,8 +196,12 @@ def test_rename_exchange_reports_unavailable_and_errno(
         renameat2 = None
 
     monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: NoExchange())
-    with pytest.raises(OSError, match="unavailable"):
-        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+    parent_fd = os.open(tmp_path, os.O_RDONLY)
+    try:
+        with pytest.raises(OSError, match="unavailable"):
+            publication._rename_exchange_at(parent_fd, "left", "right")
+    finally:
+        os.close(parent_fd)
 
     class FailingExchange:
         argtypes: object = None
@@ -211,8 +215,12 @@ def test_rename_exchange_reports_unavailable_and_errno(
 
     monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: ErrnoExchange())
     monkeypatch.setattr(ctypes, "get_errno", lambda: errno.EXDEV)
-    with pytest.raises(OSError, match="cross-device"):
-        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+    parent_fd = os.open(tmp_path, os.O_RDONLY)
+    try:
+        with pytest.raises(OSError, match="cross-device"):
+            publication._rename_exchange_at(parent_fd, "left", "right")
+    finally:
+        os.close(parent_fd)
 
 
 def test_parent_and_lock_safety_reject_symlink_and_nonregular_components(tmp_path: Path) -> None:

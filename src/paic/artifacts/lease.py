@@ -18,8 +18,8 @@ compatibility, but safety does not depend on its pathname remaining stable.
 
 from __future__ import annotations
 
-import contextlib
 import asyncio
+import contextlib
 import contextvars
 import errno
 import hashlib
@@ -32,7 +32,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
-from typing import Literal, ParamSpec, TypeVar, cast
+from typing import Literal, ParamSpec, TypeVar
 
 try:
     import fcntl

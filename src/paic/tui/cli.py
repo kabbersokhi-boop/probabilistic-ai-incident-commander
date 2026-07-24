@@ -78,6 +78,25 @@ def dispatch_tui(args: argparse.Namespace) -> int:
             return 0
         config, snapshot = _load_snapshot(args.workspace)
         if args.tui_command == "run":
+            coordination_failure = any(
+                any(
+                    "Workspace artifact leases could not be acquired safely" in issue
+                    for issue in stage.issues
+                )
+                for stage in snapshot.stages
+            )
+            if coordination_failure:
+                print(
+                    json.dumps(
+                        {
+                            "success": False,
+                            "error": "workspace artifact coordination failed; interactive UI was not started",
+                        },
+                        indent=2,
+                    ),
+                    file=sys.stderr,
+                )
+                return 2
             return int(
                 TUIApplication(
                     config,

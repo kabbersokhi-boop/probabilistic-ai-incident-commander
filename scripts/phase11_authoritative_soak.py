@@ -200,6 +200,8 @@ def run(args: argparse.Namespace) -> int:
         "workspace_sha256": _sha256(workspace.resolve()),
         "resolved_configuration_sha256": _configuration_sha256(config),
     }
+    if args.fresh and (metadata_path.exists() or iteration_path.exists()):
+        raise RuntimeError("fresh soak requested but output directory already contains evidence")
     if metadata_path.exists():
         prior = json.loads(metadata_path.read_text(encoding="utf-8"))
         if prior != metadata:
@@ -210,6 +212,7 @@ def run(args: argparse.Namespace) -> int:
         _atomic_json(metadata_path, metadata)
 
     completed = _load_iterations(iteration_path)
+    resumed = bool(completed)
     for _ in range(args.warmup):
         inspect_workspace(config)
     gc.collect()
@@ -289,6 +292,7 @@ def run(args: argparse.Namespace) -> int:
         "cumulative_inspection_seconds": cumulative_inspection_seconds,
         "run_elapsed_seconds": run_elapsed_seconds,
         "minimums_satisfied": minimums_satisfied,
+        "resumed": resumed,
         "unique_snapshot_hashes": hashes,
         "status_counts": counts,
         "configured_stage_counts": sorted({item.configured_stage_count for item in completed}),
@@ -334,6 +338,7 @@ def main() -> int:
     parser.add_argument("--iterations", type=int, default=25)
     parser.add_argument("--duration-seconds", type=float, default=float("inf"))
     parser.add_argument("--mode", choices=("inspection", "endurance"), default="inspection")
+    parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--max-fd-delta", type=int, default=0)
     parser.add_argument("--max-gc-delta", type=int, default=2048)

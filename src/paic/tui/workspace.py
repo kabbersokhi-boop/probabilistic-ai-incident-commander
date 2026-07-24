@@ -608,15 +608,92 @@ def inspect_workspace(config: WorkspaceConfig) -> WorkspaceSnapshot:
     except ArtifactLeaseError as exc:
         message = f"Workspace artifact leases could not be acquired safely: {exc}"
         configured_paths = {
-            "dataset": config.paths.metrics.dataset_dir or config.paths.incident.dataset_dir,
-            "analytics": config.paths.metrics.analytics_dir,
-            "detection": config.paths.metrics.detection_dir,
+            "dataset": next(
+                (
+                    value
+                    for value in (
+                        config.paths.metrics.dataset_dir,
+                        config.paths.incident.dataset_dir,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
+            "analytics": next(
+                (
+                    value
+                    for value in (
+                        config.paths.metrics.analytics_dir,
+                        config.paths.incident.analytics_dir,
+                        config.paths.recovery.analytics_dir,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
+            "detection": next(
+                (
+                    value
+                    for value in (
+                        config.paths.metrics.detection_dir,
+                        config.paths.incident.detection_dir,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
             "impact": config.paths.incident.impact_dir,
             "evidence": config.paths.incident.evidence_dir,
-            "investigation": config.paths.incident.investigation_dir,
-            "remediation": config.paths.remediation.plan_dir,
-            "recovery": config.paths.recovery.report_dir,
-            "evaluation": config.paths.evaluation.run_dir,
+            "investigation": next(
+                (
+                    value
+                    for value in (
+                        config.paths.incident.investigation_dir,
+                        config.paths.incident.investigation_config,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
+            "remediation": next(
+                (
+                    value
+                    for value in (
+                        config.paths.remediation.plan_dir,
+                        config.paths.remediation.state_before_dir,
+                        config.paths.remediation.state_after_dir,
+                        config.paths.remediation.execution_dir,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
+            "recovery": next(
+                (
+                    value
+                    for value in (
+                        config.paths.recovery.observations_dir,
+                        config.paths.recovery.analytics_dir,
+                        config.paths.recovery.report_dir,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
+            "evaluation": next(
+                (
+                    value
+                    for value in (
+                        config.paths.evaluation.run_dir,
+                        config.paths.evaluation.visible_dir,
+                        config.paths.evaluation.answers_dir,
+                        config.paths.evaluation.predictions,
+                        config.paths.evaluation.config,
+                    )
+                    if value is not None
+                ),
+                None,
+            ),
         }
         raw_stages = [
             (

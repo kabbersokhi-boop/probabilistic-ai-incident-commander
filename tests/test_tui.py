@@ -503,6 +503,78 @@ def test_workspace_lease_failure_is_a_controlled_error(
     assert "coordination file" in snapshot.stages[0].issues[0]
 
 
+def test_subordinate_only_recovery_configuration_is_not_reported_unconfigured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    observations = tmp_path / "observations"
+    observations.mkdir()
+    config = WorkspaceConfig(
+        workspace_id="subordinate-recovery",
+        display_name="Subordinate recovery",
+        root_dir=tmp_path,
+        paths=WorkspacePaths.model_validate({"recovery": {"observations_dir": observations}}),
+    )
+    monkeypatch.setattr(
+        workspace_module,
+        "artifact_reader_leases",
+        lambda _: (_ for _ in ()).throw(ArtifactLeaseError("unsafe lease")),
+    )
+    snapshot = inspect_workspace(config)
+    recovery = next(stage for stage in snapshot.stages if stage.key == "recovery")
+    assert recovery.status == "error"
+    assert "leases could not be acquired" in recovery.issues[0].lower()
+    assert snapshot.overall_status == "error"
+    assert snapshot.configured_stage_count == 1
+
+
+def test_interactive_run_refuses_start_after_coordination_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = WorkspaceConfig(
+        workspace_id="subordinate-recovery",
+        display_name="Subordinate recovery",
+        root_dir=tmp_path,
+        paths=WorkspacePaths(),
+    )
+    failed = WorkspaceSnapshot(
+        workspace_id=config.workspace_id,
+        display_name=config.display_name,
+        root_dir=".",
+        overall_status="error",
+        configured_stage_count=1,
+        healthy_stage_count=0,
+        stages=[
+            StageSnapshot(
+                key="recovery",
+                title="Recovery verification",
+                status="error",
+                summary="coordination failed",
+                issues=["Workspace artifact leases could not be acquired safely: unsafe lease"],
+            )
+        ],
+    )
+    monkeypatch.setattr("paic.tui.cli._load_snapshot", lambda _: (config, failed))
+    monkeypatch.setattr(
+        "paic.tui.cli.TUIApplication",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("UI started")),
+    )
+    args: Any = type(
+        "Args",
+        (),
+        {
+            "tui_command": "run",
+            "workspace": tmp_path / "unused.yaml",
+            "format": "json",
+            "no_color": True,
+            "ascii": True,
+        },
+    )()
+    assert dispatch_tui(args) == 2
+    assert "interactive UI was not started" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("command", ["run", "snapshot", "validate"])  # type: ignore[untyped-decorator]
 def test_cli_lease_failure_has_no_traceback(
     monkeypatch: pytest.MonkeyPatch,

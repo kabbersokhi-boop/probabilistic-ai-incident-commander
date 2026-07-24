@@ -1,0 +1,2 @@
+tests/test_phase11_evidence_freshness.py:82:62: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+Found 1 error.

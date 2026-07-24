@@ -1,0 +1,71 @@
+name: one-shot reader boundary fixes
+
+on:
+  push:
+    branches: [agent/phase11-fix-review2]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Patch reader boundaries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          lease = Path('src/paic/artifacts/lease.py')
+          text = lease.read_text()
+          text = text.replace(
+              '''        except FileNotFoundError:\n            self.root_fd = None\n            self.root_info = None\n            return\n        except OSError as exc:\n''',
+              '''        except (FileNotFoundError, NotADirectoryError):\n            self.root_fd = None\n            self.root_info = None\n            return\n        except OSError as exc:\n''',
+              1,
+          )
+          lease.write_text(text)
+
+          benchmark = Path('src/paic/evaluation/benchmark.py')
+          text = benchmark.read_text()
+          old = '''def _regular_file(path: Path, label: str) -> Path:\n    anchored = artifact_path(path)\n    try:\n        if anchored.is_symlink() or not anchored.is_file():\n            raise BenchmarkError(f"{label} must be a regular non-symlink file")\n    except OSError as exc:\n        raise BenchmarkError(f"{label} is unavailable: {path}") from exc\n    return anchored\n'''
+          new = '''def _regular_file(path: Path, label: str) -> Path:\n    anchored = artifact_path(path)\n    try:\n        if not anchored.exists():\n            raise BenchmarkError(f"{label} is unavailable: {path}")\n        if anchored.is_symlink() or not anchored.is_file():\n            raise BenchmarkError(f"{label} must be a regular non-symlink file")\n    except OSError as exc:\n        raise BenchmarkError(f"{label} is unavailable: {path}") from exc\n    return anchored\n'''
+          if old not in text:
+              raise SystemExit('regular file block not found')
+          benchmark.write_text(text.replace(old, new))
+
+          test = Path('tests/test_artifact_lease_nested.py')
+          text = test.read_text()
+          text = text.replace(
+              'from paic.artifacts.lease import ArtifactLeaseError, artifact_reader_leases',
+              'from paic.artifacts.lease import ArtifactLeaseError, artifact_path, artifact_reader_leases',
+          )
+          text = text.replace(
+              'return (Path(path) / "value.txt").read_text(encoding="utf-8")',
+              'return (artifact_path(path) / "value.txt").read_text(encoding="utf-8")',
+          )
+          test.write_text(text)
+          PY
+          python -m pip install -e ".[dev]"
+          ruff check --fix src/paic tests
+          ruff format src/paic tests
+          set +e
+          {
+            ruff format --check src/paic tests; echo "ruff_format_exit=$?"
+            ruff check src/paic tests; echo "ruff_check_exit=$?"
+            pytest -q --tb=short tests/test_artifact_lease.py tests/test_artifact_lease_nested.py tests/test_evaluation.py tests/test_investigation_cli.py tests/test_investigation_evaluation.py tests/test_investigation_orchestrator.py; echo "pytest_exit=$?"
+            mypy --strict src tests; echo "mypy_exit=$?"
+          } > review2-reader-boundaries.txt 2>&1
+          rm -f .github/workflows/one-shot-reader-boundaries.yml .review2-reader-boundaries-trigger review2-reader-verify6.txt
+      - name: Commit fixes and report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix anchored reader validation boundaries"
+          git push origin HEAD:agent/phase11-fix-review2

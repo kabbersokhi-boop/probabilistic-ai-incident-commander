@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 import polars as pl
 
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_reader
 from paic.simulator.config import SimulationConfig
 from paic.simulator.io import (
     DatasetIOError,

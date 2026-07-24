@@ -19,7 +19,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.artifact import file_sha256
 from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
@@ -138,7 +143,9 @@ def _derive_observations(
             "incident_id": execution.receipt.incident_id,
             "execution_receipt_sha256": execution.receipt.receipt_sha256,
             "execution_manifest_sha256": manifest_sha256(execution_dir),
-            "analytics_manifest_sha256": file_sha256(artifact_path(Path(analytics_dir) / "manifest.json")),
+            "analytics_manifest_sha256": file_sha256(
+                artifact_path(Path(analytics_dir) / "manifest.json")
+            ),
             "source_simulation_id": analytics_manifest.source_simulation_id,
             "generator_config_sha256": _digest(scenario.model_dump(mode="json")),
             "executed_at": execution.receipt.executed_at,

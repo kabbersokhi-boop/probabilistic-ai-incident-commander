@@ -13,7 +13,7 @@ from paic.analytics.config import AnalyticsConfig
 from paic.analytics.io import AnalyticsIOError, load_analytics, metric_catalog_json
 from paic.analytics.quality import quality_error_count
 from paic.analytics.schema import ANALYTICS_TABLE_ORDER, ANALYTICS_TABLE_SPECS
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_readers
 from paic.simulator.io import file_sha256
 from paic.simulator.io import load_manifest as load_source_manifest
 from paic.simulator.validation import validate_dataset_directory

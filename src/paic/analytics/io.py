@@ -25,7 +25,7 @@ from paic.analytics.quality import quality_error_count
 from paic.analytics.registry import metric_catalog
 from paic.analytics.schema import ANALYTICS_TABLE_ORDER, ANALYTICS_TABLE_SPECS
 from paic.analytics.types import AnalyticsBuildResult, AnalyticsFrameMap, LoadedAnalytics
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.io import file_sha256
 

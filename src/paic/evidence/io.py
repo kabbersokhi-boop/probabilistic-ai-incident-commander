@@ -13,7 +13,7 @@ from typing import Any
 import polars as pl
 
 from paic import __version__
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import evidence_quality_error_count

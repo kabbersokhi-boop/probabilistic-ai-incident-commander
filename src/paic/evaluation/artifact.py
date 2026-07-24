@@ -11,7 +11,12 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from paic import __version__
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.benchmark import (
     digest_models,
@@ -431,7 +436,9 @@ def replay_evaluation(
         raise EvaluationArtifactError("semantic replay mismatch")
     payloads = _payload_bytes(run)
     calibration = _read_json(artifact_path(Path(root) / "calibration.json"))
-    safety = SafetyResults.model_validate(_read_json(artifact_path(Path(root) / "safety-results.json")))
+    safety = SafetyResults.model_validate(
+        _read_json(artifact_path(Path(root) / "safety-results.json"))
+    )
     expected_calibration = json.loads(payloads["calibration.json"])
     expected_safety = SafetyResults.model_validate_json(payloads["safety-results.json"])
     if calibration != expected_calibration or safety != expected_safety:
@@ -449,7 +456,9 @@ def replay_evaluation(
     assert config_path is not None
     source_visible, _answers, visible_hash, answer_hash = load_benchmark(visible_dir, answers_dir)
     predictions = load_predictions(predictions_path)
-    config = EvaluationConfig.model_validate_json(artifact_path(config_path).read_text(encoding="utf-8"))
+    config = EvaluationConfig.model_validate_json(
+        artifact_path(config_path).read_text(encoding="utf-8")
+    )
     effective_visible = resolve_ablation(source_visible, config.ablation)
     effective_predictions = resolve_prediction_ablation(
         predictions,

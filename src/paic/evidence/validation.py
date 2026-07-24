@@ -8,7 +8,7 @@ from pathlib import Path
 
 import polars as pl
 
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_readers
+from paic.artifacts.lease import artifact_path, artifact_readers
 from paic.evidence.config import EvidenceConfig
 from paic.evidence.engine import (
     EvidenceBuildError,

@@ -10,7 +10,12 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest

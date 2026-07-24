@@ -11,7 +11,12 @@ from typing import Literal
 
 from pydantic import Field
 
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader, artifact_readers
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.artifact import replay_evaluation
 from paic.evaluation.benchmark import digest_value

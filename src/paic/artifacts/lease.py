@@ -59,9 +59,9 @@ _ACTIVE_PARENTS: contextvars.ContextVar[dict[str, tuple[int, int, int, Owner]] |
 _ACTIVE_ROOT_FDS: contextvars.ContextVar[dict[int, Owner] | None] = contextvars.ContextVar(
     "paic_active_artifact_root_fds", default=None
 )
-_ACTIVE_ROOT_PATHS: contextvars.ContextVar[
-    dict[str, tuple[tuple[int, Owner], ...]] | None
-] = contextvars.ContextVar("paic_active_artifact_root_paths", default=None)
+_ACTIVE_ROOT_PATHS: contextvars.ContextVar[dict[str, tuple[tuple[int, Owner], ...]] | None] = (
+    contextvars.ContextVar("paic_active_artifact_root_paths", default=None)
+)
 
 
 def _execution_owner() -> Owner:
@@ -148,7 +148,6 @@ def artifact_path(path: str | Path) -> Path:
     """Return an owner-scoped descriptor-relative path for an active artifact root."""
 
     candidate = _canonical_root(path)
-    candidate_text = os.path.normcase(os.fspath(candidate))
     owner = _execution_owner()
     for root_text, entries in sorted(
         _active_root_paths().items(), key=lambda item: len(item[0]), reverse=True
@@ -169,10 +168,16 @@ def artifact_path(path: str | Path) -> Path:
 def artifact_root_is_regular(path: str | Path) -> bool:
     """Check an artifact root without rejecting an internal descriptor anchor."""
 
+    descriptor_fd = _descriptor_fd(path)
+    owner = _execution_owner()
+    if descriptor_fd is not None and _active_root_fds().get(descriptor_fd) == owner:
+        try:
+            return stat.S_ISDIR(os.fstat(descriptor_fd).st_mode)
+        except OSError:
+            return False
     candidate = _canonical_root(path)
     key = os.path.normcase(os.fspath(candidate))
     entries = _active_root_paths().get(key, ())
-    owner = _execution_owner()
     if entries and entries[-1][1] == owner:
         try:
             return stat.S_ISDIR(os.fstat(entries[-1][0]).st_mode)

@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from paic import __version__
-from paic.artifacts.lease import artifact_path, artifact_root_is_regular, artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.config import SimulationConfig
 from paic.simulator.manifest import (

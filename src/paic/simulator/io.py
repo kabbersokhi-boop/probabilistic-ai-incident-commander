@@ -164,6 +164,7 @@ def _export_dataset_to_root(result: SimulationResult, root: Path) -> DatasetMani
     return manifest
 
 
+@artifact_reader
 def load_manifest(dataset_dir: str | Path) -> DatasetManifest:
     path = Path(dataset_dir) / "manifest.json"
     try:

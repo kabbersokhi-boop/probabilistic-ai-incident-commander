@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import ctypes
 import os
+import secrets
 import shutil
 import stat
-import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +44,6 @@ def _fsync_directory(path: Path) -> None:
 
 
 def _fsync_payload_tree(root: Path) -> None:
-    """Flush every regular payload and directory in deterministic order."""
     for entry in sorted(root.iterdir(), key=lambda item: item.name):
         info = entry.lstat()
         if stat.S_ISLNK(info.st_mode):
@@ -59,8 +58,7 @@ def _fsync_payload_tree(root: Path) -> None:
     _fsync_directory(root)
 
 
-def _rename_exchange(left: Path, right: Path) -> None:
-    """Exchange two names without a missing-target window on Linux."""
+def _rename_exchange_at(parent_fd: int, left_name: str, right_name: str) -> None:
     libc = ctypes.CDLL(None, use_errno=True)
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is None:
@@ -73,7 +71,7 @@ def _rename_exchange(left: Path, right: Path) -> None:
         ctypes.c_uint,
     ]
     renameat2.restype = ctypes.c_int
-    if renameat2(-100, os.fsencode(left), -100, os.fsencode(right), 2) != 0:
+    if renameat2(parent_fd, os.fsencode(left_name), parent_fd, os.fsencode(right_name), 2) != 0:
         error = ctypes.get_errno()
         raise OSError(error, os.strerror(error))
 
@@ -94,14 +92,7 @@ def _assert_safe_target(target: Path) -> None:
 
 
 class AtomicDirectoryPublisher:
-    """Publish a complete tree under an exclusive per-target writer lock.
-
-    Existing targets are exchanged with the staged tree using Linux ``renameat2``;
-    readers therefore observe either complete generation. Platforms without the
-    exchange primitive fail closed rather than exposing a two-rename gap. A lock
-    file is never broken automatically; an operator must verify the writer is dead
-    before removing a stale lock.
-    """
+    """Publish a complete tree under an exclusive anchored writer lease."""
 
     def __init__(
         self,
@@ -111,11 +102,12 @@ class AtomicDirectoryPublisher:
         failure_hook: FailureHook | None = None,
     ) -> None:
         self.target = Path(target)
+        self._root = self.target.absolute()
         self.overwrite = overwrite
         self.failure_hook = failure_hook
         self.staging: Path | None = None
         self.backup: Path | None = None
-        self.lock_path = self.target.parent / f".{self.target.name}.lock"
+        self.lock_path = self._root.parent / f".{self._root.name}.lock"
         self._lock_fd: int | None = None
         self._lock_identity: tuple[int, int] | None = None
         self._rollback_failed = False
@@ -127,6 +119,33 @@ class AtomicDirectoryPublisher:
         if self.failure_hook is not None:
             self.failure_hook(point)
 
+    def _parent_fd(self) -> int:
+        if self._lease is None or self._lease.parent_fd is None:
+            raise ArtifactPublicationError("publisher lease parent was not acquired")
+        return self._lease.parent_fd
+
+    def _parent_entry(self, name: str) -> Path:
+        return Path(f"/proc/self/fd/{self._parent_fd()}") / name
+
+    def _target_exists(self) -> bool:
+        try:
+            info = os.stat(self._root.name, dir_fd=self._parent_fd(), follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISDIR(info.st_mode):
+            raise ArtifactPublicationError("artifact target must be a directory")
+        return True
+
+    def _make_staging(self) -> Path:
+        for _ in range(128):
+            name = f".{self._root.name}.staging-{secrets.token_hex(8)}"
+            try:
+                os.mkdir(name, 0o700, dir_fd=self._parent_fd())
+            except FileExistsError:
+                continue
+            return self._parent_entry(name)
+        raise ArtifactPublicationError("cannot allocate a unique staging directory")
+
     def _release_lock(self) -> None:
         if self._lock_fd is None:
             return
@@ -137,80 +156,66 @@ class AtomicDirectoryPublisher:
             close_error = exc
         self._lock_fd = None
         try:
-            current = self.lock_path.stat()
+            current = os.stat(
+                self.lock_path.name,
+                dir_fd=self._parent_fd(),
+                follow_symlinks=False,
+            )
             if self._lock_identity == (current.st_dev, current.st_ino):
-                self.lock_path.unlink()
-        except OSError:
+                os.unlink(self.lock_path.name, dir_fd=self._parent_fd())
+        except (OSError, ArtifactPublicationError):
             pass
         self._lock_identity = None
         if close_error is not None:
             raise ArtifactPublicationError("cannot close artifact writer lock") from close_error
 
     def __enter__(self) -> Path:
-        _assert_safe_target(self.target)
-        if self.target.exists() and not self.overwrite:
-            raise ArtifactPublicationError(f"output directory already exists: {self.target}")
-        self.target.parent.mkdir(parents=True, exist_ok=True)
-        _assert_safe_target(self.target)
-        if self.lock_path.is_symlink() or (
-            self.lock_path.exists() and not self.lock_path.is_file()
-        ):
-            raise ArtifactPublicationError("artifact writer lock is not a regular file")
+        _assert_safe_target(self._root)
+        self._root.parent.mkdir(parents=True, exist_ok=True)
+        _assert_safe_target(self._root)
         try:
+            self._lease = artifact_lease(self._root, exclusive=True)
+            self._lease.__enter__()
+            self._lease.validate_current_parent()
+            if self._target_exists() and not self.overwrite:
+                raise ArtifactPublicationError(f"output directory already exists: {self.target}")
+            try:
+                lock_info = os.stat(
+                    self.lock_path.name,
+                    dir_fd=self._parent_fd(),
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                lock_info = None
+            if lock_info is not None and not stat.S_ISREG(lock_info.st_mode):
+                raise ArtifactPublicationError("artifact writer lock is not a regular file")
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
             flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-            self._lock_fd = os.open(self.lock_path, flags, 0o600)
+            self._lock_fd = os.open(
+                self.lock_path.name,
+                flags,
+                0o600,
+                dir_fd=self._parent_fd(),
+            )
             lock_info = os.fstat(self._lock_fd)
             if not stat.S_ISREG(lock_info.st_mode) or lock_info.st_nlink != 1:
                 raise ArtifactPublicationError("artifact writer lock is not a regular file")
             self._lock_identity = (lock_info.st_dev, lock_info.st_ino)
             os.write(self._lock_fd, f"{os.getpid()}\n".encode())
             os.fsync(self._lock_fd)
+            self._lease.validate_current_parent()
+            self.staging = self._make_staging()
+            self._lease.validate_current_parent()
+            self._point("staging-created")
+            return self.staging
         except FileExistsError as exc:
+            self.__exit__(type(exc), exc, exc.__traceback__)
             raise ArtifactPublicationError(
                 f"artifact target is already locked: {self.lock_path}"
             ) from exc
-        except (OSError, ArtifactPublicationError) as exc:
-            if self._lock_fd is not None:
-                try:
-                    self._release_lock()
-                except ArtifactPublicationError as cleanup_error:
-                    raise ArtifactPublicationError(
-                        f"cannot acquire artifact writer lock safely: {exc}; {cleanup_error}"
-                    ) from exc
-            if isinstance(exc, ArtifactPublicationError):
-                raise
-            raise ArtifactPublicationError(f"cannot acquire artifact writer lock: {exc}") from exc
-        try:
-            # Hold the shared artifact's exclusive lease for the complete
-            # transaction, including staging validation and cleanup.  Readers
-            # therefore cannot enter while a generation is being assembled.
-            self._lease = artifact_lease(self.target, exclusive=True)
-            self._lease.__enter__()
         except Exception:
-            self._release_lock()
+            self.__exit__(None, None, None)
             raise
-        try:
-            self.staging = Path(
-                tempfile.mkdtemp(prefix=f".{self.target.name}.staging-", dir=self.target.parent)
-            )
-        except Exception:
-            if self._lease is not None:
-                self._lease.__exit__(None, None, None)
-                self._lease = None
-            self._release_lock()
-            raise
-        try:
-            self._point("staging-created")
-        except Exception:
-            shutil.rmtree(self.staging, ignore_errors=True)
-            self.staging = None
-            if self._lease is not None:
-                self._lease.__exit__(None, None, None)
-                self._lease = None
-            self._release_lock()
-            raise
-        return self.staging
 
     def commit(self) -> PublicationResult:
         if self.staging is None:
@@ -218,41 +223,56 @@ class AtomicDirectoryPublisher:
         try:
             if self._lease is None:
                 raise ArtifactPublicationError("publisher lease was not acquired")
+            self._lease.validate_current_parent()
             _fsync_payload_tree(self.staging)
             self._point("payload-written")
-            if self.target.exists():
+            self._lease.validate_current_parent()
+            staging_name = self.staging.name
+            if self._target_exists():
                 self._point("old-moved")
-                _rename_exchange(self.target, self.staging)
-                self.backup = self.staging
+                _rename_exchange_at(self._parent_fd(), self._root.name, staging_name)
+                self.backup = self._parent_entry(staging_name)
             else:
-                os.replace(self.staging, self.target)
+                os.replace(
+                    staging_name,
+                    self._root.name,
+                    src_dir_fd=self._parent_fd(),
+                    dst_dir_fd=self._parent_fd(),
+                )
             self.committed = True
             self.staging = None
             self._point("new-committed")
-            _fsync_directory(self.target.parent)
+            os.fsync(self._parent_fd())
             self.durability_confirmed = True
             self._point("parent-synced")
             if self.backup is not None:
                 shutil.rmtree(self.backup)
                 self.backup = None
-                _fsync_directory(self.target.parent)
+                os.fsync(self._parent_fd())
+            self._lease.validate_current_parent()
         except Exception as exc:
-            if not self.committed and self.backup is not None and not self.target.exists():
+            if not self.committed and self.backup is not None and not self._target_exists():
                 try:
-                    os.replace(self.backup, self.target)
+                    os.replace(
+                        self.backup.name,
+                        self._root.name,
+                        src_dir_fd=self._parent_fd(),
+                        dst_dir_fd=self._parent_fd(),
+                    )
                     self.backup = None
                 except OSError as restore_exc:
                     self._rollback_failed = True
                     raise ArtifactPublicationError(
                         "artifact publication rollback failed; backup preserved at "
-                        f"{self.backup}: {restore_exc}"
+                        f"{self._root.parent / self.backup.name}: {restore_exc}"
                     ) from exc
-            state = "committed but durability is uncertain" if self.committed else "not committed"
+            if self.committed and self.durability_confirmed:
+                state = "committed and durable; post-commit cleanup failed"
+            elif self.committed:
+                state = "committed but durability is uncertain"
+            else:
+                state = "not committed"
             raise ArtifactPublicationError(f"artifact publication failed ({state}): {exc}") from exc
-        finally:
-            # The lease remains held until __exit__, so cleanup and parent sync
-            # are serialized with readers and other writers as well.
-            pass
         return PublicationResult(self.target, True, self.durability_confirmed)
 
     def __exit__(
@@ -261,27 +281,43 @@ class AtomicDirectoryPublisher:
         exc: object,
         traceback: object,
     ) -> None:
+        pending_error: BaseException | None = None
         try:
             if self.staging is not None:
                 shutil.rmtree(self.staging, ignore_errors=True)
                 self.staging = None
             if exc is not None and not self.committed and self.backup is not None:
-                if not self.target.exists():
+                if not self._target_exists():
                     try:
-                        os.replace(self.backup, self.target)
+                        os.replace(
+                            self.backup.name,
+                            self._root.name,
+                            src_dir_fd=self._parent_fd(),
+                            dst_dir_fd=self._parent_fd(),
+                        )
                     except OSError as restore_exc:
                         self._rollback_failed = True
                         raise ArtifactPublicationError(
-                            f"artifact publication rollback failed; backup preserved at {self.backup}"
+                            f"artifact publication rollback failed; backup preserved at {self._root.parent / self.backup.name}"
                         ) from restore_exc
                 if self.backup.exists():
-                    # Preserve a complete generation if restoration could not finish.
                     return
                 self.backup = None
+        except BaseException as cleanup_error:
+            pending_error = cleanup_error
         finally:
+            try:
+                self._release_lock()
+            except BaseException as lock_error:
+                if pending_error is None:
+                    pending_error = lock_error
             if self._lease is not None:
                 try:
                     self._lease.__exit__(exc_type, exc, traceback)
+                except BaseException as lease_error:
+                    if pending_error is None:
+                        pending_error = lease_error
                 finally:
                     self._lease = None
-            self._release_lock()
+        if pending_error is not None:
+            raise pending_error

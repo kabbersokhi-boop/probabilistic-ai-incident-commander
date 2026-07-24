@@ -26,8 +26,10 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 def _digest(value: Any, name: str) -> None:
-    if not isinstance(value, str) or len(value) != 64 or any(
-        char not in "0123456789abcdef" for char in value
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(char not in "0123456789abcdef" for char in value)
     ):
         raise EvidenceValidationError(f"{name} must be a lowercase SHA-256 digest")
 

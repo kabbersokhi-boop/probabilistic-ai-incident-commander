@@ -179,9 +179,7 @@ def _open_parent(parent: Path) -> tuple[int, os.stat_result]:
     return _open_directory(parent, private=True)
 
 
-def _revalidate_directory(
-    path: Path, fd: int, expected: os.stat_result, *, message: str
-) -> None:
+def _revalidate_directory(path: Path, fd: int, expected: os.stat_result, *, message: str) -> None:
     try:
         _validate_parent_path(path)
         descriptor_info = os.fstat(fd)

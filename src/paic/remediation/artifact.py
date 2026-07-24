@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import os
-import shutil
-import tempfile
 from collections.abc import Callable
-from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
-from uuid import uuid4
 
 from paic import __version__
 from paic.artifacts.lease import artifact_reader
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.artifact import replay_investigation
 from paic.remediation.config import RemediationConfig
 from paic.remediation.executor import ExecutionError, verify_execution_transition
@@ -56,59 +53,6 @@ class LoadedExecution:
     receipt: ExecutionReceipt
 
 
-def _stage_root(path: str | Path, *, overwrite: bool) -> tuple[Path, Path, bool]:
-    """Create a private sibling staging directory without touching the destination."""
-
-    destination = Path(path)
-    parent = destination.parent
-    parent.mkdir(parents=True, exist_ok=True)
-    exists = destination.exists() or destination.is_symlink()
-    if exists and not overwrite:
-        raise RemediationArtifactError(f"output directory already exists: {destination}")
-    if exists and (destination.is_file() or destination.is_symlink() or not destination.is_dir()):
-        raise RemediationArtifactError(f"output path is not a regular directory: {destination}")
-    staged = Path(tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=parent))
-    os.chmod(staged, 0o700)
-    return destination, staged, exists
-
-
-def _fsync_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
-def _publish(root: Path, destination: Path, *, replace: bool) -> None:
-    """Atomically publish a fully validated staged artifact, restoring on failure."""
-
-    backup: Path | None = None
-    committed = False
-    try:
-        if replace:
-            backup = destination.with_name(f".{destination.name}.previous-{uuid4().hex}")
-            os.replace(destination, backup)
-        os.replace(root, destination)
-        committed = True
-        try:
-            _fsync_directory(destination.parent)
-        except OSError as exc:
-            # The rename is the visibility/commit point.  Do not report a
-            # committed artifact as failed solely because durability
-            # confirmation is interrupted; a later validator can inspect it.
-            if not destination.is_dir() or destination.is_symlink():
-                raise RemediationArtifactError("published artifact is unavailable") from exc
-    except OSError as exc:
-        if not committed and backup is not None and backup.exists() and not destination.exists():
-            os.replace(backup, destination)
-            _fsync_directory(destination.parent)
-        raise RemediationArtifactError(f"cannot atomically publish artifact: {exc}") from exc
-    if backup is not None:
-        with suppress(OSError):
-            shutil.rmtree(backup)
-
-
 def _export(
     output_dir: str | Path,
     *,
@@ -116,15 +60,19 @@ def _export(
     writer: Callable[[Path], RemediationArtifactManifest],
     validator: Callable[[str | Path], T],
 ) -> RemediationArtifactManifest:
-    destination, staged, replace = _stage_root(output_dir, overwrite=overwrite)
     try:
-        manifest = writer(staged)
-        validator(staged)
-        _publish(staged, destination, replace=replace)
+        publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
+        with publisher as staged:
+            manifest = writer(staged)
+            validator(staged)
+            publisher.commit()
         return manifest
+    except ArtifactPublicationError as exc:
+        message = str(exc)
+        if "target must be a directory" in message or "target must not be a symlink" in message:
+            message = "artifact output is not a regular directory"
+        raise RemediationArtifactError(message) from exc
     except Exception:
-        if staged.exists():
-            shutil.rmtree(staged)
         raise
 
 
@@ -170,7 +118,6 @@ def _write_manifest(
     marker = root / "_SUCCESS"
     marker.write_text(file_sha256(manifest_path) + "\n", encoding="utf-8")
     os.chmod(marker, 0o600)
-    _fsync_directory(root)
     return manifest
 
 

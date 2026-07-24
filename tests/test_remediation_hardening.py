@@ -4,7 +4,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -12,6 +11,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.investigation.config import DecisionPolicy
 from paic.investigation.models import InvestigationProposal, InvestigationReport
 from paic.investigation.probability import score_proposal
@@ -1307,15 +1307,18 @@ def test_atomic_publish_failure_restores_existing_artifact(
     state_dir = tmp_path / "state-publish"
     export_control_state(state, state_dir)
     original = (state_dir / "state.json").read_bytes()
-    replace = os.replace
 
-    def fail_stage_publish(source: str | Path, destination: str | Path) -> None:
-        if Path(source).name.startswith(".state-publish.tmp-") and Path(destination) == state_dir:
-            raise OSError("injected publish failure")
-        replace(source, destination)
+    class FailingPublisher(AtomicDirectoryPublisher):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["failure_hook"] = lambda point: (
+                (_ for _ in ()).throw(OSError("injected publish failure"))
+                if point == "old-moved"
+                else None
+            )
+            super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(os, "replace", fail_stage_publish)
-    with pytest.raises(RemediationArtifactError, match="atomically publish"):
+    monkeypatch.setattr(remediation_artifact, "AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(RemediationArtifactError, match="not committed"):
         export_control_state(state.model_copy(update={"generation": 1}), state_dir, overwrite=True)
     assert (state_dir / "state.json").read_bytes() == original
     assert validate_control_state(state_dir) == []

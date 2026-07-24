@@ -5,13 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from paic import __version__
 from paic.artifacts.lease import artifact_reader
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.config import RecoveryConfig
 from paic.recovery.engine import evaluate_recovery, verify_report
 from paic.recovery.manifest import RecoveryArtifactFile, RecoveryArtifactManifest
@@ -48,14 +47,6 @@ def file_sha256(path: Path) -> str:
     return value.hexdigest()
 
 
-def _fsync_dir(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
 def manifest_sha256(path: str | Path) -> str:
     return file_sha256(Path(path) / "manifest.json")
 
@@ -82,89 +73,54 @@ def export_recovery(
     overwrite: bool = False,
 ) -> RecoveryArtifactManifest:
     verify_report(report)
-    destination = Path(output_dir)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    exists = destination.exists() or destination.is_symlink()
-    if exists and not overwrite:
-        raise RecoveryArtifactError(f"output directory already exists: {destination}")
-    if exists and (destination.is_symlink() or not destination.is_dir()):
-        raise RecoveryArtifactError("recovery output path is not a regular directory")
-    staged = Path(tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=destination.parent))
-    os.chmod(staged, 0o700)
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
     try:
-        files = [
-            _write(
-                staged / "recovery.config.resolved.json",
-                config.model_dump_json(indent=2) + "\n",
-            ),
-            _write(staged / "observation-set.json", observations.model_dump_json(indent=2) + "\n"),
-            _write(staged / "report.json", report.model_dump_json(indent=2) + "\n"),
-            _write(
-                staged / "metric-evaluations.jsonl",
-                "".join(item.model_dump_json() + "\n" for item in report.metric_evaluations),
-            ),
-        ]
-        manifest = RecoveryArtifactManifest(
-            artifact_id=report.recovery_id,
-            incident_id=report.incident_id,
-            generator_version=__version__,
-            status=report.decision,
-            payload_sha256=report.report_sha256,
-            bindings={
-                "execution_manifest": report.execution_manifest_sha256,
-                "execution_receipt": report.execution_receipt_sha256,
-                "config": report.config_sha256,
-                "observation_manifest": report.observation_manifest_sha256,
-            },
-            files=sorted(files, key=lambda item: item.relative_path),
-        )
-        manifest_path = staged / "manifest.json"
-        with manifest_path.open("x", encoding="utf-8") as handle:
-            handle.write(manifest.model_dump_json(indent=2) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(manifest_path, 0o600)
-        marker = staged / "_SUCCESS"
-        with marker.open("x", encoding="utf-8") as handle:
-            handle.write(file_sha256(manifest_path) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(marker, 0o600)
-        _fsync_dir(staged)
-        load_recovery(staged)
-        backup: Path | None = None
-        committed = False
-        if exists:
-            backup = Path(
-                tempfile.mkdtemp(prefix=f".{destination.name}.backup-", dir=destination.parent)
+        with publisher as staged:
+            files = [
+                _write(
+                    staged / "recovery.config.resolved.json",
+                    config.model_dump_json(indent=2) + "\n",
+                ),
+                _write(
+                    staged / "observation-set.json", observations.model_dump_json(indent=2) + "\n"
+                ),
+                _write(staged / "report.json", report.model_dump_json(indent=2) + "\n"),
+                _write(
+                    staged / "metric-evaluations.jsonl",
+                    "".join(item.model_dump_json() + "\n" for item in report.metric_evaluations),
+                ),
+            ]
+            manifest = RecoveryArtifactManifest(
+                artifact_id=report.recovery_id,
+                incident_id=report.incident_id,
+                generator_version=__version__,
+                status=report.decision,
+                payload_sha256=report.report_sha256,
+                bindings={
+                    "execution_manifest": report.execution_manifest_sha256,
+                    "execution_receipt": report.execution_receipt_sha256,
+                    "config": report.config_sha256,
+                    "observation_manifest": report.observation_manifest_sha256,
+                },
+                files=sorted(files, key=lambda item: item.relative_path),
             )
-            backup.rmdir()
-            os.replace(destination, backup)
-        try:
-            os.replace(staged, destination)
-            committed = True
-            try:
-                _fsync_dir(destination.parent)
-            except OSError:
-                # Visibility is the rename commit point.  A readable validated
-                # destination is authoritative even if a later durability hint fails.
-                load_recovery(destination)
-            if backup is not None:
-                shutil.rmtree(backup, ignore_errors=True)
-        except Exception:
-            if (
-                not committed
-                and backup is not None
-                and backup.exists()
-                and not destination.exists()
-            ):
-                os.replace(backup, destination)
-            raise
-        return manifest
-    except Exception:
-        if staged.exists():
-            shutil.rmtree(staged)
-        raise
+            manifest_path = staged / "manifest.json"
+            with manifest_path.open("x", encoding="utf-8") as handle:
+                handle.write(manifest.model_dump_json(indent=2) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(manifest_path, 0o600)
+            marker = staged / "_SUCCESS"
+            with marker.open("x", encoding="utf-8") as handle:
+                handle.write(file_sha256(manifest_path) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(marker, 0o600)
+            load_recovery(staged)
+            publisher.commit()
+            return manifest
+    except ArtifactPublicationError as exc:
+        raise RecoveryArtifactError(str(exc)) from exc
 
 
 def _load_manifest(root: Path) -> RecoveryArtifactManifest:

@@ -4,10 +4,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import polars as pl
 import pytest
 
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.recovery import observations as observation_module
 from paic.recovery.artifact import file_sha256
 from paic.recovery.observations import (
@@ -195,18 +197,19 @@ def test_observation_publication_overwrite_and_post_commit_fsync(
     build_observations(_scenario(), analytics_dir, execution_dir, artifact)
     with pytest.raises(ObservationError, match="already exists"):
         build_observations(_scenario(), analytics_dir, execution_dir, artifact)
-    original_fsync = observation_module._fsync_dir
-    calls = 0
 
-    def fail_only_parent(path: Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("directory confirmation unavailable")
-        original_fsync(path)
+    class FailingPublisher(AtomicDirectoryPublisher):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["failure_hook"] = lambda point: (
+                (_ for _ in ()).throw(OSError("directory confirmation unavailable"))
+                if point == "new-committed"
+                else None
+            )
+            super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(observation_module, "_fsync_dir", fail_only_parent)
-    build_observations(_scenario(), analytics_dir, execution_dir, artifact, overwrite=True)
+    monkeypatch.setattr(observation_module, "AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(ObservationError, match="committed but durability"):
+        build_observations(_scenario(), analytics_dir, execution_dir, artifact, overwrite=True)
     assert load_observations(artifact, analytics_dir=analytics_dir, execution_dir=execution_dir)
 
 

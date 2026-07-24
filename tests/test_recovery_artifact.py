@@ -5,9 +5,11 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.recovery.artifact import (
     RecoveryArtifactError,
     export_recovery,
@@ -123,19 +125,19 @@ def test_artifact_overwrite_survives_post_commit_fsync_failure(
 
     root = tmp_path / "recovery"
     original_report = build_artifact(root)
-    original_fsync = artifact_module._fsync_dir
-    calls = 0
 
-    def fail_only_parent(path: Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("post-commit fsync unavailable")
-        original_fsync(path)
+    class FailingPublisher(AtomicDirectoryPublisher):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["failure_hook"] = lambda point: (
+                (_ for _ in ()).throw(OSError("post-commit fsync unavailable"))
+                if point == "new-committed"
+                else None
+            )
+            super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(artifact_module, "_fsync_dir", fail_only_parent)
-    manifest = export_recovery(config(), observations(), original_report, root, overwrite=True)
-    assert manifest.payload_sha256 == original_report.report_sha256
+    monkeypatch.setattr(artifact_module, "AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(RecoveryArtifactError, match="committed but durability"):
+        export_recovery(config(), observations(), original_report, root, overwrite=True)
     assert load_recovery(root).report == original_report
 
 

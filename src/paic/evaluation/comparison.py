@@ -6,14 +6,13 @@ import hashlib
 import json
 import os
 import random
-import shutil
-import uuid
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 
 from paic.artifacts.lease import artifact_reader
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.artifact import replay_evaluation
 from paic.evaluation.benchmark import digest_value
 from paic.evaluation.models import StrictModel
@@ -227,43 +226,28 @@ def _fsync_directory(path: Path) -> None:
 
 
 def export_comparison(report: ComparisonReport, output_dir: str | Path) -> None:
-    target = Path(output_dir)
-    parent = target.parent
-    parent.mkdir(parents=True, exist_ok=True)
-    if target.is_symlink():
-        raise ComparisonArtifactError("comparison output must not be a symlink")
-    if target.exists():
-        raise ComparisonArtifactError(f"comparison output already exists: {target}")
-    staging = parent / f".{target.name}.staging-{uuid.uuid4().hex}"
-    staging.mkdir(mode=0o700)
-    committed = False
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=False)
     try:
-        comparison_bytes = _canonical(report.model_dump(mode="json"))
-        _write_durable(staging / "comparison.json", comparison_bytes)
-        manifest = ComparisonManifest(
-            left_run_id=report.left_run_id,
-            right_run_id=report.right_run_id,
-            file=ComparisonFile(
-                byte_size=len(comparison_bytes),
-                sha256=hashlib.sha256(comparison_bytes).hexdigest(),
-            ),
-        )
-        manifest_bytes = _canonical(manifest.model_dump(mode="json"))
-        _write_durable(staging / "manifest.json", manifest_bytes)
-        _write_durable(
-            staging / "_SUCCESS",
-            (hashlib.sha256(manifest_bytes).hexdigest() + "\n").encode(),
-        )
-        _fsync_directory(staging)
-        os.replace(staging, target)
-        committed = True
-        _fsync_directory(parent)
-    except Exception as exc:
-        if not committed and staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
-        if isinstance(exc, ComparisonArtifactError):
-            raise
-        raise ComparisonArtifactError(f"cannot publish comparison artifact: {exc}") from exc
+        with publisher as staging:
+            comparison_bytes = _canonical(report.model_dump(mode="json"))
+            _write_durable(staging / "comparison.json", comparison_bytes)
+            manifest = ComparisonManifest(
+                left_run_id=report.left_run_id,
+                right_run_id=report.right_run_id,
+                file=ComparisonFile(
+                    byte_size=len(comparison_bytes),
+                    sha256=hashlib.sha256(comparison_bytes).hexdigest(),
+                ),
+            )
+            manifest_bytes = _canonical(manifest.model_dump(mode="json"))
+            _write_durable(staging / "manifest.json", manifest_bytes)
+            _write_durable(
+                staging / "_SUCCESS",
+                (hashlib.sha256(manifest_bytes).hexdigest() + "\n").encode(),
+            )
+            publisher.commit()
+    except ArtifactPublicationError as exc:
+        raise ComparisonArtifactError(str(exc)) from exc
 
 
 @artifact_reader

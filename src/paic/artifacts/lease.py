@@ -30,7 +30,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
-from typing import Literal, ParamSpec, TypeVar
+from typing import Literal, ParamSpec, TypeVar, cast
 
 try:
     import fcntl
@@ -273,7 +273,7 @@ def _read_identity(fd: int) -> tuple[int, int, int, int] | None:
         raise ArtifactLeaseError("artifact coordination identity is invalid") from exc
     if len(parts) != 4 or any(part < 0 for part in parts):
         raise ArtifactLeaseError("artifact coordination identity is invalid")
-    return parts  # type: ignore[return-value]
+    return cast(tuple[int, int, int, int], parts)
 
 
 def _write_identity(fd: int, value: tuple[int, int, int, int]) -> None:
@@ -352,6 +352,8 @@ class _ArtifactLease:
         self.gate_info: os.stat_result | None = None
         self.identity_fd: int | None = None
         self.lease_fd: int | None = None
+        self.root_fd: int | None = None
+        self.root_info: os.stat_result | None = None
         self.gate_locked = False
         self.domain_locked = False
         self.lease_locked = False
@@ -378,6 +380,34 @@ class _ArtifactLease:
             raise ArtifactLeaseError("artifact lease domain has no stable turnstile parent")
         self.domain_key = os.path.normcase(os.fspath(self.domain))
 
+    def _open_root_anchor(self) -> None:
+        if self.parent_fd is None or self.parent_info is None:
+            raise ArtifactLeaseError("artifact lease parent was not acquired")
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            self.root_fd = os.open(self.root.name, flags, dir_fd=self.parent_fd)
+        except FileNotFoundError:
+            self.root_fd = None
+            self.root_info = None
+            return
+        except OSError as exc:
+            raise ArtifactLeaseError(f"cannot anchor artifact root: {exc}") from exc
+        self.root_info = os.fstat(self.root_fd)
+        if not stat.S_ISDIR(self.root_info.st_mode):
+            raise ArtifactLeaseError("artifact root must be a regular directory")
+        current = os.stat(self.root.name, dir_fd=self.parent_fd, follow_symlinks=False)
+        if not _identity(self.root_info, current):
+            raise ArtifactLeaseError("artifact root changed during acquisition")
+
+    def anchored_root(self) -> Path:
+        if self.root_fd is None:
+            return self.root
+        for base in (Path("/proc/self/fd"), Path("/dev/fd")):
+            if base.is_dir():
+                return base / str(self.root_fd)
+        raise ArtifactLeaseError("descriptor-backed artifact paths are unavailable")
+
     def _enter_reentrant_if_safe(self) -> bool:
         assert self.domain_key is not None
         current = _active_domains().get(self.domain_key)
@@ -387,6 +417,7 @@ class _ArtifactLease:
         if self.exclusive and not active_exclusive:
             raise ArtifactLeaseError("cannot acquire nested exclusive artifact lease")
         self.parent_fd, self.parent_info = _open_parent(self.parent)
+        self._open_root_anchor()
         self._reentrant = True
         self._active = True
         _active_domains()[self.domain_key] = (active_exclusive, count + 1)
@@ -453,6 +484,7 @@ class _ArtifactLease:
 
     def acquire_body(self) -> None:
         if self._reentrant:
+            self.validate_current_parent()
             self.lease_locked = True
             return
         if (
@@ -542,6 +574,7 @@ class _ArtifactLease:
                 self.parent_info,
             )
             self.validate_current_parent()
+            self._open_root_anchor()
             self.lease_locked = True
             self._mark_active()
             if not self.exclusive:
@@ -572,18 +605,24 @@ class _ArtifactLease:
                 self.validate_current_parent()
             except ArtifactLeaseError as exc:
                 error = exc
+            root_error = _release_descriptor("artifact root", self.root_fd, False)
             close_error = _release_descriptor("artifact parent", self.parent_fd, False)
+            self.root_fd = None
+            self.root_info = None
             self.parent_fd = None
             self.parent_info = None
             self._unmark_active()
             self._reentrant = False
             if error is not None:
                 raise error
+            if root_error is not None:
+                raise root_error
             if close_error is not None:
                 raise close_error
             return
         errors: list[ArtifactLeaseError] = []
         for name, fd, locked in (
+            ("artifact root", self.root_fd, False),
             ("artifact data", self.lease_fd, self.lease_locked),
             ("artifact identity", self.identity_fd, False),
             ("artifact parent", self.parent_fd, False),
@@ -593,7 +632,10 @@ class _ArtifactLease:
             error = _release_descriptor(name, fd, locked)
             if error is not None:
                 errors.append(error)
-        self.lease_fd = self.identity_fd = self.parent_fd = self.domain_fd = self.gate_fd = None
+        self.root_fd = self.lease_fd = self.identity_fd = self.parent_fd = self.domain_fd = (
+            self.gate_fd
+        ) = None
+        self.root_info = None
         self.lease_locked = self.domain_locked = self.gate_locked = False
         self._unmark_active()
         if errors:
@@ -655,8 +697,13 @@ def _reader_wrapper(
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
         roots = [bound.arguments.get(name) for name in root_names]
-        with artifact_reader_leases(roots):
-            return func(*args, **kwargs)
+        with artifact_reader_leases(roots) as anchored:
+            for name in root_names:
+                value = bound.arguments.get(name)
+                if value is not None:
+                    key = os.path.normcase(os.fspath(_canonical_root(value)))
+                    bound.arguments[name] = anchored.get(key, value)
+            return func(*bound.args, **bound.kwargs)
 
     return wrapped
 
@@ -683,7 +730,9 @@ def artifact_readers(*root_parameters: str) -> Callable[[Callable[P, T]], Callab
 
 
 @contextlib.contextmanager
-def artifact_reader_leases(roots: Sequence[str | Path | None]) -> Iterator[None]:
+def artifact_reader_leases(
+    roots: Sequence[str | Path | None],
+) -> Iterator[dict[str, Path]]:
     """Acquire shared leases in deterministic canonical order."""
 
     ordered: dict[str, Path] = {}
@@ -691,7 +740,10 @@ def artifact_reader_leases(roots: Sequence[str | Path | None]) -> Iterator[None]
         if root is not None:
             path = _canonical_root(root)
             ordered.setdefault(os.path.normcase(os.fspath(path)), path)
+    leases = [(key, _ArtifactLease(ordered[key], exclusive=False)) for key in sorted(ordered)]
     with ExitStack() as stack:
-        for key in sorted(ordered):
-            stack.enter_context(_ArtifactLease(ordered[key], exclusive=False))
-        yield
+        anchored: dict[str, Path] = {}
+        for key, lease in leases:
+            stack.enter_context(lease)
+            anchored[key] = lease.anchored_root()
+        yield anchored

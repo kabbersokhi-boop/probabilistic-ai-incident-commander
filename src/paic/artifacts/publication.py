@@ -125,7 +125,8 @@ class AtomicDirectoryPublisher:
         return self._lease.parent_fd
 
     def _parent_entry(self, name: str) -> Path:
-        return Path(f"/proc/self/fd/{self._parent_fd()}") / name
+        """Return the lexical sibling path while descriptor-relative syscalls stay authoritative."""
+        return self._root.parent / name
 
     def _target_exists(self) -> bool:
         try:
@@ -284,7 +285,14 @@ class AtomicDirectoryPublisher:
         pending_error: BaseException | None = None
         try:
             if self.staging is not None:
-                shutil.rmtree(self.staging, ignore_errors=True)
+                try:
+                    shutil.rmtree(self.staging)
+                except FileNotFoundError:
+                    pass
+                except OSError as cleanup_exc:
+                    raise ArtifactPublicationError(
+                        f"artifact staging cleanup failed: {cleanup_exc}"
+                    ) from cleanup_exc
                 self.staging = None
             if exc is not None and not self.committed and self.backup is not None:
                 if not self._target_exists():

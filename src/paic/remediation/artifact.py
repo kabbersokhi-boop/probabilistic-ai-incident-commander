@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.artifact import replay_investigation
 from paic.remediation.config import RemediationConfig
@@ -351,6 +351,7 @@ def load_execution(path: str | Path) -> LoadedExecution:
     return LoadedExecution(manifest, receipt)
 
 
+@artifact_reader
 def manifest_sha256(path: str | Path) -> str:
     return str(file_sha256(Path(path) / "manifest.json"))
 
@@ -363,6 +364,16 @@ def validate_control_state(path: str | Path) -> list[str]:
     return []
 
 
+@artifact_readers(
+    "path",
+    "investigation_dir",
+    "control_state_dir",
+    "dataset_dir",
+    "analytics_dir",
+    "detection_dir",
+    "impact_dir",
+    "evidence_dir",
+)
 def validate_plan(
     path: str | Path,
     *,
@@ -424,6 +435,7 @@ def validate_plan(
     return issues
 
 
+@artifact_readers("path", "plan_dir", "before_state_dir", "after_state_dir")
 def validate_execution(
     path: str | Path,
     *,

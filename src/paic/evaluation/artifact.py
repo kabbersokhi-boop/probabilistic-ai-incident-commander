@@ -11,7 +11,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.benchmark import (
     digest_models,
@@ -415,7 +415,7 @@ def load_evaluation(root: str | Path) -> EvaluationRun:
     return run
 
 
-@artifact_reader
+@artifact_readers("root", "visible_dir", "answers_dir")
 def replay_evaluation(
     root: str | Path,
     *,

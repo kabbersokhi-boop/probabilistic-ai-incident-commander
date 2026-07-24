@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_reader, artifact_readers
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.evaluation.artifact import replay_evaluation
 from paic.evaluation.benchmark import digest_value
@@ -101,6 +101,7 @@ def _bootstrap_interval(
     )
 
 
+@artifact_readers("left_dir", "right_dir", "visible_dir", "answers_dir")
 def compare_runs(
     left_dir: str | Path,
     right_dir: str | Path,
@@ -282,6 +283,7 @@ def load_comparison(root: str | Path) -> ComparisonReport:
     return report
 
 
+@artifact_readers("comparison_dir", "left_dir", "right_dir", "visible_dir", "answers_dir")
 def replay_comparison(
     comparison_dir: str | Path,
     left_dir: str | Path,

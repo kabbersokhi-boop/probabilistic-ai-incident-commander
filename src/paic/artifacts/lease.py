@@ -386,8 +386,7 @@ class _ArtifactLease:
         active_exclusive, count = current
         if self.exclusive and not active_exclusive:
             raise ArtifactLeaseError("cannot acquire nested exclusive artifact lease")
-        current_parent = os.stat(self.parent, follow_symlinks=False)
-        _validate_parent_info(current_parent)
+        self.parent_fd, self.parent_info = _open_parent(self.parent)
         self._reentrant = True
         self._active = True
         _active_domains()[self.domain_key] = (active_exclusive, count + 1)
@@ -416,11 +415,6 @@ class _ArtifactLease:
         self._active = False
 
     def validate_current_parent(self) -> None:
-        if self._reentrant:
-            _validate_parent_path(self.parent)
-            info = os.stat(self.parent, follow_symlinks=False)
-            _validate_parent_info(info)
-            return
         if self.parent_fd is None or self.parent_info is None:
             raise ArtifactLeaseError("artifact lease parent was not acquired")
         _revalidate_directory(
@@ -573,8 +567,20 @@ class _ArtifactLease:
 
     def release(self) -> None:
         if self._reentrant:
+            error: ArtifactLeaseError | None = None
+            try:
+                self.validate_current_parent()
+            except ArtifactLeaseError as exc:
+                error = exc
+            close_error = _release_descriptor("artifact parent", self.parent_fd, False)
+            self.parent_fd = None
+            self.parent_info = None
             self._unmark_active()
             self._reentrant = False
+            if error is not None:
+                raise error
+            if close_error is not None:
+                raise close_error
             return
         errors: list[ArtifactLeaseError] = []
         for name, fd, locked in (

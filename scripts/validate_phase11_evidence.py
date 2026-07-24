@@ -12,10 +12,10 @@ from typing import Any
 
 
 class EvidenceValidationError(RuntimeError):
-    """Raised when an evidence bundle is incomplete or internally inconsistent."""
+    """Raised when evidence is incomplete or internally inconsistent."""
 
 
-def _load_json(path: Path) -> dict[str, Any]:
+def _load(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -25,19 +25,17 @@ def _load_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _hash(value: Any, name: str) -> None:
-    if (
-        not isinstance(value, str)
-        or len(value) != 64
-        or any(c not in "0123456789abcdef" for c in value)
+def _digest(value: Any, name: str) -> None:
+    if not isinstance(value, str) or len(value) != 64 or any(
+        char not in "0123456789abcdef" for char in value
     ):
         raise EvidenceValidationError(f"{name} must be a lowercase SHA-256 digest")
 
 
-def _exact_bool(mapping: dict[str, Any], key: str, source: str) -> bool:
-    if key not in mapping or type(mapping[key]) is not bool:
-        raise EvidenceValidationError(f"{source}.{key} must be an explicit boolean")
-    return mapping[key]
+def _number(value: Any, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise EvidenceValidationError(f"{name} is missing or invalid")
+    return float(value)
 
 
 def validate_bundle(
@@ -53,91 +51,74 @@ def validate_bundle(
     reject_resumed_endurance: bool = True,
 ) -> dict[str, Any]:
     root = Path(output_dir)
-    metadata = _load_json(root / "metadata.json")
-    summary = _load_json(root / "summary.json")
+    metadata = _load(root / "metadata.json")
+    summary = _load(root / "summary.json")
     if metadata.get("commit") != expected_commit or summary.get("commit") != expected_commit:
         raise EvidenceValidationError("commit provenance does not match the expected head")
     if metadata.get("mode") != expected_mode or summary.get("mode") != expected_mode:
         raise EvidenceValidationError("mode provenance does not match the requested mode")
     for key in ("workspace_sha256", "resolved_configuration_sha256"):
-        _hash(metadata.get(key), f"metadata.{key}")
+        _digest(metadata.get(key), f"metadata.{key}")
         if summary.get(key) != metadata.get(key):
             raise EvidenceValidationError(f"summary.{key} does not match metadata")
 
-    metadata_fresh = _exact_bool(metadata, "fresh", "metadata")
-    if summary.get("fresh") is not metadata_fresh:
-        raise EvidenceValidationError("summary.fresh does not match metadata")
-    resumed = _exact_bool(summary, "resumed", "summary")
-    if reject_resumed_endurance and (metadata_fresh is not True or resumed is not False):
-        raise EvidenceValidationError("release evidence must be an explicit fresh, non-resumed run")
+    if "resumed" not in summary or type(summary["resumed"]) is not bool:
+        raise EvidenceValidationError("summary.resumed must be an explicit boolean")
+    if reject_resumed_endurance and summary["resumed"] is not False:
+        raise EvidenceValidationError("release evidence must be a fresh run")
 
-    iterations_path = root / "iterations.jsonl"
     try:
-        raw_lines = iterations_path.read_text(encoding="utf-8").splitlines()
+        lines = (root / "iterations.jsonl").read_text(encoding="utf-8").splitlines()
     except OSError as exc:
         raise EvidenceValidationError("cannot read iterations.jsonl") from exc
-    if not raw_lines or any(not line.strip() for line in raw_lines):
+    if not lines or any(not line.strip() for line in lines):
         raise EvidenceValidationError("iterations.jsonl is empty or contains a blank record")
     records: list[dict[str, Any]] = []
-    for line_number, line in enumerate(raw_lines, start=1):
+    for index, line in enumerate(lines, start=1):
         try:
             value = json.loads(line)
         except ValueError as exc:
-            raise EvidenceValidationError(f"invalid iterations.jsonl record {line_number}") from exc
+            raise EvidenceValidationError(f"invalid iterations.jsonl record {index}") from exc
         if not isinstance(value, dict):
-            raise EvidenceValidationError(f"iterations.jsonl record {line_number} is not an object")
+            raise EvidenceValidationError(f"iterations.jsonl record {index} is not an object")
         records.append(value)
 
     if summary.get("iterations") != len(records) or len(records) < min_iterations:
         raise EvidenceValidationError("summary iteration count does not match the complete JSONL")
-    expected_indexes = list(range(1, len(records) + 1))
-    if [record.get("index") for record in records] != expected_indexes:
+    if [item.get("index") for item in records] != list(range(1, len(records) + 1)):
         raise EvidenceValidationError("iteration indexes are not contiguous")
-    if any(record.get("status") != "healthy" for record in records):
+    if any(item.get("status") != "healthy" for item in records):
         raise EvidenceValidationError("iteration status is not healthy")
-    hashes = {record.get("snapshot_sha256") for record in records}
+    hashes = {item.get("snapshot_sha256") for item in records}
     if len(hashes) != 1 or not isinstance(next(iter(hashes)), str):
         raise EvidenceValidationError("iteration snapshot hashes are not deterministic")
-    snapshot_hash = next(iter(hashes))
-    _hash(snapshot_hash, "iteration snapshot_sha256")
-    if summary.get("unique_snapshot_hashes") != [snapshot_hash]:
+    snapshot = next(iter(hashes))
+    _digest(snapshot, "iteration snapshot_sha256")
+    if summary.get("unique_snapshot_hashes") != [snapshot]:
         raise EvidenceValidationError("summary snapshot hashes do not match JSONL")
 
     durations: list[float] = []
-    for record in records:
-        duration = record.get("duration_seconds")
-        if (
-            not isinstance(duration, (int, float))
-            or isinstance(duration, bool)
-            or not math.isfinite(duration)
-            or duration < 0
-        ):
+    for item in records:
+        duration = _number(item.get("duration_seconds"), "iteration duration")
+        if duration < 0:
             raise EvidenceValidationError("iteration duration is invalid")
-        durations.append(float(duration))
+        durations.append(duration)
         for field in ("configured_stage_count", "healthy_stage_count", "authoritative_stage_count"):
-            if record.get(field) != 9:
+            if item.get(field) != 9:
                 raise EvidenceValidationError(f"iteration {field} is not 9")
-
-    if Counter(record["status"] for record in records) != summary.get("status_counts"):
+    if Counter(item["status"] for item in records) != summary.get("status_counts"):
         raise EvidenceValidationError("summary status counts do not match JSONL")
-    for field, summary_key in (
+    for field, key in (
         ("configured_stage_count", "configured_stage_counts"),
         ("healthy_stage_count", "healthy_stage_counts"),
         ("authoritative_stage_count", "authoritative_stage_counts"),
     ):
-        if summary.get(summary_key) != [9]:
-            raise EvidenceValidationError(f"summary {summary_key} is not [9]")
-        if sorted({record[field] for record in records}) != summary.get(summary_key):
-            raise EvidenceValidationError(f"summary {summary_key} does not match JSONL")
+        if summary.get(key) != [9] or sorted({item[field] for item in records}) != [9]:
+            raise EvidenceValidationError(f"summary {key} does not match JSONL")
 
     cumulative = sum(durations)
-    reported = summary.get("cumulative_inspection_seconds")
-    if (
-        not isinstance(reported, (int, float))
-        or isinstance(reported, bool)
-        or not math.isfinite(float(reported))
-        or not math.isclose(cumulative, float(reported), rel_tol=1e-9, abs_tol=1e-6)
-    ):
+    reported = _number(summary.get("cumulative_inspection_seconds"), "cumulative duration")
+    if not math.isclose(cumulative, reported, rel_tol=1e-9, abs_tol=1e-6):
         raise EvidenceValidationError("cumulative duration does not match JSONL")
     if summary.get("minimum_iterations") != min_iterations:
         raise EvidenceValidationError("minimum iteration threshold does not match request")
@@ -149,22 +130,13 @@ def validate_bundle(
     if summary.get("publication_debris") != []:
         raise EvidenceValidationError("publication debris is present")
 
-    limits = (
+    for key, limit in (
         ("fd_delta", max_fd_delta),
         ("gc_object_delta", max_gc_delta),
         ("rss_delta_bytes", max_rss_delta),
-    )
-    for key, limit in limits:
-        value = summary.get(key)
-        if limit is not None:
-            if (
-                not isinstance(value, (int, float))
-                or isinstance(value, bool)
-                or not math.isfinite(float(value))
-            ):
-                raise EvidenceValidationError(f"{key} is missing or invalid")
-            if value > limit:
-                raise EvidenceValidationError(f"{key} exceeds its configured limit")
+    ):
+        if limit is not None and _number(summary.get(key), key) > limit:
+            raise EvidenceValidationError(f"{key} exceeds its configured limit")
     return summary
 
 

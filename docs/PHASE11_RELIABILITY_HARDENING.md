@@ -9,8 +9,9 @@ A shared `AtomicDirectoryPublisher` builds a complete generation beside the dest
 The primitive distinguishes:
 
 - failure before commit: the previous generation remains authoritative;
-- failure after the new generation becomes visible: the operation reports that commit occurred but durability confirmation is uncertain;
-- successful commit and parent-directory sync: the new generation is authoritative and the backup is removed.
+- failure after the new generation becomes visible but before parent sync: the operation reports that commit occurred but durability confirmation is uncertain;
+- failure during backup cleanup after parent sync: the operation reports that the new generation is committed and durable while cleanup remains incomplete;
+- successful commit, parent-directory sync, and cleanup: the new generation is authoritative and the backup is removed.
 
 All overwritable artifact exporters use this primitive (including remediation,
 recovery observations/reports, evaluation, comparison, analytics, detection,
@@ -18,14 +19,13 @@ impact, evidence, simulator, and investigation outputs). A writer holds the
 matching artifact lease for the complete transaction; readers use that same
 lease root.
 
-The publisher now serializes writers with a per-target exclusive lock. Lock files
-are never broken automatically; an operator must verify the recorded writer is
-dead before removing a stale lock. Staged payloads are recursively restricted to
-regular files and directories, every file is flushed with `fsync`, and each
-directory is flushed before publication. On Linux, existing generations switch
-with `renameat2(RENAME_EXCHANGE)`, so readers never observe a missing target.
-Platforms without that primitive fail closed rather than using an unsafe
-two-rename fallback.
+The publisher serializes writers with a per-target diagnostic lock while the
+kernel lease supplies read/write exclusion. Staged payloads are recursively
+restricted to regular files and directories, every file is flushed with
+`fsync`, and each directory is flushed before publication. On Linux, existing
+generations switch with `renameat2(RENAME_EXCHANGE)`, so readers never observe a
+missing target. Platforms without that primitive fail closed rather than using
+an unsafe two-rename fallback.
 
 The exchange is the Linux `renameat2(2)` interface with
 `RENAME_EXCHANGE` (`flags=2`), and both names must be directories on the same
@@ -34,24 +34,22 @@ controlled, non-committing publication errors; the live generation is untouched.
 Initial publication without overwrite still uses ordinary `os.replace` and is
 portable. Crash-consistent overwrite is therefore explicitly Linux-only.
 
-Readers and publishers also coordinate through persistent per-artifact lease
-and intent inodes. Every entrant takes the exclusive intent turnstile first and
-retains it for the complete lease. This deliberately serializes artifact
-readers: it closes the pathname-replacement race that could otherwise create a
-second active lock domain while preserving a shared data-lock check and a
-strict writer boundary. Thus a declared writer gates all later readers and
-existing readers drain deterministically. The lock order is **intent -> verified parent directory -> data lease**;
-multi-root callers sort canonical roots and acquire every intent before any
-data lease. Kernel locks are released automatically when a process exits, so
-abandoned intent is recoverable. Lease paths are never recreated automatically;
-symlinked, replaced, non-regular, multiply-linked, or incorrectly-owned paths
-fail closed.
+Readers and publishers map artifact roots to a stable coordination-domain
+directory inode. That domain is chosen above every ancestor entry the current
+user could rename, so replacing an artifact parent or its diagnostic `.lease`
+file cannot create an independent active lock domain. A stable parent-directory
+inode acts as the writer turnstile. Readers hold it only while entering the
+shared domain lock, so readers overlap; a writer holds it while draining readers
+and throughout its exclusive domain lease, preventing later readers from
+barging.
 
-The threat model assumes the artifact parent is owned by the current effective
-user and is not group/world writable. Accidental replacement by another
-application process is detected by descriptor/path identity revalidation. A
-privileged process able to replace the verified parent directory is outside the
-model; such a process can defeat filesystem locking itself.
+The artifact parent pathname and its opened directory descriptor are compared
+after blocking acquisition and before pathname-based publication operations.
+Per-root identity records make a replacement `.lease` inode start a new epoch
+only while the stable domain is exclusively held. Multi-root callers sort
+canonical roots and acquire shared leases deterministically. Artifact parents
+must be current-user-owned and not group/world writable; symlinked, non-regular,
+multiply-linked, or incorrectly-owned coordination paths fail closed.
 
 If restoration fails, the complete backup is retained and its path is included in
 the controlled error. Cleanup never deletes the only remaining complete generation.

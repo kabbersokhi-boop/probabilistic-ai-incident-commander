@@ -532,6 +532,18 @@ class _ArtifactLease:
     def _open_root_anchor(self) -> None:
         if self.parent_fd is None or self.parent_info is None:
             raise ArtifactLeaseError("artifact lease parent was not acquired")
+        if self.root_fd is not None:
+            if self.root_info is None:
+                raise ArtifactLeaseError("artifact root anchor is incomplete")
+            try:
+                current = os.stat(
+                    self.root.name, dir_fd=self.parent_fd, follow_symlinks=False
+                )
+            except OSError as exc:
+                raise ArtifactLeaseError("artifact root changed during acquisition") from exc
+            if not _identity(self.root_info, current):
+                raise ArtifactLeaseError("artifact root changed during acquisition")
+            return
         flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
         flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
         try:

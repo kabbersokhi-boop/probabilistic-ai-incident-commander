@@ -1,0 +1,39 @@
+name: Apply descriptor anchor leak hotfix
+
+on:
+  push:
+    branches: [agent/phase11-fix-review2]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase11-fix-review2
+          fetch-depth: 0
+      - name: Patch and commit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/paic/artifacts/lease.py')
+          text = path.read_text()
+          old = '''    def _open_root_anchor(self) -> None:\n        if self.parent_fd is None or self.parent_info is None:\n            raise ArtifactLeaseError("artifact lease parent was not acquired")\n        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)\n'''
+          new = '''    def _open_root_anchor(self) -> None:\n        if self.parent_fd is None or self.parent_info is None:\n            raise ArtifactLeaseError("artifact lease parent was not acquired")\n        if self.root_fd is not None:\n            if self.root_info is None:\n                raise ArtifactLeaseError("artifact root anchor is incomplete")\n            try:\n                current = os.stat(\n                    self.root.name, dir_fd=self.parent_fd, follow_symlinks=False\n                )\n            except OSError as exc:\n                raise ArtifactLeaseError("artifact root changed during acquisition") from exc\n            if not _identity(self.root_info, current):\n                raise ArtifactLeaseError("artifact root changed during acquisition")\n            return\n        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)\n'''
+          if text.count(old) != 1:
+              raise SystemExit('expected anchor method prefix exactly once')
+          path.write_text(text.replace(old, new))
+
+          workflow = Path('.github/workflows/review2-fd-hotfix.yml')
+          workflow.unlink()
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: reuse and revalidate artifact root anchors"
+          git push origin HEAD:agent/phase11-fix-review2

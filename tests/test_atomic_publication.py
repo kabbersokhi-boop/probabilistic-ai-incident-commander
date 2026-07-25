@@ -135,7 +135,9 @@ def test_failed_rollback_preserves_backup_and_reports_recovery_path(
     (backup / "value.txt").write_text("old", encoding="utf-8")
     shutil.rmtree(target)
     publisher.backup = backup
-    monkeypatch.setattr(os, "replace", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("blocked")))
+    monkeypatch.setattr(
+        os, "replace", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("blocked"))
+    )
     with pytest.raises(ArtifactPublicationError, match="backup preserved"):
         publisher.__exit__(RuntimeError, RuntimeError("failure"), None)
     assert (backup / "value.txt").read_text(encoding="utf-8") == "old"
@@ -248,7 +250,9 @@ def test_lock_acquisition_oserror_is_controlled(
 ) -> None:
     target = tmp_path / "artifact"
     target.mkdir()
-    monkeypatch.setattr(os, "open", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied")))
+    monkeypatch.setattr(
+        os, "open", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("denied"))
+    )
     with pytest.raises(ArtifactPublicationError, match="cannot acquire"):
         AtomicDirectoryPublisher(target, overwrite=True).__enter__()
 
@@ -269,7 +273,11 @@ def test_commit_failure_restores_backup_when_target_is_missing(
     (backup / "value.txt").write_text("old", encoding="utf-8")
     publisher.staging = staging
     publisher.backup = backup
-    monkeypatch.setattr(publication, "_fsync_payload_tree", lambda _root: (_ for _ in ()).throw(OSError("before exchange")))
+    monkeypatch.setattr(
+        publication,
+        "_fsync_payload_tree",
+        lambda _root: (_ for _ in ()).throw(OSError("before exchange")),
+    )
     with pytest.raises(ArtifactPublicationError, match="not committed"):
         publisher.commit()
     assert (publisher.target / "value.txt").read_text(encoding="utf-8") == "old"
@@ -353,7 +361,11 @@ def test_publication_generations_are_monotonic(tmp_path: Path) -> None:
     for generation in range(4):
         publisher = AtomicDirectoryPublisher(target, overwrite=generation > 0)
         with publisher as staging:
-            (staging / "generation.json").write_text(json.dumps({"generation": generation}), encoding="utf-8")
+            (staging / "generation.json").write_text(
+                json.dumps({"generation": generation}), encoding="utf-8"
+            )
             publisher.commit()
-        generations.append(json.loads((target / "generation.json").read_text(encoding="utf-8"))["generation"])
+        generations.append(
+            json.loads((target / "generation.json").read_text(encoding="utf-8"))["generation"]
+        )
     assert all(left < right for left, right in pairwise(generations))

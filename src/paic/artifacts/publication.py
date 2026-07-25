@@ -299,9 +299,7 @@ class AtomicDirectoryPublisher:
             ) from exc
         except OSError as exc:
             self._abort_enter(exc)
-            raise ArtifactPublicationError(
-                f"cannot acquire artifact writer lock: {exc}"
-            ) from exc
+            raise ArtifactPublicationError(f"cannot acquire artifact writer lock: {exc}") from exc
         except Exception as exc:
             self._abort_enter(exc)
             raise

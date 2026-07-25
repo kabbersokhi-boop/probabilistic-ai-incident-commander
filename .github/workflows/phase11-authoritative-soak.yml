@@ -1,6 +1,7 @@
 name: Phase 11 inspection and authoritative soak
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -14,42 +15,81 @@ concurrency:
 
 jobs:
   authoritative-soak:
-    name: artifact compatibility diagnostic (Python ${{ matrix.python-version }})
+    name: ${{ github.event_name == 'workflow_dispatch' && 'authoritative endurance certification' || 'pull-request inspection gate' }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+    env:
+      POLARS_MAX_THREADS: "4"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      CERTIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}
+      MIN_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
+      EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
+
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
       - name: Verify exact checked-out commit
         env:
           EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Install quietly
-        run: python -m pip install -e ".[dev]" --quiet
-      - name: Capture focused compatibility tests
+
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Verify threshold regressions
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: |
-          set +e
-          python -m pytest -q --tb=short \
-            tests/test_atomic_publication.py::test_failed_rollback_preserves_backup_and_reports_recovery_path \
-            tests/test_investigation_unit.py::test_artifact_semantic_tampering_and_source_mismatch \
-            > focused-pytest.txt 2>&1
-          echo $? > focused-pytest.exit
-          exit 0
-      - name: Upload focused traceback
+        run: python -m pytest -q tests/test_phase11_authoritative_soak.py
+
+      - name: Build authoritative workspace
+        run: make tui-smoke
+
+      - name: Run authoritative soak
+        run: >-
+          python scripts/phase11_authoritative_soak.py
+          --workspace configs/tui/smoke.yaml
+          --output-dir "$SOAK_DIR"
+          --iterations 25
+          --duration-seconds "$MIN_DURATION_SECONDS"
+          --mode "$CERTIFICATION_MODE"
+          --fresh
+          --warmup 10
+          --max-fd-delta 0
+          --max-gc-delta 2048
+          --max-rss-delta 67108864
+
+      - name: Validate certification evidence
+        run: >-
+          python scripts/validate_phase11_evidence.py
+          --output-dir "$SOAK_DIR"
+          --expected-commit "$EXPECTED_COMMIT"
+          --mode "$CERTIFICATION_MODE"
+          --min-iterations 25
+          --min-duration-seconds "$MIN_DURATION_SECONDS"
+          --max-fd-delta 0
+          --max-gc-delta 2048
+          --max-rss-delta 67108864
+
+      - name: Upload authoritative soak evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: focused-pytest-${{ matrix.python-version }}
-          path: |
-            focused-pytest.txt
-            focused-pytest.exit
-          retention-days: 1
+          name: phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-python-${{ matrix.python-version }}
+          path: ${{ env.SOAK_DIR }}
+          if-no-files-found: warn
+          retention-days: 90

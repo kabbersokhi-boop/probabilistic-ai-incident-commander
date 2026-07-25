@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+from contextlib import suppress
 import os
 import secrets
 import shutil
@@ -145,17 +146,13 @@ class AtomicDirectoryPublisher:
             return descriptor
         except ArtifactPublicationError:
             if descriptor is not None:
-                try:
+                with suppress(OSError):
                     os.close(descriptor)
-                except OSError:
-                    pass
             raise
         except OSError as exc:
             if descriptor is not None:
-                try:
+                with suppress(OSError):
                     os.close(descriptor)
-                except OSError:
-                    pass
             raise ArtifactPublicationError(
                 f"cannot acquire artifact publication parent: {exc}"
             ) from exc

@@ -536,9 +536,7 @@ class _ArtifactLease:
             if self.root_info is None:
                 raise ArtifactLeaseError("artifact root anchor is incomplete")
             try:
-                current = os.stat(
-                    self.root.name, dir_fd=self.parent_fd, follow_symlinks=False
-                )
+                current = os.stat(self.root.name, dir_fd=self.parent_fd, follow_symlinks=False)
             except OSError as exc:
                 raise ArtifactLeaseError("artifact root changed during acquisition") from exc
             if not _identity(self.root_info, current):

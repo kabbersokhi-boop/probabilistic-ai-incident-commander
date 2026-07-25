@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import ctypes
-from contextlib import suppress
 import os
 import secrets
 import shutil
 import stat
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal

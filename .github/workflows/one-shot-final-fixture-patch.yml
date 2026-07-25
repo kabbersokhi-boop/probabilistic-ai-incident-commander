@@ -1,0 +1,63 @@
+name: one-shot final fixture patch
+
+on:
+  push:
+    paths:
+      - .review2-final-fixture-patch-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase11-fix-review2
+          fetch-depth: 0
+      - name: Apply fixture fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('tests/test_atomic_publication.py')
+          s = p.read_text()
+          old = 'monkeypatch.setattr(os, "replace", lambda *_args: (_ for _ in ()).throw(OSError("blocked")))'
+          new = 'monkeypatch.setattr(\n        os,\n        "replace",\n        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("blocked")),\n    )'
+          if old not in s:
+              raise SystemExit('publication pattern missing')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('tests/test_investigation_unit.py')
+          s = p.read_text()
+          old = '''    monkeypatch.setattr(
+        "paic.investigation.artifact.bind_sources",
+        lambda *args, **kwargs: SimpleNamespace(hashes={"dataset": "f" * 64}),
+    )
+    assert any(
+        "source manifest hashes" in issue
+        for issue in validate_investigation(output, dataset_dir="/unused")
+    )'''
+          new = '''    dataset_dir = tmp_path / "dataset-source"
+    dataset_dir.mkdir()
+    monkeypatch.setattr(
+        "paic.investigation.artifact.bind_sources",
+        lambda *args, **kwargs: SimpleNamespace(hashes={"dataset": "f" * 64}),
+    )
+    assert any(
+        "source manifest hashes" in issue
+        for issue in validate_investigation(output, dataset_dir=dataset_dir)
+    )'''
+          if old not in s:
+              raise SystemExit('investigation pattern missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit and self-remove
+        run: |
+          rm -f .github/workflows/one-shot-final-fixture-fix.yml .github/workflows/one-shot-final-fixture-patch.yml .review2-final-fixture-trigger .review2-final-fixture-patch-trigger .github/workflows/one-shot-final-pytest.yml .review2-final-pytest-trigger review2-final-pytest.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Fix final hardened lease fixtures'
+          git push origin HEAD:agent/phase11-fix-review2

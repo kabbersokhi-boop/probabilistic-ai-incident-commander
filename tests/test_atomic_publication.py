@@ -135,7 +135,11 @@ def test_failed_rollback_preserves_backup_and_reports_recovery_path(
     (backup / "value.txt").write_text("old", encoding="utf-8")
     shutil.rmtree(target)
     publisher.backup = backup
-    monkeypatch.setattr(os, "replace", lambda *_args: (_ for _ in ()).throw(OSError("blocked")))
+    monkeypatch.setattr(
+        os,
+        "replace",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("blocked")),
+    )
     with pytest.raises(ArtifactPublicationError, match="backup preserved"):
         publisher.__exit__(RuntimeError, RuntimeError("failure"), None)
     assert (backup / "value.txt").read_text(encoding="utf-8") == "old"

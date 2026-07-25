@@ -36,8 +36,12 @@ def pytest_runtest_call(item: pytest.Item) -> Generator[None, None, None]:
         original_reader_leases = lease.artifact_reader_leases
 
         @contextmanager
-        def existing_reader_leases(roots: Iterable[str | Path]) -> Generator[None, None, None]:
-            existing = [root for root in roots if Path(root) != Path("/unused")]
+        def existing_reader_leases(
+            roots: Iterable[str | Path | None],
+        ) -> Generator[None, None, None]:
+            existing = [
+                root for root in roots if root is not None and Path(root) != Path("/unused")
+            ]
             with original_reader_leases(existing):
                 yield
 

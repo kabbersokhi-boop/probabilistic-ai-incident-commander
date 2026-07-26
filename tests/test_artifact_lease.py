@@ -234,6 +234,139 @@ def test_lease_wraps_open_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         pass
 
 
+def test_directory_acquisition_reports_close_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.artifacts.lease as lease_module
+
+    real_open = os.open
+    real_close = os.close
+    real_fstat = os.fstat
+    opened: list[int] = []
+
+    def capture_open(*args: Any, **kwargs: Any) -> int:
+        fd = real_open(*args, **kwargs)
+        opened.append(fd)
+        return fd
+
+    def invalid_fstat(fd: int) -> os.stat_result:
+        info = real_fstat(fd)
+        if fd == opened[0]:
+            values = list(info)
+            values[0] = stat.S_IFIFO
+            return os.stat_result(values)
+        return info
+
+    def fail_close(fd: int) -> None:
+        if fd == opened[0]:
+            raise OSError("close failed")
+        real_close(fd)
+
+    monkeypatch.setattr("paic.artifacts.lease.os.open", capture_open)
+    monkeypatch.setattr("paic.artifacts.lease.os.fstat", invalid_fstat)
+    monkeypatch.setattr("paic.artifacts.lease.os.close", fail_close)
+    try:
+        with pytest.raises(ArtifactLeaseError, match="artifact lease domain is unsafe") as caught:
+            lease_module._open_directory(tmp_path, private=False)
+        assert any(
+            "cannot close artifact lease during artifact lease directory acquisition" in note
+            for note in caught.value.__notes__
+        )
+    finally:
+        if opened:
+            real_close(opened[0])
+
+
+def test_coordination_acquisition_reports_close_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.artifacts.lease as lease_module
+
+    coordination = tmp_path / ".artifact.lease"
+    coordination.touch()
+    directory_fd = os.open(
+        tmp_path,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+    )
+    real_open = os.open
+    real_close = os.close
+    real_fstat = os.fstat
+    opened: list[int] = []
+
+    def capture_open(*args: Any, **kwargs: Any) -> int:
+        fd = real_open(*args, **kwargs)
+        opened.append(fd)
+        return fd
+
+    def invalid_fstat(fd: int) -> os.stat_result:
+        info = real_fstat(fd)
+        if fd == opened[0]:
+            values = list(info)
+            values[3] = 2
+            return os.stat_result(values)
+        return info
+
+    def fail_close(fd: int) -> None:
+        if fd == opened[0]:
+            raise OSError("close failed")
+        real_close(fd)
+
+    monkeypatch.setattr("paic.artifacts.lease.os.open", capture_open)
+    monkeypatch.setattr("paic.artifacts.lease.os.fstat", invalid_fstat)
+    monkeypatch.setattr("paic.artifacts.lease.os.close", fail_close)
+    try:
+        directory_info = real_fstat(directory_fd)
+        with pytest.raises(ArtifactLeaseError, match="coordination file must be regular") as caught:
+            lease_module._open_lock_file(directory_fd, coordination, directory_info)
+        assert any(
+            "cannot close artifact lease during artifact coordination file acquisition" in note
+            for note in caught.value.__notes__
+        )
+    finally:
+        if opened:
+            real_close(opened[0])
+        real_close(directory_fd)
+
+
+def test_multi_root_preparation_reports_release_failures_and_continues(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.artifacts.lease as lease_module
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    third = tmp_path / "third"
+    events: list[tuple[str, str]] = []
+
+    class SpyLease(_ArtifactLease):
+        def prepare_anchor(self) -> None:
+            events.append(("prepare", self.root.name))
+            if self.root == third:
+                raise ArtifactLeaseError("original preparation failure")
+
+        def release(self) -> None:
+            events.append(("release", self.root.name))
+            if self.root == second:
+                raise ArtifactLeaseError("release failure")
+
+    monkeypatch.setattr(lease_module, "_ArtifactLease", SpyLease)
+    with (
+        pytest.raises(ArtifactLeaseError, match="original preparation failure") as caught,
+        artifact_reader_leases([first, second, third]),
+    ):
+        pass
+
+    assert events == [
+        ("prepare", "first"),
+        ("prepare", "second"),
+        ("prepare", "third"),
+        ("release", "third"),
+        ("release", "second"),
+        ("release", "first"),
+    ]
+    assert any("release failure" in note for note in caught.value.__notes__)
+
+
 def test_multi_root_order_is_deterministic(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"

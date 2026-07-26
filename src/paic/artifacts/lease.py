@@ -307,16 +307,25 @@ def _open_directory(path: Path, *, private: bool) -> tuple[int, os.stat_result]:
         if not _identity(info, current):
             raise ArtifactLeaseError("artifact lease directory changed during acquisition")
         return fd, info
-    except ArtifactLeaseError:
-        if fd is not None:
-            with contextlib.suppress(OSError):
-                os.close(fd)
+    except ArtifactLeaseError as exc:
+        cleanup_error = _release_descriptor(
+            "artifact lease directory acquisition",
+            fd,
+            False,
+        )
+        if cleanup_error is not None:
+            exc.add_note(str(cleanup_error))
         raise
     except (OSError, AttributeError) as exc:
-        if fd is not None:
-            with contextlib.suppress(OSError):
-                os.close(fd)
-        raise ArtifactLeaseError(f"cannot open artifact lease directory: {exc}") from exc
+        error = ArtifactLeaseError(f"cannot open artifact lease directory: {exc}")
+        cleanup_error = _release_descriptor(
+            "artifact lease directory acquisition",
+            fd,
+            False,
+        )
+        if cleanup_error is not None:
+            error.add_note(str(cleanup_error))
+        raise error from exc
 
 
 def _open_parent(parent: Path) -> tuple[int, os.stat_result]:
@@ -370,16 +379,25 @@ def _open_lock_file(directory_fd: int, path: Path, directory_info: os.stat_resul
         if before is not None and not _identity(before, info):
             raise ArtifactLeaseError("artifact coordination file changed during acquisition")
         return fd
-    except ArtifactLeaseError:
-        if fd is not None:
-            with contextlib.suppress(OSError):
-                os.close(fd)
+    except ArtifactLeaseError as exc:
+        cleanup_error = _release_descriptor(
+            "artifact coordination file acquisition",
+            fd,
+            False,
+        )
+        if cleanup_error is not None:
+            exc.add_note(str(cleanup_error))
         raise
     except (OSError, AttributeError) as exc:
-        if fd is not None:
-            with contextlib.suppress(OSError):
-                os.close(fd)
-        raise ArtifactLeaseError(f"cannot open artifact coordination file: {exc}") from exc
+        error = ArtifactLeaseError(f"cannot open artifact coordination file: {exc}")
+        cleanup_error = _release_descriptor(
+            "artifact coordination file acquisition",
+            fd,
+            False,
+        )
+        if cleanup_error is not None:
+            error.add_note(str(cleanup_error))
+        raise error from exc
 
 
 def _revalidate_lock_file(
@@ -981,10 +999,12 @@ def artifact_reader_leases(
     try:
         for _key, lease in leases:
             lease.prepare_anchor()
-    except Exception:
+    except Exception as exc:
         for _key, lease in reversed(leases):
-            with contextlib.suppress(ArtifactLeaseError):
+            try:
                 lease.release()
+            except ArtifactLeaseError as release_error:
+                exc.add_note(str(release_error))
         raise
     with ExitStack() as stack:
         anchored: dict[str, Path] = {}

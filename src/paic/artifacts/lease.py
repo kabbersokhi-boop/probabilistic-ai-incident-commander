@@ -536,12 +536,24 @@ class _ArtifactLease:
             if self.root_info is None:
                 raise ArtifactLeaseError("artifact root anchor is incomplete")
             try:
-                current = os.stat(self.root.name, dir_fd=self.parent_fd, follow_symlinks=False)
-            except OSError as exc:
-                raise ArtifactLeaseError("artifact root changed during acquisition") from exc
-            if not _identity(self.root_info, current):
-                raise ArtifactLeaseError("artifact root changed during acquisition")
-            return
+                current = os.stat(
+                    self.root.name,
+                    dir_fd=self.parent_fd,
+                    follow_symlinks=False,
+                )
+            except OSError:
+                current = None
+            if current is not None and _identity(self.root_info, current):
+                return
+            error = _release_descriptor(
+                "stale artifact root",
+                self.root_fd,
+                False,
+            )
+            self.root_fd = None
+            self.root_info = None
+            if error is not None:
+                raise error
         flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
         flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
         try:

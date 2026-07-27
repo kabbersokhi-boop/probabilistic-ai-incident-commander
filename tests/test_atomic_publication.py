@@ -392,6 +392,33 @@ def test_release_lock_reports_verified_unlink_failure(
         publisher.lock_path.unlink(missing_ok=True)
 
 
+def test_release_lock_reports_parent_validation_failure_without_unlinking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    publisher.lock_path.touch()
+    publisher._lock_fd = os.open(publisher.lock_path, os.O_RDWR)
+    lock_info = os.fstat(publisher._lock_fd)
+    publisher._lock_identity = (lock_info.st_dev, lock_info.st_ino)
+    monkeypatch.setattr(
+        publisher,
+        "_validate_parent_anchor",
+        lambda: (_ for _ in ()).throw(
+            ArtifactPublicationError("artifact publication parent changed")
+        ),
+    )
+    try:
+        with pytest.raises(ArtifactPublicationError, match="parent changed"):
+            publisher._release_lock()
+        assert publisher._lock_fd is None
+        assert publisher.lock_path.exists()
+    finally:
+        publisher._close_parent_anchor()
+        publisher.lock_path.unlink(missing_ok=True)
+
+
 class _FailingPublicationLease(_ArtifactLease):
     def __init__(self, root: Path) -> None:
         super().__init__(root, exclusive=True)

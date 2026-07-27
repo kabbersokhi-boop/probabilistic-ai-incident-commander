@@ -271,6 +271,7 @@ class AtomicDirectoryPublisher:
         self._lock_fd = None
         try:
             parent_fd = self._parent_fd()
+            self._validate_parent_anchor()
             try:
                 current = os.stat(
                     self.lock_path.name,
@@ -429,7 +430,10 @@ class AtomicDirectoryPublisher:
                     self.staging = None
                 except OSError as cleanup_exc:
                     cleanup_errors.append(
-                        ArtifactPublicationError(f"artifact staging cleanup failed: {cleanup_exc}")
+                        _publication_error(
+                            f"artifact staging cleanup failed: {cleanup_exc}",
+                            cause=cleanup_exc,
+                        )
                     )
                 else:
                     self.staging = None

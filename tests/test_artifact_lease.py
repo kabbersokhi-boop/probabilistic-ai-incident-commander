@@ -367,6 +367,112 @@ def test_multi_root_preparation_reports_release_failures_and_continues(
     assert any("release failure" in note for note in caught.value.__notes__)
 
 
+def test_acquire_intent_preserves_primary_when_release_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.artifacts.lease as lease_module
+
+    target = tmp_path / "artifact"
+    target.mkdir()
+    lease = _ArtifactLease(target, exclusive=False)
+    real_close = os.close
+    failed_fd: list[int] = []
+    close_calls: list[int] = []
+
+    def fail_lock(fd: int, **_kwargs: Any) -> None:
+        failed_fd.append(fd)
+        raise ArtifactLeaseError("intent acquisition failed")
+
+    def fail_close(fd: int) -> None:
+        close_calls.append(fd)
+        if failed_fd and fd == failed_fd[0]:
+            raise OSError("intent close failed")
+        real_close(fd)
+
+    monkeypatch.setattr(lease_module, "_lock", fail_lock)
+    monkeypatch.setattr("paic.artifacts.lease.os.close", fail_close)
+    try:
+        with pytest.raises(ArtifactLeaseError, match="intent acquisition failed") as caught:
+            lease.acquire_intent()
+        assert any(
+            "cannot close artifact lease during artifact writer turnstile" in note
+            for note in caught.value.__notes__
+        )
+        assert all(fd is None for fd in (lease.domain_fd, lease.gate_fd, lease.parent_fd))
+        assert len(close_calls) == len(set(close_calls))
+    finally:
+        if failed_fd:
+            real_close(failed_fd[0])
+
+
+def test_acquire_body_preserves_primary_when_release_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import paic.artifacts.lease as lease_module
+
+    target = tmp_path / "artifact"
+    target.mkdir()
+    lease = _ArtifactLease(target, exclusive=True)
+    lease.acquire_intent()
+    domain_fd = lease.domain_fd
+    assert domain_fd is not None
+    real_close = os.close
+    close_calls: list[int] = []
+
+    def fail_lock(fd: int, **_kwargs: Any) -> None:
+        raise ArtifactLeaseError("body acquisition failed")
+
+    def fail_close(fd: int) -> None:
+        close_calls.append(fd)
+        if fd == domain_fd:
+            raise OSError("body close failed")
+        real_close(fd)
+
+    monkeypatch.setattr(lease_module, "_lock", fail_lock)
+    monkeypatch.setattr("paic.artifacts.lease.os.close", fail_close)
+    try:
+        with pytest.raises(ArtifactLeaseError, match="body acquisition failed") as caught:
+            lease.acquire_body()
+        assert any(
+            "cannot close artifact lease during artifact coordination domain" in note
+            for note in caught.value.__notes__
+        )
+        assert all(
+            fd is None
+            for fd in (
+                lease.domain_fd,
+                lease.gate_fd,
+                lease.parent_fd,
+                lease.lease_fd,
+                lease.identity_fd,
+            )
+        )
+        assert len(close_calls) == len(set(close_calls))
+    finally:
+        real_close(domain_fd)
+
+
+def test_enter_preserves_primary_when_release_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lease = _ArtifactLease(tmp_path / "artifact", exclusive=False)
+    calls: list[str] = []
+
+    def fail_intent() -> None:
+        raise ArtifactLeaseError("enter acquisition failed")
+
+    def fail_release() -> None:
+        calls.append("release")
+        raise ArtifactLeaseError("enter cleanup failed")
+
+    monkeypatch.setattr(lease, "acquire_intent", fail_intent)
+    monkeypatch.setattr(lease, "release", fail_release)
+    with pytest.raises(ArtifactLeaseError, match="enter acquisition failed") as caught:
+        lease.__enter__()
+    assert calls == ["release"]
+    assert any("enter cleanup failed" in note for note in caught.value.__notes__)
+
+
 def test_multi_root_order_is_deterministic(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"

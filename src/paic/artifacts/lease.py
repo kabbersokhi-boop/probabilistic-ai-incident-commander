@@ -656,6 +656,7 @@ class _ArtifactLease:
         self._record_active_parent()
         if self.root_fd is not None:
             _set_active_root_fd(self.root_fd, owner)
+            _push_active_root(self.root, self.root_fd, owner)
         _set_active_domain(self.domain_key, (active_exclusive, count + 1, owner))
         return True
 
@@ -738,8 +739,8 @@ class _ArtifactLease:
                 message="artifact writer turnstile changed during locking",
             )
             self.validate_current_parent()
-        except Exception:
-            self.release()
+        except Exception as exc:
+            self._release_after_failure(exc)
             raise
 
     def acquire_body(self) -> None:
@@ -845,16 +846,22 @@ class _ArtifactLease:
                 self.gate_locked = False
                 if error is not None:
                     raise error
-        except Exception:
-            self.release()
+        except Exception as exc:
+            self._release_after_failure(exc)
             raise
+
+    def _release_after_failure(self, exc: BaseException) -> None:
+        try:
+            self.release()
+        except ArtifactLeaseError as release_error:
+            exc.add_note(str(release_error))
 
     def __enter__(self) -> None:
         try:
             self.acquire_intent()
             self.acquire_body()
-        except Exception:
-            self.release()
+        except Exception as exc:
+            self._release_after_failure(exc)
             raise
         return None
 

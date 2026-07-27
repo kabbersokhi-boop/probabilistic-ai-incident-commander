@@ -8,7 +8,6 @@ import secrets
 import shutil
 import stat
 from collections.abc import Callable
-from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -34,6 +33,44 @@ class PublicationResult:
     target: Path
     committed: bool
     durability_confirmed: bool
+
+
+def _close_publication_descriptor(
+    descriptor: int | None, phase: str
+) -> ArtifactPublicationError | None:
+    if descriptor is None:
+        return None
+    try:
+        os.close(descriptor)
+    except OSError as exc:
+        error = ArtifactPublicationError(f"cannot close {phase}")
+        error.__cause__ = exc
+        return error
+    return None
+
+
+def _publication_error(
+    message: str, *, cause: BaseException | None = None
+) -> ArtifactPublicationError:
+    error = ArtifactPublicationError(message)
+    if cause is not None:
+        error.__cause__ = cause
+    return error
+
+
+def _attach_cleanup_error(target: BaseException, cleanup_error: BaseException) -> None:
+    target.add_note(str(cleanup_error))
+    for note in getattr(cleanup_error, "__notes__", ()):
+        target.add_note(str(note))
+
+
+def _raise_cleanup_errors(errors: list[ArtifactPublicationError]) -> None:
+    if not errors:
+        return
+    first = errors[0]
+    for later in errors[1:]:
+        _attach_cleanup_error(first, later)
+    raise first
 
 
 def _fsync_directory(path: Path) -> None:
@@ -144,18 +181,23 @@ class AtomicDirectoryPublisher:
             self._parent_anchor_fd = descriptor
             self._parent_anchor_identity = (info.st_dev, info.st_ino)
             return descriptor
-        except ArtifactPublicationError:
-            if descriptor is not None:
-                with suppress(OSError):
-                    os.close(descriptor)
+        except ArtifactPublicationError as exc:
+            close_error = _close_publication_descriptor(
+                descriptor,
+                "artifact publication parent during acquisition",
+            )
+            if close_error is not None:
+                exc.add_note(str(close_error))
             raise
         except OSError as exc:
-            if descriptor is not None:
-                with suppress(OSError):
-                    os.close(descriptor)
-            raise ArtifactPublicationError(
-                f"cannot acquire artifact publication parent: {exc}"
-            ) from exc
+            error = ArtifactPublicationError(f"cannot acquire artifact publication parent: {exc}")
+            close_error = _close_publication_descriptor(
+                descriptor,
+                "artifact publication parent during acquisition",
+            )
+            if close_error is not None:
+                error.add_note(str(close_error))
+            raise error from exc
 
     def _parent_fd(self) -> int:
         return self._open_parent_anchor()
@@ -221,25 +263,37 @@ class AtomicDirectoryPublisher:
     def _release_lock(self) -> None:
         if self._lock_fd is None:
             return
-        close_error: OSError | None = None
+        errors: list[ArtifactPublicationError] = []
         try:
             os.close(self._lock_fd)
         except OSError as exc:
-            close_error = exc
+            errors.append(_publication_error("cannot close artifact writer lock", cause=exc))
         self._lock_fd = None
         try:
-            current = os.stat(
-                self.lock_path.name,
-                dir_fd=self._parent_fd(),
-                follow_symlinks=False,
-            )
-            if self._lock_identity == (current.st_dev, current.st_ino):
-                os.unlink(self.lock_path.name, dir_fd=self._parent_fd())
-        except (OSError, ArtifactPublicationError):
-            pass
+            parent_fd = self._parent_fd()
+            try:
+                current = os.stat(
+                    self.lock_path.name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                current = None
+            if current is not None and self._lock_identity == (current.st_dev, current.st_ino):
+                try:
+                    os.unlink(self.lock_path.name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    errors.append(
+                        _publication_error("cannot remove artifact writer lock", cause=exc)
+                    )
+        except ArtifactPublicationError as exc:
+            errors.append(exc)
+        except OSError as exc:
+            errors.append(_publication_error("cannot inspect artifact writer lock", cause=exc))
         self._lock_identity = None
-        if close_error is not None:
-            raise ArtifactPublicationError("cannot close artifact writer lock") from close_error
+        _raise_cleanup_errors(errors)
 
     def __enter__(self) -> Path:
         try:
@@ -365,18 +419,20 @@ class AtomicDirectoryPublisher:
         exc: object,
         traceback: object,
     ) -> None:
-        pending_error: BaseException | None = None
+        body_error = exc if isinstance(exc, BaseException) else None
+        cleanup_errors: list[BaseException] = []
         try:
             if self.staging is not None:
                 try:
                     shutil.rmtree(self.staging)
                 except FileNotFoundError:
-                    pass
+                    self.staging = None
                 except OSError as cleanup_exc:
-                    raise ArtifactPublicationError(
-                        f"artifact staging cleanup failed: {cleanup_exc}"
-                    ) from cleanup_exc
-                self.staging = None
+                    cleanup_errors.append(
+                        ArtifactPublicationError(f"artifact staging cleanup failed: {cleanup_exc}")
+                    )
+                else:
+                    self.staging = None
             if exc is not None and not self.committed and self.backup is not None:
                 if not self._target_exists():
                     try:
@@ -389,32 +445,39 @@ class AtomicDirectoryPublisher:
                         os.fsync(self._parent_fd())
                     except OSError as restore_exc:
                         self._rollback_failed = True
-                        raise ArtifactPublicationError(
-                            "artifact publication rollback failed; backup preserved at "
-                            f"{self._root.parent / self.backup.name}"
-                        ) from restore_exc
+                        cleanup_errors.append(
+                            _publication_error(
+                                "artifact publication rollback failed; backup preserved at "
+                                f"{self._root.parent / self.backup.name}",
+                                cause=restore_exc,
+                            )
+                        )
                 if not self.backup.exists():
                     self.backup = None
-        except BaseException as cleanup_error:
-            pending_error = cleanup_error
+        except BaseException as initial_cleanup_error:
+            cleanup_errors.append(initial_cleanup_error)
         finally:
             try:
                 self._release_lock()
             except BaseException as lock_error:
-                if pending_error is None:
-                    pending_error = lock_error
+                cleanup_errors.append(lock_error)
             if self._lease is not None:
                 try:
                     self._lease.__exit__(exc_type, exc, traceback)
                 except BaseException as lease_error:
-                    if pending_error is None:
-                        pending_error = lease_error
+                    cleanup_errors.append(lease_error)
                 finally:
                     self._lease = None
             try:
                 self._close_parent_anchor()
             except BaseException as anchor_error:
-                if pending_error is None:
-                    pending_error = anchor_error
-        if pending_error is not None:
-            raise pending_error
+                cleanup_errors.append(anchor_error)
+        if body_error is not None:
+            for failure in cleanup_errors:
+                _attach_cleanup_error(body_error, failure)
+            return
+        if cleanup_errors:
+            first = cleanup_errors[0]
+            for later in cleanup_errors[1:]:
+                _attach_cleanup_error(first, later)
+            raise first

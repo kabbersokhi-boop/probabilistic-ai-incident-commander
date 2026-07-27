@@ -59,6 +59,27 @@ def test_single_threshold_modes_remain_supported() -> None:
     assert module._minimums_satisfied(completed, min_iterations=0, min_duration_seconds=2.0)
 
 
+def test_authoritative_snapshot_requires_nine_healthy_authoritative_stages() -> None:
+    module = _load_module()
+
+    class Stage:
+        status = "healthy"
+        authoritative = True
+
+    class Snapshot:
+        overall_status = "healthy"
+        configured_stage_count = 9
+        healthy_stage_count = 9
+
+        def __init__(self) -> None:
+            self.stages = [Stage() for _ in range(9)]
+
+    assert module._authoritative_snapshot(Snapshot())
+    invalid = Snapshot()
+    invalid.stages[0].authoritative = False
+    assert not module._authoritative_snapshot(invalid)
+
+
 @pytest.mark.parametrize(  # type: ignore[untyped-decorator]
     ("iterations", "duration"),
     [(-1, 0.0), (0, -1.0), (0, float("inf")), (0, 0.0)],

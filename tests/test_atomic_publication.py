@@ -5,16 +5,19 @@ import errno
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import time
 from itertools import pairwise
 from pathlib import Path
 from threading import Event, Thread
+from typing import Any, Literal
 
 import pytest
 
 from paic.artifacts import publication
+from paic.artifacts.lease import ArtifactLeaseError, _ArtifactLease
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.io import export_dataset
 from paic.simulator.types import SimulationResult
@@ -135,9 +138,14 @@ def test_failed_rollback_preserves_backup_and_reports_recovery_path(
     (backup / "value.txt").write_text("old", encoding="utf-8")
     shutil.rmtree(target)
     publisher.backup = backup
-    monkeypatch.setattr(os, "replace", lambda *_args: (_ for _ in ()).throw(OSError("blocked")))
-    with pytest.raises(ArtifactPublicationError, match="backup preserved"):
-        publisher.__exit__(RuntimeError, RuntimeError("failure"), None)
+    monkeypatch.setattr(
+        os,
+        "replace",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("blocked")),
+    )
+    body = RuntimeError("failure")
+    publisher.__exit__(RuntimeError, body, None)
+    assert any("backup preserved" in note for note in body.__notes__)
     assert (backup / "value.txt").read_text(encoding="utf-8") == "old"
 
 
@@ -164,10 +172,10 @@ def test_atomic_exchange_unavailable_fails_closed(
     target.mkdir()
     (target / "value.txt").write_text("old", encoding="utf-8")
 
-    def unavailable(_left: Path, _right: Path) -> None:
+    def unavailable(_parent_fd: int, _left_name: str, _right_name: str) -> None:
         raise failure
 
-    monkeypatch.setattr(publication, "_rename_exchange", unavailable)
+    monkeypatch.setattr(publication, "_rename_exchange_at", unavailable)
     publisher = AtomicDirectoryPublisher(target, overwrite=True)
     with pytest.raises(ArtifactPublicationError, match="not committed"), publisher as staging:
         (staging / "value.txt").write_text("new", encoding="utf-8")
@@ -196,8 +204,12 @@ def test_rename_exchange_reports_unavailable_and_errno(
         renameat2 = None
 
     monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: NoExchange())
-    with pytest.raises(OSError, match="unavailable"):
-        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+    parent_fd = os.open(tmp_path, os.O_RDONLY)
+    try:
+        with pytest.raises(OSError, match="unavailable"):
+            publication._rename_exchange_at(parent_fd, "left", "right")
+    finally:
+        os.close(parent_fd)
 
     class FailingExchange:
         argtypes: object = None
@@ -211,8 +223,12 @@ def test_rename_exchange_reports_unavailable_and_errno(
 
     monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: ErrnoExchange())
     monkeypatch.setattr(ctypes, "get_errno", lambda: errno.EXDEV)
-    with pytest.raises(OSError, match="cross-device"):
-        publication._rename_exchange(tmp_path / "left", tmp_path / "right")
+    parent_fd = os.open(tmp_path, os.O_RDONLY)
+    try:
+        with pytest.raises(OSError, match="cross-device"):
+            publication._rename_exchange_at(parent_fd, "left", "right")
+    finally:
+        os.close(parent_fd)
 
 
 def test_parent_and_lock_safety_reject_symlink_and_nonregular_components(tmp_path: Path) -> None:
@@ -244,6 +260,215 @@ def test_lock_acquisition_oserror_is_controlled(
     )
     with pytest.raises(ArtifactPublicationError, match="cannot acquire"):
         AtomicDirectoryPublisher(target, overwrite=True).__enter__()
+
+
+def test_parent_anchor_acquisition_reports_close_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    real_open = os.open
+    real_close = os.close
+    real_fstat = os.fstat
+    opened: list[int] = []
+
+    def capture_open(*args: Any, **kwargs: Any) -> int:
+        descriptor = real_open(*args, **kwargs)
+        opened.append(descriptor)
+        return descriptor
+
+    def invalid_fstat(descriptor: int) -> os.stat_result:
+        info = real_fstat(descriptor)
+        if descriptor == opened[0]:
+            values = list(info)
+            values[0] = stat.S_IFIFO
+            return os.stat_result(values)
+        return info
+
+    def failing_close(descriptor: int) -> None:
+        if descriptor == opened[0]:
+            raise OSError("parent close failed")
+        real_close(descriptor)
+
+    monkeypatch.setattr("paic.artifacts.publication.os.open", capture_open)
+    monkeypatch.setattr("paic.artifacts.publication.os.fstat", invalid_fstat)
+    monkeypatch.setattr("paic.artifacts.publication.os.close", failing_close)
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    try:
+        with pytest.raises(ArtifactPublicationError, match="parent changed") as caught:
+            publisher._open_parent_anchor()
+        assert any(
+            "cannot close artifact publication parent during acquisition" in note
+            for note in caught.value.__notes__
+        )
+    finally:
+        if opened:
+            real_close(opened[0])
+
+
+def test_release_lock_reports_stat_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    publisher.lock_path.touch()
+    publisher._lock_fd = os.open(publisher.lock_path, os.O_RDWR)
+    lock_info = os.fstat(publisher._lock_fd)
+    publisher._lock_identity = (lock_info.st_dev, lock_info.st_ino)
+    real_stat = os.stat
+
+    def failing_stat(path: Any, *args: Any, **kwargs: Any) -> os.stat_result:
+        if path == publisher.lock_path.name:
+            raise OSError("lock stat failed")
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr("paic.artifacts.publication.os.stat", failing_stat)
+    try:
+        with pytest.raises(
+            ArtifactPublicationError, match="inspect artifact writer lock"
+        ) as caught:
+            publisher._release_lock()
+        assert caught.value.__cause__ is not None
+        assert publisher._lock_fd is None
+        assert publisher._lock_identity is None
+    finally:
+        publisher._close_parent_anchor()
+
+
+def test_release_lock_reports_close_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    publisher.lock_path.touch()
+    publisher._lock_fd = os.open(publisher.lock_path, os.O_RDWR)
+    lock_fd = publisher._lock_fd
+    assert lock_fd is not None
+    lock_info = os.fstat(lock_fd)
+    publisher._lock_identity = (lock_info.st_dev, lock_info.st_ino)
+    real_close = os.close
+
+    def failing_close(descriptor: int) -> None:
+        if descriptor == lock_fd:
+            raise OSError("lock close failed")
+        real_close(descriptor)
+
+    monkeypatch.setattr("paic.artifacts.publication.os.close", failing_close)
+    try:
+        with pytest.raises(ArtifactPublicationError, match="close artifact writer lock") as caught:
+            publisher._release_lock()
+        assert caught.value.__cause__ is not None
+        assert publisher._lock_fd is None
+        assert not publisher.lock_path.exists()
+    finally:
+        real_close(lock_fd)
+        publisher._close_parent_anchor()
+
+
+def test_release_lock_reports_verified_unlink_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    publisher.lock_path.touch()
+    publisher._lock_fd = os.open(publisher.lock_path, os.O_RDWR)
+    lock_info = os.fstat(publisher._lock_fd)
+    publisher._lock_identity = (lock_info.st_dev, lock_info.st_ino)
+    real_unlink = os.unlink
+
+    def failing_unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if path == publisher.lock_path.name:
+            raise OSError("lock unlink failed")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr("paic.artifacts.publication.os.unlink", failing_unlink)
+    try:
+        with pytest.raises(ArtifactPublicationError, match="remove artifact writer lock") as caught:
+            publisher._release_lock()
+        assert caught.value.__cause__ is not None
+        assert publisher.lock_path.exists()
+    finally:
+        publisher._close_parent_anchor()
+        publisher.lock_path.unlink(missing_ok=True)
+
+
+def test_release_lock_reports_parent_validation_failure_without_unlinking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "artifact"
+    target.mkdir()
+    publisher = AtomicDirectoryPublisher(target, overwrite=True)
+    publisher.lock_path.touch()
+    publisher._lock_fd = os.open(publisher.lock_path, os.O_RDWR)
+    lock_info = os.fstat(publisher._lock_fd)
+    publisher._lock_identity = (lock_info.st_dev, lock_info.st_ino)
+    monkeypatch.setattr(
+        publisher,
+        "_validate_parent_anchor",
+        lambda: (_ for _ in ()).throw(
+            ArtifactPublicationError("artifact publication parent changed")
+        ),
+    )
+    try:
+        with pytest.raises(ArtifactPublicationError, match="parent changed"):
+            publisher._release_lock()
+        assert publisher._lock_fd is None
+        assert publisher.lock_path.exists()
+    finally:
+        publisher._close_parent_anchor()
+        publisher.lock_path.unlink(missing_ok=True)
+
+
+class _FailingPublicationLease(_ArtifactLease):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root, exclusive=True)
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> Literal[False]:
+        raise ArtifactLeaseError("lease cleanup failed")
+
+
+@pytest.mark.parametrize("body_error", [False, True])  # type: ignore[untyped-decorator]
+def test_publisher_reports_all_cleanup_failures_without_masking_body(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    body_error: bool,
+) -> None:
+    publisher = AtomicDirectoryPublisher(tmp_path / "artifact", overwrite=True)
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    publisher.staging = staging
+    publisher._lease = _FailingPublicationLease(tmp_path / "lease-root")
+    body = RuntimeError("body failure")
+
+    def failing_rmtree(_path: Path) -> None:
+        raise OSError("staging cleanup failed")
+
+    def failing_lock_release() -> None:
+        raise ArtifactPublicationError("lock cleanup failed")
+
+    def failing_anchor_close() -> None:
+        raise ArtifactPublicationError("parent close failed")
+
+    monkeypatch.setattr("paic.artifacts.publication.shutil.rmtree", failing_rmtree)
+    monkeypatch.setattr(publisher, "_release_lock", failing_lock_release)
+    monkeypatch.setattr(publisher, "_close_parent_anchor", failing_anchor_close)
+
+    if body_error:
+        publisher.__exit__(RuntimeError, body, None)
+        assert body.__notes__ == [
+            "artifact staging cleanup failed: staging cleanup failed",
+            "lock cleanup failed",
+            "lease cleanup failed",
+            "parent close failed",
+        ]
+    else:
+        with pytest.raises(ArtifactPublicationError, match="staging cleanup failed") as caught:
+            publisher.__exit__(None, None, None)
+        assert caught.value.__notes__ == [
+            "lock cleanup failed",
+            "lease cleanup failed",
+            "parent close failed",
+        ]
 
 
 def test_commit_without_entering_is_rejected(tmp_path: Path) -> None:

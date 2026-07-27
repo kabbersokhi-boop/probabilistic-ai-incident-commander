@@ -30,6 +30,9 @@ class Iteration:
     duration_seconds: float
     snapshot_sha256: str
     status: str
+    configured_stage_count: int = 0
+    healthy_stage_count: int = 0
+    authoritative_stage_count: int = 0
 
 
 def _sha256(path: Path) -> str:
@@ -99,9 +102,23 @@ def _load_iterations(path: Path) -> list[Iteration]:
     if not path.exists():
         return []
     try:
-        return [
+        items = [
             Iteration(**json.loads(line)) for line in path.read_text(encoding="utf-8").splitlines()
         ]
+        for expected, item in enumerate(items, start=1):
+            if item.index != expected:
+                raise RuntimeError(
+                    "cannot resume soak results: iteration indexes are not contiguous"
+                )
+            if not math.isfinite(item.duration_seconds) or item.duration_seconds < 0:
+                raise RuntimeError("cannot resume soak results: invalid iteration duration")
+            if not item.status:
+                raise RuntimeError("cannot resume soak results: missing iteration status")
+            if item.configured_stage_count not in {0, 9} or item.healthy_stage_count not in {0, 9}:
+                raise RuntimeError("cannot resume soak results: invalid workspace stage counts")
+            if item.authoritative_stage_count not in {0, 9}:
+                raise RuntimeError("cannot resume soak results: invalid authoritative stage count")
+        return items
     except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"cannot resume soak results: {exc}") from exc
 
@@ -158,6 +175,16 @@ def _publication_debris(root: Path, results: Path) -> tuple[list[str], list[str]
     return sorted(publication_findings), sorted(control_locks)
 
 
+def _authoritative_snapshot(snapshot: Any) -> bool:
+    return (
+        snapshot.overall_status == "healthy"
+        and snapshot.configured_stage_count == 9
+        and snapshot.healthy_stage_count == 9
+        and len(snapshot.stages) == 9
+        and all(stage.status == "healthy" and stage.authoritative for stage in snapshot.stages)
+    )
+
+
 def run(args: argparse.Namespace) -> int:
     _validate_thresholds(args.iterations, args.duration_seconds)
     workspace = Path(args.workspace)
@@ -169,9 +196,12 @@ def run(args: argparse.Namespace) -> int:
     commit = _commit()
     metadata = {
         "commit": commit,
+        "mode": args.mode,
         "workspace_sha256": _sha256(workspace.resolve()),
         "resolved_configuration_sha256": _configuration_sha256(config),
     }
+    if args.fresh and (metadata_path.exists() or iteration_path.exists()):
+        raise RuntimeError("fresh soak requested but output directory already contains evidence")
     if metadata_path.exists():
         prior = json.loads(metadata_path.read_text(encoding="utf-8"))
         if prior != metadata:
@@ -182,6 +212,7 @@ def run(args: argparse.Namespace) -> int:
         _atomic_json(metadata_path, metadata)
 
     completed = _load_iterations(iteration_path)
+    resumed = bool(completed)
     for _ in range(args.warmup):
         inspect_workspace(config)
     gc.collect()
@@ -191,7 +222,7 @@ def run(args: argparse.Namespace) -> int:
     tracemalloc.start()
     baseline_trace, _ = tracemalloc.get_traced_memory()
     started = time.perf_counter()
-    failed = any(item.status in {"error", "missing"} for item in completed)
+    failed = any(item.status != "healthy" for item in completed)
     while not _minimums_satisfied(
         completed,
         min_iterations=args.iterations,
@@ -200,6 +231,8 @@ def run(args: argparse.Namespace) -> int:
         begun = time.perf_counter()
         try:
             snapshot = inspect_workspace(config)
+            if not _authoritative_snapshot(snapshot):
+                raise RuntimeError("workspace is not 9/9 healthy and authoritative")
         except Exception as exc:
             item = Iteration(
                 index=len(completed) + 1,
@@ -216,12 +249,19 @@ def run(args: argparse.Namespace) -> int:
         item = Iteration(
             index=len(completed) + 1,
             duration_seconds=time.perf_counter() - begun,
-            snapshot_sha256=hashlib.sha256(snapshot.model_dump_json().encode()).hexdigest(),
+            snapshot_sha256=hashlib.sha256(
+                json.dumps(
+                    snapshot.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+                ).encode("utf-8")
+            ).hexdigest(),
             status=snapshot.overall_status,
+            configured_stage_count=snapshot.configured_stage_count,
+            healthy_stage_count=snapshot.healthy_stage_count,
+            authoritative_stage_count=sum(1 for stage in snapshot.stages if stage.authoritative),
         )
         _append_iteration(iteration_path, item)
         completed.append(item)
-        failed |= item.status in {"error", "missing"}
+        failed |= item.status != "healthy"
         _atomic_json(metadata_path, metadata)
 
     run_elapsed_seconds = time.perf_counter() - started
@@ -252,8 +292,14 @@ def run(args: argparse.Namespace) -> int:
         "cumulative_inspection_seconds": cumulative_inspection_seconds,
         "run_elapsed_seconds": run_elapsed_seconds,
         "minimums_satisfied": minimums_satisfied,
+        "resumed": resumed,
         "unique_snapshot_hashes": hashes,
         "status_counts": counts,
+        "configured_stage_counts": sorted({item.configured_stage_count for item in completed}),
+        "healthy_stage_counts": sorted({item.healthy_stage_count for item in completed}),
+        "authoritative_stage_counts": sorted(
+            {item.authoritative_stage_count for item in completed}
+        ),
         "fd_delta": None if baseline_fd is None or final_fd is None else final_fd - baseline_fd,
         "rss_delta_bytes": None
         if baseline_rss is None or final_rss is None
@@ -265,6 +311,7 @@ def run(args: argparse.Namespace) -> int:
         "control_lock_paths": control_locks,
     }
     _atomic_json(output / "summary.json", report)
+    authoritative_failure = any(item.status != "healthy" for item in completed)
     threshold_failure = (
         not minimums_satisfied
         or (report["fd_delta"] is not None and report["fd_delta"] > args.max_fd_delta)
@@ -273,7 +320,15 @@ def run(args: argparse.Namespace) -> int:
             report["rss_delta_bytes"] is not None and report["rss_delta_bytes"] > args.max_rss_delta
         )
     )
-    return 1 if failed or len(hashes) > 1 or publication_debris or threshold_failure else 0
+    return (
+        1
+        if failed
+        or authoritative_failure
+        or len(hashes) != 1
+        or publication_debris
+        or threshold_failure
+        else 0
+    )
 
 
 def main() -> int:
@@ -282,6 +337,8 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--iterations", type=int, default=25)
     parser.add_argument("--duration-seconds", type=float, default=float("inf"))
+    parser.add_argument("--mode", choices=("inspection", "endurance"), default="inspection")
+    parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--max-fd-delta", type=int, default=0)
     parser.add_argument("--max-gc-delta", type=int, default=2048)

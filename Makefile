@@ -256,6 +256,7 @@ evaluation-adversarial:
 
 tui-smoke: detection-smoke remediation-smoke recovery-smoke evaluation-smoke
 	$(PYTHON) -m paic tui validate --workspace $(TUI_WORKSPACE)
+	$(PYTHON) scripts/assert_phase11_smoke.py --workspace $(TUI_WORKSPACE)
 
 tui-snapshot:
 	$(PYTHON) -m paic tui snapshot --workspace $(TUI_WORKSPACE) --format json

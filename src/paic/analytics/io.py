@@ -25,7 +25,7 @@ from paic.analytics.quality import quality_error_count
 from paic.analytics.registry import metric_catalog
 from paic.analytics.schema import ANALYTICS_TABLE_ORDER, ANALYTICS_TABLE_SPECS
 from paic.analytics.types import AnalyticsBuildResult, AnalyticsFrameMap, LoadedAnalytics
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import artifact_path, artifact_reader
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.simulator.io import file_sha256
 
@@ -164,8 +164,9 @@ def _export_analytics_to_root(result: AnalyticsBuildResult, root: Path) -> Analy
     return manifest
 
 
+@artifact_reader
 def load_manifest(analytics_dir: str | Path) -> AnalyticsManifest:
-    path = Path(analytics_dir) / "manifest.json"
+    path = artifact_path(artifact_path(Path(analytics_dir) / "manifest.json"))
     try:
         return AnalyticsManifest.model_validate_json(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -184,7 +185,7 @@ def _safe_analytics_path(root: Path, relative_path: str) -> Path:
 
 @artifact_reader
 def load_analytics(analytics_dir: str | Path) -> LoadedAnalytics:
-    root = Path(analytics_dir)
+    root = artifact_path(analytics_dir)
     manifest = load_manifest(root)
     tables: AnalyticsFrameMap = {}
     for table in manifest.tables:

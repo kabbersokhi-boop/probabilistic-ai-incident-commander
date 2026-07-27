@@ -10,7 +10,12 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from paic import __version__
-from paic.artifacts.lease import artifact_reader
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
 from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.investigation.config import InvestigationConfig, load_investigation_config
 from paic.investigation.manifest import InvestigationFileManifest, InvestigationManifest
@@ -145,7 +150,7 @@ def _closed_world_issues(root: Path) -> list[str]:
 
     issues: list[str] = []
     try:
-        if not root.is_dir() or root.is_symlink():
+        if not artifact_root_is_regular(root):
             return ["investigation artifact root is not a regular directory"]
         entries = list(root.iterdir())
     except OSError as exc:
@@ -163,7 +168,7 @@ def _closed_world_issues(root: Path) -> list[str]:
 
 @artifact_reader
 def load_investigation(path: str | Path) -> LoadedInvestigation:
-    root = Path(path)
+    root = artifact_path(path)
     layout_issues = _closed_world_issues(root)
     if layout_issues:
         raise InvestigationArtifactError("; ".join(layout_issues))
@@ -265,7 +270,9 @@ def _transcript_semantic_issues(loaded: LoadedInvestigation) -> list[str]:
     return issues
 
 
-@artifact_reader
+@artifact_readers(
+    "path", "dataset_dir", "analytics_dir", "detection_dir", "impact_dir", "evidence_dir"
+)
 def validate_investigation(
     path: str | Path,
     *,
@@ -275,7 +282,7 @@ def validate_investigation(
     impact_dir: str | Path | None = None,
     evidence_dir: str | Path | None = None,
 ) -> list[str]:
-    root = Path(path)
+    root = artifact_path(path)
     issues: list[str] = []
     issues.extend(_closed_world_issues(root))
     if issues:
@@ -483,6 +490,9 @@ def _replay_governed_tool_trace(
         )
 
 
+@artifact_readers(
+    "path", "dataset_dir", "analytics_dir", "detection_dir", "impact_dir", "evidence_dir"
+)
 def replay_investigation(
     path: str | Path,
     *,

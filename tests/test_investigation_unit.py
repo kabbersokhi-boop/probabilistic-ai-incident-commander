@@ -404,13 +404,15 @@ def test_artifact_semantic_tampering_and_source_mismatch(
     _refresh_manifest_file(output, "request.receipt.json")
     assert any("source paths" in issue for issue in validate_investigation(output))
 
+    dataset_dir = tmp_path / "dataset-source"
+    dataset_dir.mkdir()
     monkeypatch.setattr(
         "paic.investigation.artifact.bind_sources",
         lambda *args, **kwargs: SimpleNamespace(hashes={"dataset": "f" * 64}),
     )
     assert any(
         "source manifest hashes" in issue
-        for issue in validate_investigation(output, dataset_dir="/unused")
+        for issue in validate_investigation(output, dataset_dir=dataset_dir)
     )
 
 

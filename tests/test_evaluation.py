@@ -3,13 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
 from argparse import Namespace
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
+import paic.evaluation.artifact as evaluation_artifact
+from paic.artifacts.publication import AtomicDirectoryPublisher
 from paic.evaluation.adversarial import (
     AdversarialCase,
     check_adversarial_text,
@@ -233,18 +235,18 @@ def test_overwrite_failure_restores_previous_generation(
     original = _run(run_id="original")
     replacement = _run(run_id="replacement")
     export_evaluation(original, root)
-    real_replace = os.replace
-    calls = 0
 
-    def fail_second_replace(source: str | Path, target: str | Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("simulated publication failure")
-        real_replace(source, target)
+    class FailingPublisher(AtomicDirectoryPublisher):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["failure_hook"] = lambda point: (
+                (_ for _ in ()).throw(OSError("simulated publication failure"))
+                if point == "old-moved"
+                else None
+            )
+            super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(os, "replace", fail_second_replace)
-    with pytest.raises(EvaluationArtifactError, match="cannot publish"):
+    monkeypatch.setattr(evaluation_artifact, "AtomicDirectoryPublisher", FailingPublisher)
+    with pytest.raises(EvaluationArtifactError, match="not committed"):
         export_evaluation(replacement, root, overwrite=True)
     assert replay_evaluation(root, artifact_only=True).config.run_id == "original"
 

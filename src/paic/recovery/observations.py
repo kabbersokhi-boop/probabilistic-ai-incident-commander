@@ -9,8 +9,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
-import tempfile
 from datetime import timedelta
 from pathlib import Path
 from typing import Annotated
@@ -21,6 +19,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from paic import __version__
 from paic.analytics.io import load_analytics, load_manifest
 from paic.analytics.registry import metric_catalog
+from paic.artifacts.lease import (
+    artifact_path,
+    artifact_reader,
+    artifact_readers,
+    artifact_root_is_regular,
+)
+from paic.artifacts.publication import ArtifactPublicationError, AtomicDirectoryPublisher
 from paic.recovery.artifact import file_sha256
 from paic.recovery.manifest import ObservationArtifactFile, ObservationArtifactManifest
 from paic.recovery.models import Identifier, RecoveryObservationSet
@@ -67,14 +72,6 @@ def _digest(value: object) -> str:
     ).hexdigest()
 
 
-def _fsync_dir(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
 def _write(path: Path, content: str) -> None:
     with path.open("x", encoding="utf-8") as handle:
         handle.write(content)
@@ -83,6 +80,7 @@ def _write(path: Path, content: str) -> None:
     os.chmod(path, 0o600)
 
 
+@artifact_readers("analytics_dir", "execution_dir")
 def _derive_observations(
     scenario: ObservationScenario,
     analytics_dir: str | Path,
@@ -109,8 +107,6 @@ def _derive_observations(
             (pl.col("metric_name") == series.metric_id) & (pl.col("cohort_name") == series.cohort)
         ).sort("period_start")
         if "time_grain" in selected.columns:
-            # Analytics may publish multiple grains at the same timestamp.  A
-            # recovery series has one deterministic grain: the coarsest one.
             grain = max(
                 selected.get_column("time_grain").unique().to_list(),
                 key=lambda value: (_GRAIN_RANK.get(str(value), 0), str(value)),
@@ -147,7 +143,9 @@ def _derive_observations(
             "incident_id": execution.receipt.incident_id,
             "execution_receipt_sha256": execution.receipt.receipt_sha256,
             "execution_manifest_sha256": manifest_sha256(execution_dir),
-            "analytics_manifest_sha256": file_sha256(Path(analytics_dir) / "manifest.json"),
+            "analytics_manifest_sha256": file_sha256(
+                artifact_path(Path(analytics_dir) / "manifest.json")
+            ),
             "source_simulation_id": analytics_manifest.source_simulation_id,
             "generator_config_sha256": _digest(scenario.model_dump(mode="json")),
             "executed_at": execution.receipt.executed_at,
@@ -165,86 +163,52 @@ def build_observations(
     *,
     overwrite: bool = False,
 ) -> RecoveryObservationSet:
-    """Derive baseline rows from validated analytics and post rows from a strict scenario."""
     observation_set = _derive_observations(scenario, analytics_dir, execution_dir)
-    destination = Path(output_dir)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists() and not overwrite:
-        raise ObservationError(f"output directory already exists: {destination}")
-    staged = Path(tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=destination.parent))
+    publisher = AtomicDirectoryPublisher(output_dir, overwrite=overwrite)
     try:
-        _write(
-            staged / "observation.config.resolved.json",
-            json.dumps(scenario.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
-        )
-        _write(staged / "observation-set.json", observation_set.model_dump_json(indent=2) + "\n")
-        manifest = ObservationArtifactManifest(
-            observation_set_id=observation_set.observation_set_id,
-            incident_id=observation_set.incident_id,
-            generator_version=__version__,
-            analytics_manifest_sha256=observation_set.analytics_manifest_sha256,
-            execution_manifest_sha256=observation_set.execution_manifest_sha256,
-            execution_receipt_sha256=observation_set.execution_receipt_sha256,
-            generator_config_sha256=observation_set.generator_config_sha256,
-            files=[
-                ObservationArtifactFile(
-                    relative_path=name,
-                    byte_size=(staged / name).stat().st_size,
-                    sha256=file_sha256(staged / name),
-                )
-                for name in ("observation.config.resolved.json", "observation-set.json")
-            ],
-        )
-        _write(
-            staged / "manifest.json",
-            manifest.model_dump_json(indent=2) + "\n",
-        )
-        _write(staged / "_SUCCESS", file_sha256(staged / "manifest.json") + "\n")
-        _fsync_dir(staged)
-        backup: Path | None = None
-        committed = False
-        if destination.exists():
-            backup = Path(
-                tempfile.mkdtemp(prefix=f".{destination.name}.backup-", dir=destination.parent)
+        with publisher as staged:
+            _write(
+                staged / "observation.config.resolved.json",
+                json.dumps(scenario.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
             )
-            backup.rmdir()
-            os.replace(destination, backup)
-        try:
-            os.replace(staged, destination)
-            committed = True
-            try:
-                _fsync_dir(destination.parent)
-            except OSError:
-                # Rename is the visibility point; a readable artifact is committed.
-                load_observations(
-                    destination, analytics_dir=analytics_dir, execution_dir=execution_dir
-                )
-            if backup is not None:
-                shutil.rmtree(backup, ignore_errors=True)
-        except Exception:
-            if (
-                not committed
-                and backup is not None
-                and backup.exists()
-                and not destination.exists()
-            ):
-                os.replace(backup, destination)
-            raise
-    except Exception:
-        if staged.exists():
-            shutil.rmtree(staged)
-        raise
+            _write(
+                staged / "observation-set.json", observation_set.model_dump_json(indent=2) + "\n"
+            )
+            manifest = ObservationArtifactManifest(
+                observation_set_id=observation_set.observation_set_id,
+                incident_id=observation_set.incident_id,
+                generator_version=__version__,
+                analytics_manifest_sha256=observation_set.analytics_manifest_sha256,
+                execution_manifest_sha256=observation_set.execution_manifest_sha256,
+                execution_receipt_sha256=observation_set.execution_receipt_sha256,
+                generator_config_sha256=observation_set.generator_config_sha256,
+                files=[
+                    ObservationArtifactFile(
+                        relative_path=name,
+                        byte_size=(staged / name).stat().st_size,
+                        sha256=file_sha256(staged / name),
+                    )
+                    for name in ("observation.config.resolved.json", "observation-set.json")
+                ],
+            )
+            _write(staged / "manifest.json", manifest.model_dump_json(indent=2) + "\n")
+            _write(staged / "_SUCCESS", file_sha256(staged / "manifest.json") + "\n")
+            load_observations(staged, analytics_dir=analytics_dir, execution_dir=execution_dir)
+            publisher.commit()
+    except ArtifactPublicationError as exc:
+        raise ObservationError(str(exc)) from exc
     return observation_set
 
 
+@artifact_readers("path", "analytics_dir", "execution_dir")
 def load_observations(
     path: str | Path,
     *,
     analytics_dir: str | Path | None = None,
     execution_dir: str | Path | None = None,
 ) -> RecoveryObservationSet:
-    root = Path(path)
-    if root.is_symlink() or not root.is_dir() or {item.name for item in root.iterdir()} != EXPECTED:
+    root = artifact_path(path)
+    if not artifact_root_is_regular(root) or {item.name for item in root.iterdir()} != EXPECTED:
         raise ObservationError("observation artifact contains missing or undeclared paths")
     if any(item.is_symlink() or not item.is_file() for item in root.iterdir()):
         raise ObservationError("observation artifact contains non-regular paths")
@@ -299,7 +263,7 @@ def load_observations(
         analytics = load_analytics(analytics_dir)
         analytics_manifest = load_manifest(analytics_dir)
         if observations.analytics_manifest_sha256 != file_sha256(
-            Path(analytics_dir) / "manifest.json"
+            artifact_path(Path(analytics_dir) / "manifest.json")
         ):
             raise ObservationError("observation artifact is bound to another analytics manifest")
         if observations.source_simulation_id != analytics_manifest.source_simulation_id:
@@ -321,8 +285,9 @@ def load_observations(
     return observations
 
 
+@artifact_reader
 def observation_manifest_sha256(path: str | Path) -> str:
-    return file_sha256(Path(path) / "manifest.json")
+    return file_sha256(artifact_path(Path(path) / "manifest.json"))
 
 
 def validate_observations(

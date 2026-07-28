@@ -63,4 +63,4 @@ jobs:
         env:
           PAIC_VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           PAIC_IMAGE_TAG: test
-        run: docker compose run --rm --no-build validate
+        run: docker compose run --rm validate

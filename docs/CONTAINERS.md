@@ -49,10 +49,10 @@ Validate the Compose model and run the one-shot service:
 ```bash
 PAIC_VCS_REF="$(git rev-parse HEAD)" docker compose config --quiet
 PAIC_VCS_REF="$(git rev-parse HEAD)" docker compose build validate
-PAIC_VCS_REF="$(git rev-parse HEAD)" docker compose run --rm --no-build validate
+PAIC_VCS_REF="$(git rev-parse HEAD)" docker compose run --rm validate
 ```
 
-The Compose service has no ports, networks, persistent volumes, or restart loop. It exits after validating the bundled contracts.
+The Compose service uses `pull_policy: never`, so the run must use the locally built image rather than contacting a registry. It has no ports, networks, persistent volumes, or restart loop and exits after validating the bundled contracts.
 
 ## Security boundary
 

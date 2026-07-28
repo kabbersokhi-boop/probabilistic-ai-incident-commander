@@ -1,6 +1,6 @@
 # Terminal Control Room
 
-Phase 11 begins with a deliberately small, read-only terminal interface. It is an engineering and validation surface, not a second implementation of incident authority.
+Phase 11 delivers a deliberately small, read-only terminal interface and its reliability gates. It is an engineering and validation surface, not a second implementation of incident authority.
 
 ## Design rules
 
@@ -73,4 +73,6 @@ Warnings intentionally return `0`: they describe incomplete provenance configura
 
 ## Phase 11 boundary
 
-This is the first Phase 11 unit. Phase 11 remains in progress until the TUI has been exercised under repeated runs, corrupted artifacts, interrupted workflows, terminal resizing, non-interactive streams, long paths, and both supported Python versions. Docker belongs to Phase 12. The public web product is deferred until the TUI and containerized system have met their reliability gates.
+Phase 11 coverage is complete for repeated runs, corrupted artifacts, interruption handling, terminal resizing, non-interactive streams, long paths, Python 3.11, and Python 3.12. The TUI remains read-only: no production, approval, remediation, recovery, shell, cloud, or secret authority is added.
+
+Docker/containerization is the next Phase 12 unit and is not included here. The public web product remains deferred until the TUI and containerized system have met their reliability gates.

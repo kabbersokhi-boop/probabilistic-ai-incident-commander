@@ -12,6 +12,8 @@ from paic.tui.models import WorkspaceConfig, WorkspaceSnapshot
 from paic.tui.render import Renderer
 from paic.tui.workspace import inspect_workspace
 
+TerminalWidthProvider = Callable[[], int]
+
 
 class TUIApplication:
     def __init__(
@@ -21,6 +23,7 @@ class TUIApplication:
         input_stream: TextIO = sys.stdin,
         output_stream: TextIO = sys.stdout,
         snapshot_builder: Callable[[WorkspaceConfig], WorkspaceSnapshot] = inspect_workspace,
+        terminal_width_provider: TerminalWidthProvider | None = None,
         color: bool = True,
         unicode: bool = True,
     ):
@@ -28,8 +31,13 @@ class TUIApplication:
         self.input_stream = input_stream
         self.output_stream = output_stream
         self.snapshot_builder = snapshot_builder
-        width = shutil.get_terminal_size(fallback=(88, 24)).columns
-        self.renderer = Renderer(width=width, color=color, unicode=unicode)
+        self.terminal_width_provider = terminal_width_provider or (
+            lambda: shutil.get_terminal_size(fallback=(88, 24)).columns
+        )
+        self.renderer = Renderer(width=88, color=color, unicode=unicode)
+
+    def _update_width(self) -> None:
+        self.renderer.width = self.terminal_width_provider()
 
     def _clear(self) -> None:
         if self.output_stream.isatty():
@@ -51,6 +59,7 @@ class TUIApplication:
         try:
             snapshot = self.snapshot_builder(self.config)
             while True:
+                self._update_width()
                 self._clear()
                 self._write(self.renderer.overview(snapshot))
                 choice = self._read().lower()
@@ -60,6 +69,7 @@ class TUIApplication:
                     snapshot = self.snapshot_builder(self.config)
                     continue
                 if choice in {"h", "help", "?"}:
+                    self._update_width()
                     self._clear()
                     self._write(self.renderer.help())
                     self._read("")
@@ -69,6 +79,7 @@ class TUIApplication:
                 except ValueError:
                     continue
                 if 0 <= index < len(snapshot.stages):
+                    self._update_width()
                     self._clear()
                     self._write(self.renderer.detail(snapshot.stages[index]))
                     self._read("")

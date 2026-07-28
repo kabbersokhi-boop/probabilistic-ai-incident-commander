@@ -46,7 +46,8 @@ class Palette:
 
 class Renderer:
     def __init__(self, *, width: int = 88, color: bool = True, unicode: bool = True):
-        self.width = max(60, width)
+        self._width = 40
+        self.width = width
         self.unicode = unicode
         self.palette = (
             Palette(
@@ -61,6 +62,14 @@ class Renderer:
             if color
             else Palette("", "", "", "", "", "", "")
         )
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @width.setter
+    def width(self, value: int) -> None:
+        self._width = max(40, value)
 
     def _status(self, value: str) -> str:
         icon_map = {
@@ -86,8 +95,33 @@ class Renderer:
 
     def _wrap(self, value: Any, *, indent: str = "", width: int | None = None) -> list[str]:
         clean = sanitize_terminal_text(value)
-        available = width or self.width
-        return [indent + line for line in textwrap.wrap(clean, width=available)] or [indent]
+        available = max(1, (width or self.width) - len(indent))
+        return [
+            indent + line
+            for line in textwrap.wrap(
+                clean,
+                width=available,
+                break_long_words=True,
+                break_on_hyphens=False,
+            )
+        ] or [indent]
+
+    def _labelled(self, label: str, value: Any) -> list[str]:
+        clean = sanitize_terminal_text(value)
+        prefix = f"{label}: "
+        first_width = max(1, self.width - len(prefix))
+        chunks = textwrap.wrap(
+            clean,
+            width=first_width,
+            break_long_words=True,
+            break_on_hyphens=False,
+        ) or [""]
+        rows = [prefix + chunks[0]]
+        rows.extend(" " * len(prefix) + chunk for chunk in chunks[1:])
+        return rows
+
+    def _centered(self, value: str) -> list[str]:
+        return [line.center(self.width) for line in self._wrap(value)]
 
     def banner(self, snapshot: WorkspaceSnapshot) -> str:
         title = "PAIC TERMINAL CONTROL ROOM"
@@ -95,9 +129,9 @@ class Renderer:
         lines = [
             self._rule("═" if self.unicode else "="),
             f"{self.palette.bold}{title.center(self.width)}{self.palette.reset}",
-            display_name.center(self.width),
-            self._rule("═" if self.unicode else "="),
         ]
+        lines.extend(self._centered(display_name))
+        lines.append(self._rule("═" if self.unicode else "="))
         return "\n".join(lines)
 
     def overview(self, snapshot: WorkspaceSnapshot) -> str:
@@ -113,57 +147,74 @@ class Renderer:
         for index, stage in enumerate(snapshot.stages, 1):
             auth = "authoritative" if stage.authoritative else "read-only check"
             title = sanitize_terminal_text(stage.title)
-            rows.append(
-                f"{index:>2}. {title:<28} {self._status(stage.status):<30} "
-                f"{self.palette.dim}{auth}{self.palette.reset}"
-            )
-            rows.extend(self._wrap(stage.summary, indent="    ", width=max(20, self.width - 4)))
+            status = self._status(stage.status)
+            compact = f"{index:>2}. {title}  {strip_ansi(status)}  {auth}"
+            if len(compact) <= self.width:
+                rows.append(
+                    f"{index:>2}. {title}  {status}  {self.palette.dim}{auth}{self.palette.reset}"
+                )
+                rows.extend(self._wrap(stage.summary, indent="    "))
+            else:
+                rows.extend(self._wrap(f"{index}. {title}"))
+                rows.append(f"   {status}")
+                rows.extend(self._wrap(auth, indent="   "))
+                rows.extend(self._wrap(stage.summary, indent="   "))
         rows.extend(
             [
                 self._rule(),
-                "Choose a number for details, [R]efresh, [H]elp, or [Q]uit.",
             ]
         )
+        rows.extend(self._wrap("Choose a number for details, [R]efresh, [H]elp, or [Q]uit."))
         return "\n".join(rows)
 
     def detail(self, stage: StageSnapshot) -> str:
         title = sanitize_terminal_text(stage.title)
         rows = [
             self._rule("═" if self.unicode else "="),
-            f"{self.palette.bold}{title}{self.palette.reset}",
+            *[f"{self.palette.bold}{line}{self.palette.reset}" for line in self._wrap(title)],
             f"Status: {self._status(stage.status)}",
-            f"Authority: {'source-authoritative' if stage.authoritative else 'artifact/read-only'}",
+            *self._labelled(
+                "Authority",
+                "source-authoritative" if stage.authoritative else "artifact/read-only",
+            ),
         ]
         if stage.path:
-            rows.append(f"Path: {sanitize_terminal_text(stage.path)}")
+            rows.extend(self._labelled("Path", stage.path))
         rows.append(self._rule())
         rows.extend(self._wrap(stage.summary))
         if stage.details:
             rows.extend(["", f"{self.palette.bold}What this means{self.palette.reset}"])
-            rows.extend(f"  - {sanitize_terminal_text(item)}" for item in stage.details)
+            for item in stage.details:
+                rows.extend(self._wrap(item, indent="  - "))
         if stage.issues:
             rows.extend(["", f"{self.palette.bold}Problems to fix{self.palette.reset}"])
             for issue in stage.issues:
-                rows.extend(self._wrap(issue, indent="  - ", width=max(20, self.width - 4)))
-        rows.extend([self._rule(), "Press Enter to return."])
+                rows.extend(self._wrap(issue, indent="  - "))
+        rows.append(self._rule())
+        rows.extend(self._wrap("Press Enter to return."))
         return "\n".join(rows)
 
     def help(self) -> str:
-        return "\n".join(
-            [
-                self._rule("═" if self.unicode else "="),
-                f"{self.palette.bold}How to read this screen{self.palette.reset}",
-                self._rule(),
-                "HEALTHY means the configured authoritative checks passed.",
-                "WARNING means the artifact is readable but original source files were not supplied,",
-                "so the TUI will not claim full provenance.",
-                "ERROR or MISSING means the stage needs attention before relying on it.",
-                "The TUI is read-only. It cannot approve, execute, reopen, or mutate an incident.",
-                "All authority remains in the existing PAIC validators and governed commands.",
-                self._rule(),
-                "Press Enter to return.",
-            ]
-        )
+        paragraphs = [
+            "HEALTHY means the configured authoritative checks passed.",
+            "WARNING means the artifact is readable but original source files were not supplied, so the TUI will not claim full provenance.",
+            "ERROR or MISSING means the stage needs attention before relying on it.",
+            "The TUI is read-only. It cannot approve, execute, reopen, or mutate an incident.",
+            "All authority remains in the existing PAIC validators and governed commands.",
+        ]
+        rows = [
+            self._rule("═" if self.unicode else "="),
+            *[
+                f"{self.palette.bold}{line}{self.palette.reset}"
+                for line in self._wrap("How to read this screen")
+            ],
+            self._rule(),
+        ]
+        for paragraph in paragraphs:
+            rows.extend(self._wrap(paragraph))
+        rows.append(self._rule())
+        rows.extend(self._wrap("Press Enter to return."))
+        return "\n".join(rows)
 
 
 def strip_ansi(value: str) -> str:

@@ -47,7 +47,7 @@ It is also a reproducible technical case study for evaluating how probabilistic 
 
 ## Current capabilities
 
-The repository provides eleven completed governed capabilities. Phase 11 now adds the first read-only developer TUI unit for exhaustive validation and operational inspection.
+The repository provides eleven completed governed capabilities. Phase 11's read-only terminal control room and reliability gates are complete for exhaustive validation and operational inspection.
 
 ### Executable product and evaluation contracts
 
@@ -156,12 +156,14 @@ The standard reference build analyses 3,000 customers, identifies 103 incident-e
 - Real input/configuration ablations and deterministic paired bootstrap intervals
 - SQL, path, artifact, approval, token, remediation, and recovery adversarial boundaries
 
-### Read-only terminal control room (Phase 11 in progress)
+### Read-only terminal control room (Phase 11 complete)
 
 - Plain-language status across data, detection, impact, evidence, investigation, remediation, recovery, and evaluation
 - Existing validators and authoritative replay functions remain the only source of truth
 - Deterministic JSON snapshots for CI, regression fixtures, and support bundles
 - Safe workspace-relative paths, ASCII/no-color modes, EOF and interrupt handling
+- Responsive terminal rendering for resizing, narrow widths, long paths, and long unbroken content
+- Reliability coverage for repeated runs, corrupted artifacts, interruption handling, terminal resizing, non-interactive streams, long paths, Python 3.11, and Python 3.12
 - No approval, execution, rollback, recovery, shell, cloud, or secret authority
 
 ## Quick start
@@ -497,9 +499,10 @@ docs/                   Architecture, data, analytics, detection, impact, eviden
 
 The remaining delivery sequence is:
 
-1. complete the developer TUI, exhaustive lifecycle testing, endurance testing, and artifact-publication hardening;
-2. add Docker and production engineering, including observability, persistent services, identity, secrets, and deployment testing;
-3. build the public web product only after the TUI and containerized system meet their reliability gates.
+1. add Docker/containerization and production engineering in Phase 12, including observability, persistent services, identity, secrets, and deployment testing;
+2. build the public web product only after the TUI and containerized system meet their reliability gates.
+
+Phase 12 Docker work is not included in this release. The TUI remains read-only and adds no production, approval, remediation, recovery, shell, cloud, or secret authority.
 
 Progress and boundaries are tracked in [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md).
 

@@ -1,0 +1,21 @@
+name: paic
+
+services:
+  validate:
+    build:
+      context: .
+      args:
+        VCS_REF: ${PAIC_VCS_REF:-unknown}
+        VERSION: ${PAIC_VERSION:-0.12.0}
+    image: paic:${PAIC_IMAGE_TAG:-local}
+    command: ["validate", "--spec-dir", "/opt/paic/specs"]
+    user: "10001:10001"
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    restart: "no"

@@ -15,8 +15,8 @@ The roadmap is organised as capability milestones. Each milestone ends with work
 | Complete | Approval and governed remediation | Trusted approver attestations, exact human approval, reversible simulated actions, risk policy, short-lived tokens, canonical local state lineage, and tamper-evident receipts |
 | Complete | Recovery verification and reopening | Guardrail metrics, statistical recovery, regression detection, immutable local lifecycle, replay, and automatic reopening |
 | Complete | Expanded evaluation and adversarial testing | Hidden benchmark, calibration, source-bound replay, model comparisons, real ablations, regression tests, and security attacks |
-| In progress | Phase 11: TUI and exhaustive hardening | Read-only terminal control room, deterministic snapshots, lifecycle stress testing, failure injection, endurance, and shared artifact-publication hardening |
-| Planned | Phase 12: Docker and production engineering | Reproducible images, Compose-based integration, persistent services, identity, secrets, observability, backup, deployment, and container endurance testing |
+| Complete | Phase 11: TUI and exhaustive hardening | Read-only terminal control room, deterministic snapshots, lifecycle stress testing, failure injection, endurance, and shared artifact-publication hardening |
+| In progress | Phase 12: Docker and production engineering | Reproducible images, Compose-based integration, persistent services, identity, secrets, observability, backup, deployment, and container endurance testing |
 | Planned | Phase 13: Web product and portfolio | Public dashboard, hosted demonstration, accessibility, video, and technical article after reliability gates pass |
 
 ## Delivery rule
@@ -25,4 +25,6 @@ A capability is complete only when its public interface works, deterministic che
 
 ## Next capability
 
-The next implementation unit is Phase 11's read-only developer TUI and exhaustive hardening program. The public web product is explicitly deferred. The TUI must call the same governed domain layer and must never bypass source validation, tool policy, approval, token verification, canonical state stores, recovery authority, or evaluation authority.
+The active implementation unit is Phase 12.1: package the existing governed CLI as a reproducible, non-root image and exercise it through a one-shot Compose validation service under no-network, read-only runtime boundaries.
+
+Later Phase 12 units will add dependency locking, supply-chain evidence, persistent services, workload identity, secret delivery, observability, backup and restore, deployment testing, and container endurance certification. The public web product remains explicitly deferred. Containerization must not bypass source validation, tool policy, approval, token verification, canonical state stores, recovery authority, or evaluation authority.

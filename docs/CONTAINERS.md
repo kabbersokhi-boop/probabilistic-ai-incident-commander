@@ -14,7 +14,7 @@ docker build \
 
 The Dockerfile uses a multi-stage build. The builder creates a wheel and dependency wheels. The runtime stage installs only those wheels, bundles read-only reference `specs`, `configs`, and `schemas`, and runs as UID/GID `10001:10001`.
 
-The Python base is pinned to the Python 3.12.13 slim Bookworm release tag. Digest pinning, automated base refresh, dependency lockfiles, SBOM generation, provenance attestations, and signing remain later Phase 12 supply-chain units.
+The Python base is pinned to the multi-platform digest for Python 3.12.13 slim Bookworm. Automated base refresh, dependency lockfiles, SBOM generation, provenance attestations, and signing remain later Phase 12 supply-chain units.
 
 ## Hardened validation
 
@@ -72,7 +72,7 @@ These controls reduce the container runtime boundary. They do not make the synth
 
 The following are explicitly outside this unit:
 
-- digest-pinned and automatically refreshed bases;
+- automated digest refresh and compatibility review;
 - locked and hashed Python dependencies;
 - SBOM, vulnerability policy, provenance, and image signing;
 - persistent services and durable storage;

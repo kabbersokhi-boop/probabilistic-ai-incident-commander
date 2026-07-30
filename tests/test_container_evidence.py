@@ -93,9 +93,7 @@ def test_bundle_omits_image_environment_from_derived_evidence(tmp_path: Path) ->
         output_dir=output,
     )
 
-    assert "SECRET_VALUE" not in (output / "container-evidence.json").read_text(
-        encoding="utf-8"
-    )
+    assert "SECRET_VALUE" not in (output / "container-evidence.json").read_text(encoding="utf-8")
     assert "SECRET_VALUE" not in (output / "sbom.cdx.json").read_text(encoding="utf-8")
 
 

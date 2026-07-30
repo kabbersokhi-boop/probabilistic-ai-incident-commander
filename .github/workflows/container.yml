@@ -64,3 +64,75 @@ jobs:
           PAIC_VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           PAIC_IMAGE_TAG: test
         run: docker compose run --rm validate
+      - name: Collect sanitized container inventories
+        run: |
+          rm -rf .artifacts/container-evidence-inputs .artifacts/container-evidence
+          mkdir -p .artifacts/container-evidence-inputs
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          image = json.loads(
+              subprocess.check_output(
+                  ["docker", "image", "inspect", "paic:test"], text=True
+              )
+          )[0]
+          config = image["Config"]
+          sanitized = {
+              "Id": image["Id"],
+              "RepoTags": image.get("RepoTags") or [],
+              "Config": {
+                  "User": config.get("User"),
+                  "Entrypoint": config.get("Entrypoint"),
+                  "Cmd": config.get("Cmd"),
+                  "Labels": config.get("Labels") or {},
+              },
+          }
+          Path(".artifacts/container-evidence-inputs/image-inspect.json").write_text(
+              json.dumps(sanitized, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
+            --entrypoint python \
+            paic:test -m pip inspect --local \
+            > .artifacts/container-evidence-inputs/python-packages.json
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
+            --entrypoint dpkg-query \
+            paic:test -W '-f=${Package}\t${Version}\t${Architecture}\n' \
+            > .artifacts/container-evidence-inputs/debian-packages.tsv
+      - name: Build and validate deterministic container evidence
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          image_id="$(docker image inspect paic:test --format '{{.Id}}')"
+          PYTHONPATH=src python -m paic.container_evidence build \
+            --image-inspect .artifacts/container-evidence-inputs/image-inspect.json \
+            --pip-inspect .artifacts/container-evidence-inputs/python-packages.json \
+            --debian-packages .artifacts/container-evidence-inputs/debian-packages.tsv \
+            --output-dir .artifacts/container-evidence
+          PYTHONPATH=src python -m paic.container_evidence validate \
+            --bundle-dir .artifacts/container-evidence \
+            --expected-revision "$EXPECTED_COMMIT" \
+            --expected-image-id "$image_id"
+          test -s .artifacts/container-evidence/container-evidence.json
+          test -s .artifacts/container-evidence/sbom.cdx.json
+          test -s .artifacts/container-evidence/SHA256SUMS
+      - name: Upload container evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: paic-container-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/container-evidence
+          if-no-files-found: error
+          retention-days: 14

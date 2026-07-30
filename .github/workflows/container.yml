@@ -1,0 +1,66 @@
+name: container
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+      - name: Build image
+        env:
+          VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          docker build \
+            --build-arg VCS_REF="$VCS_REF" \
+            --build-arg VERSION=0.12.0 \
+            --tag paic:test \
+            .
+      - name: Verify image configuration
+        run: |
+          test "$(docker image inspect paic:test --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker image inspect paic:test --format '{{json .Config.Entrypoint}}')" = '["paic"]'
+          test "$(docker image inspect paic:test --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Validate bundled contracts without network or root filesystem writes
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
+            paic:test validate --spec-dir /opt/paic/specs
+      - name: Render bundled summary without credentials
+        run: |
+          output="$(docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
+            paic:test)"
+          test -n "$output"
+          printf '%s\n' "$output"
+      - name: Validate Compose model
+        env:
+          PAIC_VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          PAIC_IMAGE_TAG: test
+        run: docker compose config --quiet
+      - name: Run hardened Compose validation service
+        env:
+          PAIC_VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          PAIC_IMAGE_TAG: test
+        run: docker compose run --rm validate

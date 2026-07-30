@@ -1,0 +1,14 @@
+**
+!.dockerignore
+!Dockerfile
+!pyproject.toml
+!README.md
+!LICENSE
+!src/
+!src/**
+!specs/
+!specs/**
+!configs/
+!configs/**
+!schemas/
+!schemas/**

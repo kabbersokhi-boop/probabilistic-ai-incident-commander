@@ -89,14 +89,10 @@ def _require_string(value: object, *, context: str) -> str:
     return value
 
 
-def _reject_unknown_keys(
-    value: dict[str, Any], allowed: frozenset[str], *, context: str
-) -> None:
+def _reject_unknown_keys(value: dict[str, Any], allowed: frozenset[str], *, context: str) -> None:
     unexpected = sorted(set(value) - allowed)
     if unexpected:
-        raise EvidenceError(
-            f"{context} is not sanitized; unexpected keys: {', '.join(unexpected)}"
-        )
+        raise EvidenceError(f"{context} is not sanitized; unexpected keys: {', '.join(unexpected)}")
 
 
 def _canonical_python_name(value: str) -> str:
@@ -132,9 +128,7 @@ def _image_metadata(path: Path) -> dict[str, Any]:
 
     entrypoint = config.get("Entrypoint")
     cmd = config.get("Cmd")
-    if not isinstance(entrypoint, list) or not all(
-        isinstance(item, str) for item in entrypoint
-    ):
+    if not isinstance(entrypoint, list) or not all(isinstance(item, str) for item in entrypoint):
         raise EvidenceError("image Entrypoint must be a string list")
     if not isinstance(cmd, list) or not all(isinstance(item, str) for item in cmd):
         raise EvidenceError("image Cmd must be a string list")
@@ -165,9 +159,7 @@ def _python_components(path: Path) -> list[dict[str, Any]]:
             package.get("metadata"), context=f"pip package {index} metadata"
         )
         name = _require_string(metadata.get("name"), context=f"pip package {index} name")
-        version = _require_string(
-            metadata.get("version"), context=f"pip package {index} version"
-        )
+        version = _require_string(metadata.get("version"), context=f"pip package {index} version")
         canonical_name = _canonical_python_name(name)
         purl = f"pkg:pypi/{quote(canonical_name, safe='')}@{quote(version, safe='')}"
         components.append(
@@ -188,9 +180,7 @@ def _debian_components(path: Path) -> list[dict[str, Any]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError) as exc:
-        raise EvidenceError(
-            f"cannot read Debian package inventory from {path}: {exc}"
-        ) from exc
+        raise EvidenceError(f"cannot read Debian package inventory from {path}: {exc}") from exc
 
     components: list[dict[str, Any]] = []
     for line_number, line in enumerate(lines, 1):
@@ -247,9 +237,7 @@ def _build_sbom(image: dict[str, Any], components: list[dict[str, Any]]) -> dict
         "version": 1,
         "metadata": {
             "tools": {
-                "components": [
-                    {"type": "application", "name": TOOL_NAME, "version": TOOL_VERSION}
-                ]
+                "components": [{"type": "application", "name": TOOL_NAME, "version": TOOL_VERSION}]
             },
             "component": {
                 "type": "container",

@@ -132,7 +132,7 @@ def test_bundle_is_deterministic_and_valid(tmp_path: Path) -> None:
     }
 
 
-def test_bundle_rejects_unsanitized_image_environment(tmp_path: Path) -> None:
+def test_bundle_omits_image_environment_from_derived_evidence(tmp_path: Path) -> None:
     image_path, pip_path, debian_path = _write_inputs(tmp_path)
     image = json.loads(image_path.read_text(encoding="utf-8"))
     image["Config"]["Env"] = ["SECRET_VALUE=must-not-appear"]
@@ -169,25 +169,19 @@ def test_validation_rejects_noncanonical_sbom_after_rehash(tmp_path: Path) -> No
     sbom_path = output / "sbom.cdx.json"
     sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
     sbom["metadata"]["component"]["version"] = "different"
-    sbom_path.write_text(
-        json.dumps(sbom, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    sbom_path.write_text(json.dumps(sbom, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _rehash_bundle(output)
 
     with pytest.raises(EvidenceError, match="SBOM does not match"):
         _validate(output)
 
 
-def test_validation_rejects_mismatched_breakdown_counts_after_rehash(
-    tmp_path: Path,
-) -> None:
+def test_validation_rejects_mismatched_breakdown_counts_after_rehash(tmp_path: Path) -> None:
     output = _build(tmp_path)
     manifest_path = output / "container-evidence.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["inventory"]["python_components"] = 0
-    manifest["inventory"]["debian_components"] = manifest["inventory"][
-        "total_components"
-    ]
+    manifest["inventory"]["debian_components"] = manifest["inventory"]["total_components"]
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

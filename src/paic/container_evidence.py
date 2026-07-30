@@ -85,7 +85,9 @@ def _image_metadata(path: Path) -> dict[str, Any]:
 
     return {
         "id": image_id,
-        "repository_tags": sorted(item for item in image.get("RepoTags", []) if isinstance(item, str)),
+        "repository_tags": sorted(
+            item for item in image.get("RepoTags", []) if isinstance(item, str)
+        ),
         "user": _require_string(config.get("User"), context="image user"),
         "entrypoint": entrypoint,
         "cmd": cmd,
@@ -105,7 +107,9 @@ def _python_components(path: Path) -> list[dict[str, Any]]:
     components: list[dict[str, Any]] = []
     for index, item in enumerate(installed):
         package = _require_mapping(item, context=f"pip package {index}")
-        metadata = _require_mapping(package.get("metadata"), context=f"pip package {index} metadata")
+        metadata = _require_mapping(
+            package.get("metadata"), context=f"pip package {index} metadata"
+        )
         name = _require_string(metadata.get("name"), context=f"pip package {index} name")
         version = _require_string(metadata.get("version"), context=f"pip package {index} version")
         canonical_name = _canonical_python_name(name)
@@ -184,9 +188,7 @@ def _build_sbom(image: dict[str, Any], components: list[dict[str, Any]]) -> dict
         "version": 1,
         "metadata": {
             "tools": {
-                "components": [
-                    {"type": "application", "name": TOOL_NAME, "version": TOOL_VERSION}
-                ]
+                "components": [{"type": "application", "name": TOOL_NAME, "version": TOOL_VERSION}]
             },
             "component": {
                 "type": "container",
@@ -352,7 +354,9 @@ def validate_bundle(
     if not isinstance(components, list) or len(components) != inventory.get("total_components"):
         raise EvidenceError("SBOM component count does not match the evidence manifest")
     references = [item.get("bom-ref") for item in components if isinstance(item, dict)]
-    if len(references) != len(set(references)) or any(not isinstance(item, str) for item in references):
+    if len(references) != len(set(references)) or any(
+        not isinstance(item, str) for item in references
+    ):
         raise EvidenceError("SBOM component references must be unique strings")
 
     _validate_checksums(bundle_dir)

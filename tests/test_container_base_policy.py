@@ -64,9 +64,7 @@ def test_valid_policy_is_deterministic(tmp_path: Path) -> None:
 def test_rejects_missing_or_incomplete_digest(tmp_path: Path, image: str) -> None:
     dockerfile, policy = _write(
         tmp_path,
-        f"FROM {image} AS python-base\n"
-        "FROM python-base AS builder\n"
-        "FROM python-base AS runtime\n",
+        f"FROM {image} AS python-base\nFROM python-base AS builder\nFROM python-base AS runtime\n",
     )
     with pytest.raises(BasePolicyError):
         validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)

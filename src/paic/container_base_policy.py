@@ -56,9 +56,7 @@ def _read_policy(path: Path) -> dict[str, Any]:
     unexpected = sorted(set(value) - allowed)
     missing = sorted(allowed - set(value))
     if unexpected or missing:
-        raise BasePolicyError(
-            f"policy keys mismatch: missing={missing}, unexpected={unexpected}"
-        )
+        raise BasePolicyError(f"policy keys mismatch: missing={missing}, unexpected={unexpected}")
     if value["schema_version"] != 1:
         raise BasePolicyError("policy schema_version must be 1")
     for key in (
@@ -127,7 +125,9 @@ def validate_base_policy(*, dockerfile_path: Path, policy_path: Path) -> dict[st
         raise BasePolicyError("external base image must be digest-pinned")
     image_ref, digest = external_image.rsplit("@", 1)
     if DIGEST_RE.fullmatch(digest) is None:
-        raise BasePolicyError("external base digest must be lowercase sha256 with 64 hex characters")
+        raise BasePolicyError(
+            "external base digest must be lowercase sha256 with 64 hex characters"
+        )
 
     expected_prefix = f"{policy['registry']}/{policy['repository']}:"
     if not image_ref.startswith(expected_prefix):
@@ -158,10 +158,7 @@ def validate_base_policy(*, dockerfile_path: Path, policy_path: Path) -> dict[st
         },
         "stage_graph": [
             {"stage": expected_external_stage, "source": external_image},
-            *[
-                {"stage": stage, "source": expected_external_stage}
-                for stage in expected_internal
-            ],
+            *[{"stage": stage, "source": expected_external_stage} for stage in expected_internal],
         ],
     }
 

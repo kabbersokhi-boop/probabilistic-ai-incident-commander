@@ -1,0 +1,12 @@
+{
+  "external_stage": "python-base",
+  "internal_stages": [
+    "builder",
+    "runtime"
+  ],
+  "python_series": "3.12.13",
+  "registry": "docker.io",
+  "repository": "library/python",
+  "schema_version": 1,
+  "variant": "slim-bookworm"
+}

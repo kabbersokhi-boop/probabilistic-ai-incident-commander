@@ -14,7 +14,7 @@ docker build \
 
 The Dockerfile uses a multi-stage build. The builder creates a wheel and dependency wheels. The runtime stage installs only those wheels, bundles read-only reference `specs`, `configs`, and `schemas`, and runs as UID/GID `10001:10001`.
 
-The Python base is pinned to the multi-platform digest for Python 3.12.13 slim Bookworm. Automated base refresh, dependency lockfiles, SBOM generation, provenance attestations, and signing remain later Phase 12 supply-chain units.
+The Python base is pinned to the multi-platform digest for Python 3.12.13 slim Bookworm. Automated base refresh, dependency lockfiles, vulnerability policy, provenance attestations, and signing remain later Phase 12 supply-chain units.
 
 ## Hardened validation
 
@@ -54,6 +54,44 @@ PAIC_VCS_REF="$(git rev-parse HEAD)" docker compose run --rm validate
 
 The Compose service uses `pull_policy: never`, so the run must use the locally built image rather than contacting a registry. It has no ports, networks, persistent volumes, or restart loop and exits after validating the bundled contracts.
 
+## Container evidence
+
+The exact-head container workflow collects three sanitized inputs after the hardened runtime and Compose checks pass:
+
+- `image-inspect.json`: image ID, repository tags, configured user, entrypoint, command, and OCI labels only;
+- `python-packages.json`: the installed Python package inventory from `pip inspect --local`;
+- `debian-packages.tsv`: package, version, and architecture from `dpkg-query`.
+
+It then runs the dependency-free evidence builder:
+
+```bash
+PYTHONPATH=src python -m paic.container_evidence build \
+  --image-inspect .artifacts/container-evidence-inputs/image-inspect.json \
+  --pip-inspect .artifacts/container-evidence-inputs/python-packages.json \
+  --debian-packages .artifacts/container-evidence-inputs/debian-packages.tsv \
+  --output-dir .artifacts/container-evidence
+```
+
+The generated bundle contains:
+
+- `container-evidence.json`, which binds the image SHA-256 ID, OCI revision, version, source, configured command, and intended hardened runtime boundary;
+- `sbom.cdx.json`, a deterministic CycloneDX 1.6 inventory of installed Python and Debian packages;
+- the three sanitized source inventories;
+- `SHA256SUMS`, covering every other file in the bundle.
+
+Validate the bundle against an expected commit and image:
+
+```bash
+PYTHONPATH=src python -m paic.container_evidence validate \
+  --bundle-dir .artifacts/container-evidence \
+  --expected-revision "$(git rev-parse HEAD)" \
+  --expected-image-id "$(docker image inspect paic:local --format '{{.Id}}')"
+```
+
+Identical input bytes produce identical bundle bytes. Validation rejects a wrong commit, wrong image ID, missing files, malformed package rows, duplicate package references, mismatched component counts, or any changed file hash.
+
+The sanitized inspection record deliberately excludes image environment variables and layer history. The derived manifest and SBOM do not copy runner environment variables, image environment variables, provider keys, approval keys, cloud credentials, or registry credentials. The CI artifact is retained for 14 days and is evidence for review, not a signed provenance statement.
+
 ## Security boundary
 
 The baseline enforces:
@@ -64,17 +102,19 @@ The baseline enforces:
 - a bounded writable `/tmp` tmpfs;
 - all Linux capabilities dropped;
 - `no-new-privileges`;
-- credential-free deterministic validation.
+- credential-free deterministic validation;
+- exact-image and exact-commit evidence binding.
 
-These controls reduce the container runtime boundary. They do not make the synthetic reference implementation a production incident-management service and do not grant approval, remediation, recovery, shell, cloud, or secret authority.
+These controls reduce the container runtime and review boundaries. They do not make the synthetic reference implementation a production incident-management service and do not grant approval, remediation, recovery, shell, cloud, registry, or secret authority.
 
 ## Remaining Phase 12 work
 
-The following are explicitly outside this unit:
+The following are explicitly outside the current unit:
 
 - automated digest refresh and compatibility review;
 - locked and hashed Python dependencies;
-- SBOM, vulnerability policy, provenance, and image signing;
+- vulnerability policy and exception handling;
+- provenance attestations and image signing;
 - persistent services and durable storage;
 - workload identity and secret delivery;
 - metrics, logs, traces, and alerting;

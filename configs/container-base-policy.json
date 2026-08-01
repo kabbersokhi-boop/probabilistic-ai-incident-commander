@@ -4,7 +4,7 @@
     "builder",
     "runtime"
   ],
-  "python_series": "3.12.13",
+  "python_series": "3.12",
   "registry": "docker.io",
   "repository": "library/python",
   "schema_version": 1,

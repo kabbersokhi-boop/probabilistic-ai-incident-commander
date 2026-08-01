@@ -15,7 +15,7 @@ def _policy() -> dict[str, object]:
         "schema_version": 1,
         "registry": "docker.io",
         "repository": "library/python",
-        "python_series": "3.12.13",
+        "python_series": "3.12",
         "variant": "slim-bookworm",
         "external_stage": "python-base",
         "internal_stages": ["builder", "runtime"],
@@ -45,41 +45,57 @@ def _write(
     return dockerfile_path, policy_path
 
 
+def _assert_rejected(tmp_path: Path, dockerfile_text: str) -> None:
+    dockerfile, policy = _write(tmp_path, dockerfile_text)
+    with pytest.raises(BasePolicyError):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+
+
 def test_valid_policy_is_deterministic(tmp_path: Path) -> None:
     dockerfile, policy = _write(tmp_path)
     first = validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
     second = validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
     assert first == second
     assert first["base"]["digest"] == DIGEST
+    assert first["base"]["python_version"] == "3.12.13"
+    assert first["policy"]["python_series"] == "3.12"
 
 
-@pytest.mark.parametrize(
-    "image",
-    [
-        "docker.io/library/python:3.12.13-slim-bookworm",
-        "docker.io/library/python:3.12.13-slim-bookworm@sha256:abc",
-        "docker.io/library/python:3.12.13-slim-bookworm@sha256:" + "A" * 64,
-    ],
-)
-def test_rejects_missing_or_incomplete_digest(tmp_path: Path, image: str) -> None:
+def test_accepts_reviewed_patch_refresh_within_series(tmp_path: Path) -> None:
     dockerfile, policy = _write(
         tmp_path,
-        f"FROM {image} AS python-base\nFROM python-base AS builder\nFROM python-base AS runtime\n",
-    )
-    with pytest.raises(BasePolicyError):
-        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
-
-
-@pytest.mark.parametrize("tag", ["3.13.0-slim-bookworm", "3.12.13-slim-trixie"])
-def test_rejects_wrong_series_or_variant(tmp_path: Path, tag: str) -> None:
-    dockerfile, policy = _write(
-        tmp_path,
-        f"FROM docker.io/library/python:{tag}@{DIGEST} AS python-base\n"
+        f"FROM docker.io/library/python:3.12.14-slim-bookworm@{DIGEST} AS python-base\n"
         "FROM python-base AS builder\n"
         "FROM python-base AS runtime\n",
     )
-    with pytest.raises(BasePolicyError):
-        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+    evidence = validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+    assert evidence["base"]["python_version"] == "3.12.14"
+
+
+def test_rejects_missing_or_incomplete_digest(tmp_path: Path) -> None:
+    images = (
+        "docker.io/library/python:3.12.13-slim-bookworm",
+        "docker.io/library/python:3.12.13-slim-bookworm@sha256:abc",
+        "docker.io/library/python:3.12.13-slim-bookworm@sha256:" + "A" * 64,
+    )
+    for image in images:
+        _assert_rejected(
+            tmp_path,
+            f"FROM {image} AS python-base\n"
+            "FROM python-base AS builder\n"
+            "FROM python-base AS runtime\n",
+        )
+
+
+def test_rejects_wrong_series_or_variant(tmp_path: Path) -> None:
+    tags = ("3.13.0-slim-bookworm", "3.12.13-slim-trixie", "3.12-slim-bookworm")
+    for tag in tags:
+        _assert_rejected(
+            tmp_path,
+            f"FROM docker.io/library/python:{tag}@{DIGEST} AS python-base\n"
+            "FROM python-base AS builder\n"
+            "FROM python-base AS runtime\n",
+        )
 
 
 def test_rejects_build_argument_indirection(tmp_path: Path) -> None:
@@ -90,20 +106,27 @@ def test_rejects_build_argument_indirection(tmp_path: Path) -> None:
         "FROM python-base AS builder\n"
         "FROM python-base AS runtime\n",
     )
-    with pytest.raises(BasePolicyError, match="indirection"):
+    with pytest.raises(BasePolicyError, match="direct"):
         validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
 
 
 def test_rejects_unexpected_stage_graph(tmp_path: Path) -> None:
-    dockerfile, policy = _write(
+    _assert_rejected(
         tmp_path,
         f"FROM docker.io/library/python:3.12.13-slim-bookworm@{DIGEST} AS python-base\n"
         "FROM python-base AS builder\n"
         "FROM alpine:3 AS helper\n"
         "FROM python-base AS runtime\n",
     )
-    with pytest.raises(BasePolicyError):
-        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+
+
+def test_rejects_duplicate_stage_names(tmp_path: Path) -> None:
+    _assert_rejected(
+        tmp_path,
+        f"FROM docker.io/library/python:3.12.13-slim-bookworm@{DIGEST} AS python-base\n"
+        "FROM python-base AS builder\n"
+        "FROM python-base AS builder\n",
+    )
 
 
 def test_rejects_overbroad_policy(tmp_path: Path) -> None:
@@ -112,3 +135,29 @@ def test_rejects_overbroad_policy(tmp_path: Path) -> None:
     dockerfile, policy_path = _write(tmp_path, policy=policy)
     with pytest.raises(BasePolicyError, match="keys mismatch"):
         validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+
+def test_rejects_malformed_policy_values(tmp_path: Path) -> None:
+    for key, value in (
+        ("python_series", "3.12.13"),
+        ("variant", "slim bookworm"),
+        ("repository", "Library/Python"),
+        ("external_stage", "python base"),
+    ):
+        policy = _policy()
+        policy[key] = value
+        dockerfile, policy_path = _write(tmp_path, policy=policy)
+        with pytest.raises(BasePolicyError, match=f"policy {key}"):
+            validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+
+def test_rejects_non_regular_inputs(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(_policy()), encoding="utf-8")
+    dockerfile_directory = tmp_path / "Dockerfile"
+    dockerfile_directory.mkdir()
+    with pytest.raises(BasePolicyError, match="regular file"):
+        validate_base_policy(
+            dockerfile_path=dockerfile_directory,
+            policy_path=policy_path,
+        )

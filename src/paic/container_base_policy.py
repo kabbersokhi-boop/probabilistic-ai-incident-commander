@@ -13,6 +13,11 @@ FROM_RE = re.compile(
     r"^FROM\s+(?P<image>\S+)(?:\s+AS\s+(?P<stage>[A-Za-z0-9._-]+))?\s*$",
     re.IGNORECASE,
 )
+REGISTRY_RE = re.compile(r"[a-z0-9][a-z0-9.-]*(?::[0-9]+)?")
+REPOSITORY_RE = re.compile(r"[a-z0-9]+(?:[._/-][a-z0-9]+)*")
+PYTHON_SERIES_RE = re.compile(r"[0-9]+\.[0-9]+")
+VARIANT_RE = re.compile(r"[a-z0-9]+(?:[._-][a-z0-9]+)*")
+STAGE_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
 class BasePolicyError(ValueError):
@@ -36,6 +41,17 @@ def _read_text(path: Path, *, context: str) -> str:
         raise BasePolicyError(f"cannot read {context} {path}: {exc}") from exc
 
 
+def _require_policy_string(
+    policy: dict[str, Any],
+    key: str,
+    pattern: re.Pattern[str],
+) -> str:
+    value = policy[key]
+    if not isinstance(value, str) or pattern.fullmatch(value) is None:
+        raise BasePolicyError(f"policy {key} has an invalid value")
+    return value
+
+
 def _read_policy(path: Path) -> dict[str, Any]:
     text = _read_text(path, context="policy")
     try:
@@ -44,6 +60,7 @@ def _read_policy(path: Path) -> dict[str, Any]:
         raise BasePolicyError(f"invalid policy JSON: {exc}") from exc
     if not isinstance(value, dict):
         raise BasePolicyError("policy must be a JSON object")
+    policy = cast(dict[str, Any], value)
     allowed = {
         "schema_version",
         "registry",
@@ -53,32 +70,30 @@ def _read_policy(path: Path) -> dict[str, Any]:
         "external_stage",
         "internal_stages",
     }
-    unexpected = sorted(set(value) - allowed)
-    missing = sorted(allowed - set(value))
+    unexpected = sorted(set(policy) - allowed)
+    missing = sorted(allowed - set(policy))
     if unexpected or missing:
         raise BasePolicyError(f"policy keys mismatch: missing={missing}, unexpected={unexpected}")
-    if value["schema_version"] != 1:
+    if policy["schema_version"] != 1:
         raise BasePolicyError("policy schema_version must be 1")
-    for key in (
-        "registry",
-        "repository",
-        "python_series",
-        "variant",
-        "external_stage",
-    ):
-        if not isinstance(value[key], str) or not value[key]:
-            raise BasePolicyError(f"policy {key} must be a non-empty string")
-    stages = value["internal_stages"]
+
+    _require_policy_string(policy, "registry", REGISTRY_RE)
+    _require_policy_string(policy, "repository", REPOSITORY_RE)
+    _require_policy_string(policy, "python_series", PYTHON_SERIES_RE)
+    _require_policy_string(policy, "variant", VARIANT_RE)
+    external_stage = _require_policy_string(policy, "external_stage", STAGE_RE)
+
+    stages = policy["internal_stages"]
     if (
         not isinstance(stages, list)
         or not stages
-        or any(not isinstance(item, str) or not item for item in stages)
+        or any(not isinstance(item, str) or STAGE_RE.fullmatch(item) is None for item in stages)
         or len(set(stages)) != len(stages)
     ):
-        raise BasePolicyError("policy internal_stages must be unique non-empty strings")
-    if value["external_stage"] in stages:
+        raise BasePolicyError("policy internal_stages must be unique valid stage names")
+    if external_stage in stages:
         raise BasePolicyError("external_stage must not appear in internal_stages")
-    return cast(dict[str, Any], value)
+    return policy
 
 
 def _from_instructions(dockerfile: str) -> list[tuple[str, str | None]]:
@@ -99,8 +114,6 @@ def _from_instructions(dockerfile: str) -> list[tuple[str, str | None]]:
 
 def validate_base_policy(*, dockerfile_path: Path, policy_path: Path) -> dict[str, Any]:
     dockerfile = _read_text(dockerfile_path, context="Dockerfile")
-    if re.search(r"^\s*ARG\s+[^\n]*IMAGE", dockerfile, flags=re.MULTILINE | re.IGNORECASE):
-        raise BasePolicyError("external base image must not use build-argument indirection")
     policy = _read_policy(policy_path)
     instructions = _from_instructions(dockerfile)
 
@@ -129,18 +142,28 @@ def validate_base_policy(*, dockerfile_path: Path, policy_path: Path) -> dict[st
             "external base digest must be lowercase sha256 with 64 hex characters"
         )
 
-    expected_prefix = f"{policy['registry']}/{policy['repository']}:"
+    registry = cast(str, policy["registry"])
+    repository = cast(str, policy["repository"])
+    python_series = cast(str, policy["python_series"])
+    variant = cast(str, policy["variant"])
+    expected_prefix = f"{registry}/{repository}:"
     if not image_ref.startswith(expected_prefix):
         raise BasePolicyError(f"external base image must start with {expected_prefix}")
     tag = image_ref[len(expected_prefix) :]
-    expected_tag = f"{policy['python_series']}-{policy['variant']}"
-    if tag != expected_tag:
-        raise BasePolicyError(f"external base tag must be exactly {expected_tag}")
+    tag_pattern = re.compile(
+        rf"(?P<version>{re.escape(python_series)}\.(?:0|[1-9][0-9]*))-{re.escape(variant)}"
+    )
+    tag_match = tag_pattern.fullmatch(tag)
+    if tag_match is None:
+        raise BasePolicyError(
+            f"external base tag must stay in Python {python_series} and variant {variant}"
+        )
 
     for (image, stage), expected_stage in zip(instructions[1:], expected_internal, strict=True):
         if image != expected_external_stage or stage != expected_stage:
             raise BasePolicyError(
-                f"internal stage {expected_stage} must derive directly from {expected_external_stage}"
+                f"internal stage {expected_stage} must derive directly "
+                f"from {expected_external_stage}"
             )
 
     return {
@@ -148,12 +171,16 @@ def validate_base_policy(*, dockerfile_path: Path, policy_path: Path) -> dict[st
         "base": {
             "image": image_ref,
             "tag": tag,
+            "python_version": tag_match.group("version"),
             "digest": digest,
             "external_stage": expected_external_stage,
         },
         "policy": {
-            "python_series": policy["python_series"],
-            "variant": policy["variant"],
+            "registry": registry,
+            "repository": repository,
+            "python_series": python_series,
+            "variant": variant,
+            "external_stage": expected_external_stage,
             "internal_stages": expected_internal,
         },
         "stage_graph": [

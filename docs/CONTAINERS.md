@@ -12,9 +12,32 @@ docker build \
   .
 ```
 
-The Dockerfile uses a multi-stage build. The builder creates a wheel and dependency wheels. The runtime stage installs only those wheels, bundles read-only reference `specs`, `configs`, and `schemas`, and runs as UID/GID `10001:10001`.
+The Dockerfile uses one direct, digest-pinned external base stage and derives the builder and runtime stages from it. The builder creates a wheel and dependency wheels. The runtime stage installs only those wheels, bundles read-only reference `specs`, `configs`, and `schemas`, and runs as UID/GID `10001:10001`.
 
-The Python base is pinned to the multi-platform digest for Python 3.12.13 slim Bookworm. Automated base refresh, dependency lockfiles, vulnerability policy, provenance attestations, and signing remain later Phase 12 supply-chain units.
+The approved base policy allows Python 3.12 patch releases on slim Bookworm only. The concrete image remains pinned to a complete lowercase SHA-256 digest. Major or minor Python movement, Debian variant movement, mutable tags, external helper images, and base-image build-argument indirection are rejected.
+
+## Base refresh policy
+
+Validate the Dockerfile before building:
+
+```bash
+PYTHONPATH=src python -m paic.container_base_policy \
+  --dockerfile Dockerfile \
+  --policy configs/container-base-policy.json \
+  --output .artifacts/container-base/container-base-evidence.json
+```
+
+The validator is dependency-free and checks that:
+
+- there is exactly one external image and every `FROM` instruction names a unique stage;
+- the external image is a direct `docker.io/library/python` reference with a complete digest;
+- the tag remains in the approved Python 3.12 series and `slim-bookworm` variant;
+- the `builder` and `runtime` stages derive directly from the approved `python-base` stage;
+- the JSON policy has only the expected keys and strict value formats.
+
+The output is deterministic JSON containing the approved registry, repository, series, variant, exact image tag, parsed Python patch version, digest, and stage graph. Exact-head container CI validates this policy before the image build and retains the evidence for 14 days.
+
+Dependabot checks the root Dockerfile weekly, limits concurrent Docker update pull requests to two, and ignores Python major and minor version updates. Patch and digest changes remain reviewable pull requests. No auto-merge, registry push, broader workflow permission, or deployment authority is added.
 
 ## Hardened validation
 
@@ -103,7 +126,8 @@ The baseline enforces:
 - all Linux capabilities dropped;
 - `no-new-privileges`;
 - credential-free deterministic validation;
-- exact-image and exact-commit evidence binding.
+- exact-image and exact-commit evidence binding;
+- exact base-digest and compatibility-policy validation before build.
 
 These controls reduce the container runtime and review boundaries. They do not make the synthetic reference implementation a production incident-management service and do not grant approval, remediation, recovery, shell, cloud, registry, or secret authority.
 
@@ -111,7 +135,6 @@ These controls reduce the container runtime and review boundaries. They do not m
 
 The following are explicitly outside the current unit:
 
-- automated digest refresh and compatibility review;
 - locked and hashed Python dependencies;
 - vulnerability policy and exception handling;
 - provenance attestations and image signing;

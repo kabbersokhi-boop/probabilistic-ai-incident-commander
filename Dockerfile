@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-ARG PYTHON_IMAGE=python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b
+FROM docker.io/library/python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b AS python-base
 
-FROM ${PYTHON_IMAGE} AS builder
+FROM python-base AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -18,7 +18,7 @@ RUN python -m pip install --upgrade pip build \
     && python -m build --wheel --outdir /wheels \
     && python -m pip wheel --wheel-dir /wheels /wheels/probabilistic_ai_incident_commander-*.whl
 
-FROM ${PYTHON_IMAGE} AS runtime
+FROM python-base AS runtime
 
 ARG VCS_REF=unknown
 ARG VERSION=0.12.0

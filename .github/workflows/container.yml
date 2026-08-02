@@ -20,6 +20,21 @@ jobs:
         env:
           EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+      - name: Validate pinned Python base policy
+        run: |
+          rm -rf .artifacts/container-base
+          PYTHONPATH=src python -m paic.container_base_policy \
+            --dockerfile Dockerfile \
+            --policy configs/container-base-policy.json \
+            --output .artifacts/container-base/container-base-evidence.json
+          test -s .artifacts/container-base/container-base-evidence.json
+      - name: Upload Python base policy evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: paic-container-base-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/container-base
+          if-no-files-found: error
+          retention-days: 14
       - name: Build image
         env:
           VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}

@@ -75,4 +75,6 @@ Warnings intentionally return `0`: they describe incomplete provenance configura
 
 Phase 11 coverage is complete for repeated runs, corrupted artifacts, interruption handling, terminal resizing, non-interactive streams, long paths, Python 3.11, and Python 3.12. The TUI remains read-only: no production, approval, remediation, recovery, shell, cloud, or secret authority is added.
 
-Docker/containerization is the next Phase 12 unit and is not included here. The public web product remains deferred until the TUI and containerized system have met their reliability gates.
+The TUI is now packaged in the Phase 12 hardened container boundary. The public web
+product remains intentionally deferred: it must consume the validated static
+web-readiness bundle and may not bypass the same reliability and authority gates.

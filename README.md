@@ -41,7 +41,7 @@ Completed production-engineering units include:
 - a direct digest-pinned Python base stage;
 - strict base-policy validation and bounded review-first Dependabot updates.
 
-The active unit is **Phase 12.4: deterministic, hash-verified Python dependency locking**. Remaining web-release work includes vulnerability policy, attestations and signing, hosted read models, workload identity, observability, backup and restore, deployment and rollback testing, endurance certification, a read-only API, an accessible dashboard, and public release evidence.
+Phase 12.4 adds deterministic hash-verified locks, vulnerability policy, a versioned static web-readiness bundle, integrity-checked backup/restore, and release gates. The only major product work left is the final accessible public web interface and its verified static hosting. This repository does not claim a hosted URL, live signing evidence, or a runtime API.
 
 See:
 
@@ -87,8 +87,8 @@ See:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install --require-hashes -r requirements-dev.lock
+python -m pip install --no-deps --no-build-isolation -e .
 ```
 
 ### Validate the project
@@ -160,9 +160,11 @@ python -m ruff format --check .
 python -m ruff check .
 python -m mypy src tests
 python -m pytest --cov=paic --cov-report=term-missing
+make locks-validate locks-freshness
+make web-bundle web-validate web-backup-restore
 ```
 
-CI also runs exact-head container validation, deterministic evidence generation, adversarial checks, package builds, and authoritative soak certification across Python 3.11 and 3.12.
+CI also runs exact-head container validation, deterministic evidence generation, vulnerability and public-artifact policy, adversarial checks, package builds, backup/restore, and authoritative soak certification across Python 3.11 and 3.12.
 
 ## Architecture
 
@@ -205,6 +207,8 @@ The hosted product will be a **read-only presentation and demonstration layer** 
 - deterministic demo data requiring no provider credentials.
 
 The browser will not receive production credentials, unrestricted SQL, shell access, approval authority, remediation authority, recovery authority, or evaluator authority.
+
+The contract is documented in [`docs/WEB_READINESS_CONTRACT.md`](docs/WEB_READINESS_CONTRACT.md), with handoff details in [`docs/HANDOFF_WEB_PRODUCT.md`](docs/HANDOFF_WEB_PRODUCT.md). The bundle is generated from `configs/tui/smoke.yaml` and validated before it is suitable for hosting.
 
 ## Evaluation results
 

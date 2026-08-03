@@ -100,4 +100,6 @@ qualifying degraded evaluations count toward consecutive reopening.
 - Observation producers remain part of the trusted data boundary.
 - Exactly-once lifecycle updates are scoped to one local filesystem store and its locking semantics.
 - TOST and robust trend checks are evidence for synthetic recovery evaluation, not proof of production causality.
-- Docker, hosted services, production identity, distributed coordination, and alert delivery remain later milestones.
+- Hosted services, production identity, distributed coordination, and alert delivery
+  remain later milestones. The existing hardened container does not change the
+  local-only recovery authority boundary.

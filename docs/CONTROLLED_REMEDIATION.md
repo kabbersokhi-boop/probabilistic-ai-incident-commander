@@ -155,4 +155,6 @@ rm -f .artifacts/remediation-approval.token
 - The local approver registry and per-identity environment keys are the reference trust boundary, not SSO-backed identity or managed keys.
 - HMAC secrets are process-environment inputs, not managed-key-service keys.
 - Recovery is not inferred from action completion. The separate recovery capability performs statistical verification and automatic reopening.
-- Docker and cloud deployment remain later capability milestones and must not be pulled into this implementation.
+- The hardened CLI container is available, but cloud deployment and any production
+  remediation integration remain out of scope. The implementation continues to
+  simulate only validated local control-state transitions.

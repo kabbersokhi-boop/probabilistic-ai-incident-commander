@@ -1,0 +1,83 @@
+name: Phase 12 exact-head readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase12-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    name: exact-head readiness (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      POLARS_MAX_THREADS: "4"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out commit
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - uses: astral-sh/setup-uv@v6
+      - name: Install from committed lock
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: Validate lock hashes and freshness
+        run: make locks-validate locks-freshness
+      - name: Validate policy and schemas
+        run: |
+          python -m paic validate --spec-dir specs
+          python scripts/export_web_schema.py --output schemas/web-readiness-bundle.schema.json
+          git diff --exit-code -- schemas/web-readiness-bundle.schema.json
+          python scripts/validate_vulnerability_policy.py \
+            --policy configs/vulnerability-policy.json \
+            --exceptions configs/vulnerability-exceptions.json \
+            configs/empty-vulnerability-report.json
+      - name: Quality and tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m ruff format --check .
+          python -m ruff check .
+          python -m mypy src tests
+          python -m pytest -q -p pytest_cov.plugin --cov=paic --cov-report=term-missing
+      - name: Build and validate public bundle
+        run: |
+          make web-bundle web-validate
+          python scripts/scan_repository_secrets.py
+      - name: Backup and restore public bundle
+        if: matrix.python-version == '3.12'
+        run: make web-backup-restore
+      - name: Build package
+        if: matrix.python-version == '3.11'
+        run: python -m build --no-isolation
+      - name: Upload web readiness evidence
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-readiness-${{ github.sha }}
+          path: .artifacts/web-bundle
+          if-no-files-found: error
+          retention-days: 14

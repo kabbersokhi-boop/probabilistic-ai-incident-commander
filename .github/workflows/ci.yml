@@ -34,8 +34,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - uses: astral-sh/setup-uv@v6
       - name: Install
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: Validate dependency locks
+        run: |
+          python -m paic.dependency_lock requirements.lock requirements-dev.lock requirements-build.lock
+          uv lock --check
+          uv export --locked --format requirements-txt --no-dev --no-emit-project --output-file /tmp/requirements.lock
+          sed -i 's|--output-file /tmp/requirements.lock|--output-file requirements.lock|' /tmp/requirements.lock
+          diff -u requirements.lock /tmp/requirements.lock
+          uv export --locked --format requirements-txt --extra dev --all-groups --no-emit-project --output-file /tmp/requirements-dev.lock
+          sed -i 's|--output-file /tmp/requirements-dev.lock|--output-file requirements-dev.lock|' /tmp/requirements-dev.lock
+          diff -u requirements-dev.lock /tmp/requirements-dev.lock
+          uv export --locked --format requirements-txt --only-group build --output-file /tmp/requirements-build.lock
+          sed -i 's|--output-file /tmp/requirements-build.lock|--output-file requirements-build.lock|' /tmp/requirements-build.lock
+          diff -u requirements-build.lock /tmp/requirements-build.lock
       - name: Validate contracts
         run: python -m paic validate --spec-dir specs
       - name: Format check
@@ -52,6 +68,7 @@ jobs:
         run: |
           rm -rf schemas-generated
           python -m paic export-schemas --output-dir schemas-generated
+          python scripts/export_web_schema.py --output schemas-generated/web-readiness-bundle.schema.json
           diff -ru schemas schemas-generated
       - name: Generate, analyse, detect, and validate smoke dataset
         run: |

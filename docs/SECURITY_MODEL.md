@@ -2,6 +2,8 @@
 
 The machine-readable source is `specs/safety.yaml`.
 
+Public artifact boundary: `src/paic/web_readiness.py` exports only validated synthetic data into a closed-world static bundle. It excludes credentials, environment-like fields, evaluator answer keys, absolute/private paths, and mutable inputs. The future browser is a read-only presentation layer; it does not receive secrets, unrestricted SQL, filesystem paths, shell, cloud, deployment, approval, remediation, recovery, or evaluator authority.
+
 ## Current boundary
 
 The implemented system is a local synthetic reference environment. Dataset generation, analytics, detection, impact, evidence, tool execution, remediation, recovery, and evaluation are deterministic and credential-free. Optional live investigation providers read keys only from the process environment. Remediation mutates only validated simulated control-state artifacts and cannot access production infrastructure.
@@ -42,6 +44,8 @@ Tool output and retrieved text are untrusted data. Prompt-like instructions insi
 Provider free-form content and any reasoning trace are runtime-only. Investigation exports record only bounded operational metadata and a SHA-256 receipt for that content; they never serialize the prose itself.
 
 Thinking content is not persisted. The system records structured tool calls, bounded tool results, model route attempts, accepted proposals, deterministic probability outputs, and integrity hashes rather than hidden model reasoning.
+
+Dependency and release controls are fail-closed: committed locks require exact hashes, vulnerability exceptions are exact and expiring, bundle manifests bind bytes, and deployment is by validated immutable checksum. Attestation or signing is trusted only when the platform verifier confirms the source commit, image/bundle digest, workflow identity, repository, and ref.
 
 
 ## Governed remediation controls

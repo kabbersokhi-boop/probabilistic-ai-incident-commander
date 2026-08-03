@@ -7,6 +7,10 @@ deterministic evaluator code computes ranking, Brier, calibration, abstention,
 evidence, and safety results. Evaluation artifacts bind benchmark and answer-key
 digests and replay without a provider.
 
+## Public web boundary
+
+The current web foundation is a deterministic static export, not a service. `paic.web_readiness` first loads the TUI workspace and invokes its authoritative validators/replay, then emits a versioned closed-world JSON bundle with source/file hashes, a manifest, and checksums. The future browser consumes this artifact read-only. It cannot select arbitrary source paths, execute SQL, alter lifecycle state, approve actions, perform remediation, declare recovery, or access evaluator answer keys. A runtime API or database is not justified by the current requirements and must not be introduced without a new bounded contract and ADR.
+
 ## End-to-end control flow
 
 ```text

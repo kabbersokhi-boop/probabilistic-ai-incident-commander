@@ -131,16 +131,16 @@ The baseline enforces:
 
 These controls reduce the container runtime and review boundaries. They do not make the synthetic reference implementation a production incident-management service and do not grant approval, remediation, recovery, shell, cloud, registry, or secret authority.
 
-## Remaining Phase 12 work
+## Phase 12 boundary
 
-The following are explicitly outside the current unit:
+The repository now includes hash-verified dependency locks, fail-closed Python/OS/image
+vulnerability policy, deterministic public-bundle export and restore tooling, release
+integrity hooks, deployment and rollback policy, and documentation for identity,
+observability, and recovery. These controls are exercised by the exact-head workflows
+where the platform can provide the required tooling.
 
-- locked and hashed Python dependencies;
-- vulnerability policy and exception handling;
-- provenance attestations and image signing;
-- persistent services and durable storage;
-- workload identity and secret delivery;
-- metrics, logs, traces, and alerting;
-- backup and restore;
-- deployment manifests and rollout testing;
-- container interruption, restart, resource-pressure, and endurance certification.
+The container remains a one-shot governed CLI image. It does not add a daemon, public
+endpoint, database, cloud integration, secret store, or new operational authority.
+Provenance attestations, keyless signing, and target-environment deployment evidence
+must be independently verified for each actual release; configuration alone is not
+treated as release evidence.

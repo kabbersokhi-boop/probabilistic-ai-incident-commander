@@ -1,4 +1,4 @@
-.PHONY: install validate summary schemas schema-check simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate phase11-authoritative-soak test coverage lint format format-check typecheck check verify clean
+.PHONY: install locks-validate locks-freshness validate summary schemas schema-check web-bundle web-validate web-backup-restore simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate phase11-authoritative-soak test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -45,7 +45,23 @@ PHASE11_SOAK_ITERATIONS ?= 25
 PHASE11_SOAK_DURATION_SECONDS ?= inf
 
 install:
-	$(PYTHON) -m pip install -e ".[dev]"
+	$(PYTHON) -m pip install --require-hashes -r requirements-dev.lock
+	$(PYTHON) -m pip install --no-deps --no-build-isolation -e .
+
+locks-validate:
+	PYTHONPATH=src $(PYTHON) -m paic.dependency_lock requirements.lock requirements-dev.lock requirements-build.lock
+
+locks-freshness:
+	uv lock --check
+	uv export --locked --format requirements-txt --no-dev --no-emit-project --output-file /tmp/paic-requirements.lock
+	sed -i 's|--output-file /tmp/paic-requirements.lock|--output-file requirements.lock|' /tmp/paic-requirements.lock
+	diff -u requirements.lock /tmp/paic-requirements.lock
+	uv export --locked --format requirements-txt --extra dev --all-groups --no-emit-project --output-file /tmp/paic-requirements-dev.lock
+	sed -i 's|--output-file /tmp/paic-requirements-dev.lock|--output-file requirements-dev.lock|' /tmp/paic-requirements-dev.lock
+	diff -u requirements-dev.lock /tmp/paic-requirements-dev.lock
+	uv export --locked --format requirements-txt --only-group build --output-file /tmp/paic-requirements-build.lock
+	sed -i 's|--output-file /tmp/paic-requirements-build.lock|--output-file requirements-build.lock|' /tmp/paic-requirements-build.lock
+	diff -u requirements-build.lock /tmp/paic-requirements-build.lock
 
 validate:
 	$(PYTHON) -m paic validate --spec-dir specs
@@ -61,6 +77,19 @@ schema-check:
 	$(PYTHON) -m paic export-schemas --output-dir $(SCHEMA_TMP)
 	diff -ru schemas $(SCHEMA_TMP)
 	rm -rf $(SCHEMA_TMP)
+
+web-bundle: tui-smoke
+	PYTHONPATH=src $(PYTHON) -m paic.web_readiness build --workspace $(TUI_WORKSPACE) --output-dir .artifacts/web-bundle
+
+web-validate:
+	PYTHONPATH=src $(PYTHON) -m paic.web_readiness validate --bundle-dir .artifacts/web-bundle
+	$(PYTHON) scripts/scan_public_bundle.py .artifacts/web-bundle
+
+web-backup-restore: web-bundle
+	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py backup --bundle .artifacts/web-bundle --archive .artifacts/web-bundle.tar.gz
+	rm -rf .artifacts/web-bundle-restored
+	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py restore --archive .artifacts/web-bundle.tar.gz --output .artifacts/web-bundle-restored
+	cmp .artifacts/web-bundle/bundle.json .artifacts/web-bundle-restored/bundle.json
 
 simulate-smoke:
 	$(PYTHON) -m paic simulate --config configs/simulation/smoke.yaml --output-dir $(SMOKE_DIR) --overwrite

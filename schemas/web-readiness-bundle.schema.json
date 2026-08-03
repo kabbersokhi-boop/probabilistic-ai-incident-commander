@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "PublicFile": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "title": "Content"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size",
+        "content"
+      ],
+      "title": "PublicFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bundle_kind": {
+      "pattern": "^paic-public-demo$",
+      "title": "Bundle Kind",
+      "type": "string"
+    },
+    "detection": {
+      "additionalProperties": true,
+      "title": "Detection",
+      "type": "object"
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+    },
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "evaluation": {
+      "additionalProperties": true,
+      "title": "Evaluation",
+      "type": "object"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/PublicFile"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "impact": {
+      "additionalProperties": true,
+      "title": "Impact",
+      "type": "object"
+    },
+    "investigation": {
+      "additionalProperties": true,
+      "title": "Investigation",
+      "type": "object"
+    },
+    "lifecycle": {
+      "additionalProperties": true,
+      "title": "Lifecycle",
+      "type": "object"
+    },
+    "operations": {
+      "additionalProperties": true,
+      "title": "Operations",
+      "type": "object"
+    },
+    "recovery": {
+      "additionalProperties": true,
+      "title": "Recovery",
+      "type": "object"
+    },
+    "remediation": {
+      "additionalProperties": true,
+      "title": "Remediation",
+      "type": "object"
+    },
+    "schema_version": {
+      "pattern": "^1\\.0$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_bindings": {
+      "additionalProperties": true,
+      "title": "Source Bindings",
+      "type": "object"
+    },
+    "stages": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "workspace_id": {
+      "title": "Workspace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "bundle_kind",
+    "disclaimer",
+    "workspace_id",
+    "display_name",
+    "source_bindings",
+    "lifecycle",
+    "detection",
+    "operations",
+    "investigation",
+    "impact",
+    "remediation",
+    "recovery",
+    "evaluation",
+    "stages",
+    "files"
+  ],
+  "title": "WebBundle",
+  "type": "object"
+}

@@ -8,6 +8,10 @@
 - web bundle schema is regenerated and deterministic;
 - bundle backup restores into a clean destination and validates;
 - promotion and rollback evidence identifies immutable checksums;
+- `make deployment-validate` accepts only the closed-world static-host policy and
+  notify-only observability rules;
+- exact-head container interruption, resource-pressure, restart-bound, and concurrent-read
+  checks pass;
 - provenance/signing status is reported honestly, with any platform evidence independently verified;
 - no unresolved critical/high finding exists without an exact, justified, unexpired exception;
 - documentation and the final web-product handoff match the implementation;

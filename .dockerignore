@@ -2,6 +2,8 @@
 !.dockerignore
 !Dockerfile
 !pyproject.toml
+!requirements.lock
+!requirements-build.lock
 !README.md
 !LICENSE
 !src/

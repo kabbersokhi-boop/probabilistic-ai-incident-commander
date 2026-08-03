@@ -12,11 +12,16 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /build
 
 COPY pyproject.toml README.md LICENSE ./
+COPY requirements.lock requirements-build.lock ./
 COPY src ./src
 
-RUN python -m pip install --upgrade pip build \
-    && python -m build --wheel --outdir /wheels \
-    && python -m pip wheel --wheel-dir /wheels /wheels/probabilistic_ai_incident_commander-*.whl
+RUN mkdir -p /build-wheels /runtime-wheels \
+    && python -m pip wheel --require-hashes --no-deps --wheel-dir /build-wheels -r requirements-build.lock \
+    && python -m pip wheel --require-hashes --no-deps --wheel-dir /runtime-wheels -r requirements.lock \
+    && python -m pip install --no-index --no-cache-dir --require-hashes --no-deps \
+         --find-links=/build-wheels -r requirements-build.lock \
+    && python -m build --no-isolation --wheel --outdir /runtime-wheels \
+    && test "$(find /runtime-wheels -maxdepth 1 -type f -name 'probabilistic_ai_incident_commander-*.whl' | wc -l)" = 1
 
 FROM python-base AS runtime
 
@@ -43,9 +48,13 @@ ENV HOME=/home/paic \
 RUN groupadd --gid 10001 paic \
     && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/paic --shell /usr/sbin/nologin paic
 
-COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-index --find-links=/wheels probabilistic-ai-incident-commander==${VERSION} \
-    && rm -rf /wheels
+COPY --from=builder /runtime-wheels /wheels
+COPY requirements.lock /build-requirements.lock
+RUN python -m pip install --no-index --no-cache-dir --require-hashes --no-deps \
+         --find-links=/wheels -r /build-requirements.lock \
+    && python -m pip install --no-index --no-cache-dir --no-deps \
+         /wheels/probabilistic_ai_incident_commander-"${VERSION}"-*.whl \
+    && rm -rf /wheels /build-requirements.lock
 
 WORKDIR /opt/paic
 COPY --chown=root:root specs ./specs

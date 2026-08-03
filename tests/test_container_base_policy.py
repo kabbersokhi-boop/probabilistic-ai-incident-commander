@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from paic.container_base_policy import BasePolicyError, validate_base_policy
+from paic.container_base_policy import BasePolicyError, main, validate_base_policy
 
 DIGEST = "sha256:" + "a" * 64
 
@@ -161,3 +161,87 @@ def test_rejects_non_regular_inputs(tmp_path: Path) -> None:
             dockerfile_path=dockerfile_directory,
             policy_path=policy_path,
         )
+
+
+def test_rejects_malformed_policy_documents(tmp_path: Path) -> None:
+    dockerfile, policy_path = _write(tmp_path)
+    cases = (
+        ("not-json", "invalid policy JSON"),
+        ("[]", "policy must be a JSON object"),
+    )
+    for body, message in cases:
+        policy_path.write_text(body, encoding="utf-8")
+        with pytest.raises(BasePolicyError, match=message):
+            validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+    policy = _policy()
+    policy.pop("variant")
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+    with pytest.raises(BasePolicyError, match="keys mismatch"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+    for value, message in (
+        (2, "schema_version"),
+        ([], "internal_stages"),
+    ):
+        policy = _policy()
+        policy["schema_version" if value == 2 else "internal_stages"] = value
+        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+        with pytest.raises(BasePolicyError, match=message):
+            validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+    policy = _policy()
+    policy["internal_stages"] = ["builder", "builder"]
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+    with pytest.raises(BasePolicyError, match="unique"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+    policy = _policy()
+    policy["internal_stages"] = ["builder", "python-base"]
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+    with pytest.raises(BasePolicyError, match="external_stage"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy_path)
+
+
+def test_rejects_malformed_and_unexpected_dockerfile_graphs(tmp_path: Path) -> None:
+    dockerfile, policy = _write(tmp_path, "FROM not-a-valid-instruction extra\n")
+    with pytest.raises(BasePolicyError, match="malformed FROM"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+    dockerfile.write_text("# comment\n", encoding="utf-8")
+    with pytest.raises(BasePolicyError, match="contain FROM"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+    dockerfile.write_text("FROM python:3.12\n", encoding="utf-8")
+    with pytest.raises(BasePolicyError, match="every FROM"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+    dockerfile.write_text(
+        f"FROM docker.io/library/python:3.12.13-slim-bookworm@{DIGEST} AS python-base\n"
+        "FROM alpine:3 AS builder\n"
+        "FROM python-base AS runtime\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(BasePolicyError, match="derive directly"):
+        validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
+
+
+def test_cli_writes_evidence_and_returns_failure_for_invalid_input(tmp_path: Path) -> None:
+    dockerfile, policy = _write(tmp_path)
+    output = tmp_path / "evidence.json"
+    assert (
+        main(["--dockerfile", str(dockerfile), "--policy", str(policy), "--output", str(output)])
+        == 0
+    )
+    evidence = json.loads(output.read_text(encoding="utf-8"))
+    assert evidence["base"]["digest"] == DIGEST
+    assert (
+        main(
+            [
+                "--dockerfile",
+                str(tmp_path / "missing"),
+                "--policy",
+                str(policy),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )

@@ -1,4 +1,4 @@
-.PHONY: install locks-validate locks-freshness validate summary schemas schema-check web-bundle web-validate web-backup-restore simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate phase11-authoritative-soak test coverage lint format format-check typecheck check verify clean
+.PHONY: install locks-validate locks-freshness validate summary schemas schema-check deployment-validate web-bundle web-validate web-backup-restore deployment-rollback-smoke simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate phase11-authoritative-soak test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -78,6 +78,12 @@ schema-check:
 	diff -ru schemas $(SCHEMA_TMP)
 	rm -rf $(SCHEMA_TMP)
 
+deployment-validate:
+	$(PYTHON) scripts/validate_deployment_manifest.py \
+		--policy deployment/static-site-policy.json \
+		--observability deployment/observability.json \
+		--root .
+
 web-bundle: tui-smoke
 	PYTHONPATH=src $(PYTHON) -m paic.web_readiness build --workspace $(TUI_WORKSPACE) --output-dir .artifacts/web-bundle
 
@@ -90,6 +96,17 @@ web-backup-restore: web-bundle
 	rm -rf .artifacts/web-bundle-restored
 	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py restore --archive .artifacts/web-bundle.tar.gz --output .artifacts/web-bundle-restored
 	cmp .artifacts/web-bundle/bundle.json .artifacts/web-bundle-restored/bundle.json
+
+deployment-rollback-smoke: web-bundle deployment-validate
+	rm -rf .artifacts/web-deployment-target .artifacts/web-deployment-target.previous
+	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py promote \
+		--bundle .artifacts/web-bundle --target .artifacts/web-deployment-target
+	cp .artifacts/web-deployment-target/bundle.json .artifacts/web-deployment-before-rollback.json
+	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py promote \
+		--bundle .artifacts/web-bundle --target .artifacts/web-deployment-target
+	PYTHONPATH=src $(PYTHON) scripts/static_artifact_ops.py rollback \
+		--target .artifacts/web-deployment-target
+	cmp .artifacts/web-deployment-before-rollback.json .artifacts/web-deployment-target/bundle.json
 
 simulate-smoke:
 	$(PYTHON) -m paic simulate --config configs/simulation/smoke.yaml --output-dir $(SMOKE_DIR) --overwrite

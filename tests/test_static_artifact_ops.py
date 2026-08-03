@@ -2,20 +2,20 @@ import json
 from pathlib import Path
 
 import pytest
-from scripts.static_artifact_ops import backup, promote, restore
+from scripts.static_artifact_ops import backup, promote, restore, rollback
 
 from paic.web_readiness import WebReadinessError
 
 
-def _bundle(tmp_path: Path) -> Path:
+def _bundle(tmp_path: Path, *, display_name: str = "Demo") -> Path:
     bundle = tmp_path / "bundle"
-    bundle.mkdir()
+    bundle.mkdir(parents=True)
     payload = {
         "schema_version": "1.0",
         "bundle_kind": "paic-public-demo",
         "disclaimer": "Synthetic demonstration data only; values are not production claims.",
         "workspace_id": "demo",
-        "display_name": "Demo",
+        "display_name": display_name,
         "source_bindings": {},
         "lifecycle": {},
         "detection": {},
@@ -56,3 +56,17 @@ def test_restore_rejects_tampered_backup(tmp_path: Path) -> None:
     archive.write_bytes(archive.read_bytes() + b"tamper")
     with pytest.raises(WebReadinessError, match="hash mismatch"):
         restore(archive, tmp_path / "restored")
+
+
+def test_rollback_restores_previous_validated_bundle(tmp_path: Path) -> None:
+    first = _bundle(tmp_path / "first", display_name="First")
+    second = _bundle(tmp_path / "second", display_name="Second")
+    target = tmp_path / "target"
+    promote(first, target)
+    promote(second, target)
+    previous = target.with_name(target.name + ".previous")
+    assert previous.is_dir()
+    assert b"Second" in (target / "bundle.json").read_bytes()
+    rollback(target)
+    assert b"First" in (target / "bundle.json").read_bytes()
+    assert b"Second" in (target.with_name(target.name + ".previous") / "bundle.json").read_bytes()

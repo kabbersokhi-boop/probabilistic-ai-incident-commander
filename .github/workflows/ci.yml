@@ -68,6 +68,7 @@ jobs:
         run: |
           rm -rf schemas-generated
           python -m paic export-schemas --output-dir schemas-generated
+          python scripts/export_web_schema.py --output schemas-generated/web-readiness-bundle.schema.json
           diff -ru schemas schemas-generated
       - name: Generate, analyse, detect, and validate smoke dataset
         run: |

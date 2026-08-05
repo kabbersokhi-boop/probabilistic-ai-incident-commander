@@ -31,7 +31,7 @@ The system can:
 
 ## Current status
 
-Phases 0 through 11 are complete. Phase 12 production engineering is in progress.
+Phases 0 through 12 production engineering are complete on `main`.
 
 Completed production-engineering units include:
 
@@ -39,9 +39,16 @@ Completed production-engineering units include:
 - deterministic image inventory and CycloneDX supply-chain evidence;
 - exact image and commit binding with retained CI artifacts;
 - a direct digest-pinned Python base stage;
-- strict base-policy validation and bounded review-first Dependabot updates.
+- strict base-policy validation and bounded review-first Dependabot updates;
+- a versioned, deterministic web-readiness bundle with deployment, observability,
+  backup, rollback, and release-integrity policies;
+- exact-head resilience checks for interruption, resource pressure, restart bounds, and
+  concurrent reads.
 
-Phase 12.4 adds deterministic hash-verified locks, vulnerability policy, a versioned static web-readiness bundle, integrity-checked backup/restore, and release gates. The only major product work left is the final accessible public web interface and its verified static hosting. This repository does not claim a hosted URL, live signing evidence, or a runtime API.
+The only major product work left is the final accessible public web interface and its
+verified static hosting. The release-integrity workflow has produced and verified GitHub
+OIDC attestations for the validated static bundle on `main`; this repository does not
+claim a hosted URL, a public OCI image signature, or a runtime API.
 
 See:
 
@@ -162,9 +169,13 @@ python -m mypy src tests
 python -m pytest --cov=paic --cov-report=term-missing
 make locks-validate locks-freshness
 make web-bundle web-validate web-backup-restore
+make deployment-validate deployment-rollback-smoke
 ```
 
-CI also runs exact-head container validation, deterministic evidence generation, vulnerability and public-artifact policy, adversarial checks, package builds, backup/restore, and authoritative soak certification across Python 3.11 and 3.12.
+CI also runs exact-head container resilience, deterministic evidence generation,
+vulnerability and public-artifact policy, deployment/rollback policy, package builds,
+backup/restore, release-attestation verification, adversarial checks, and authoritative
+soak certification across Python 3.11 and 3.12.
 
 ## Architecture
 
@@ -190,7 +201,7 @@ Human approval -> simulated remediation
 Statistical recovery verification and evaluation
                   |
                   v
-Read-only terminal control room / planned public web product
+                  Read-only terminal control room / final public web product
 ```
 
 ## Public web product plan

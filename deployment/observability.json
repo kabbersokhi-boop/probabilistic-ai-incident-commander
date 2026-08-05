@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "dashboard": {
+    "id": "public-static-product",
+    "title": "Public static product health",
+    "signals": [
+      "availability",
+      "latency",
+      "error_rate",
+      "cache_hit_rate",
+      "bundle_version",
+      "checksum_validation"
+    ],
+    "data_source": "static-host"
+  },
+  "alerts": [
+    {
+      "id": "static-host-unavailable",
+      "severity": "critical",
+      "signal": "availability",
+      "operator": "lt",
+      "threshold": 0.995,
+      "window": "5m",
+      "action": "notify-only",
+      "runbook": "docs/ROLLBACK.md"
+    },
+    {
+      "id": "public-bundle-checksum-mismatch",
+      "severity": "critical",
+      "signal": "checksum_validation",
+      "operator": "gte",
+      "threshold": 1,
+      "window": "1m",
+      "action": "notify-only",
+      "runbook": "docs/ROLLBACK.md"
+    },
+    {
+      "id": "public-bundle-error-rate",
+      "severity": "warning",
+      "signal": "error_rate",
+      "operator": "gt",
+      "threshold": 0.02,
+      "window": "5m",
+      "action": "notify-only",
+      "runbook": "docs/ROLLBACK.md"
+    },
+    {
+      "id": "public-bundle-stale",
+      "severity": "warning",
+      "signal": "bundle_version",
+      "operator": "age_gt_hours",
+      "threshold": 24,
+      "window": "15m",
+      "action": "notify-only",
+      "runbook": "docs/ROLLBACK.md"
+    }
+  ]
+}

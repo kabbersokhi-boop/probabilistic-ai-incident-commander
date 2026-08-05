@@ -79,6 +79,8 @@ jobs:
           PAIC_VCS_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           PAIC_IMAGE_TAG: test
         run: docker compose run --rm validate
+      - name: Run interruption and resource-pressure smoke
+        run: python scripts/container_resilience_smoke.py --image paic:test
       - name: Collect sanitized container inventories
         run: |
           rm -rf .artifacts/container-evidence-inputs .artifacts/container-evidence

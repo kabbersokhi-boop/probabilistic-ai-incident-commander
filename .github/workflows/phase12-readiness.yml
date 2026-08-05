@@ -67,9 +67,14 @@ jobs:
         run: |
           make web-bundle web-validate
           python scripts/scan_repository_secrets.py
+      - name: Validate static deployment and observability policy
+        run: make deployment-validate
       - name: Backup and restore public bundle
         if: matrix.python-version == '3.12'
         run: make web-backup-restore
+      - name: Exercise immutable promotion and rollback
+        if: matrix.python-version == '3.12'
+        run: make deployment-rollback-smoke
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build --no-isolation

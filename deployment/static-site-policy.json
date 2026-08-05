@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "target": "immutable-static-host",
+  "artifact": {
+    "bundle_kind": "paic-public-demo",
+    "required_files": [
+      "SHA256SUMS",
+      "bundle.json",
+      "manifest.json"
+    ],
+    "checksum_algorithm": "sha256",
+    "require_manifest_validation": true,
+    "require_public_scan": true,
+    "require_source_commit": true,
+    "require_lock_digest": true,
+    "require_provenance": true
+  },
+  "promotion": {
+    "accept_only_validated_artifacts": true,
+    "immutable": true,
+    "mutable_tags_allowed": false,
+    "browser_uploads_allowed": false,
+    "deployment_credentials_in_browser": false
+  },
+  "rollback": {
+    "strategy": "previous-validated-bundle",
+    "atomic_switch": true,
+    "restore_validation_required": true,
+    "retain_previous": true
+  },
+  "headers": {
+    "Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'none'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff"
+  },
+  "observability": {
+    "version_metadata_required": true,
+    "checksum_mismatch_alert": "public-bundle-checksum-mismatch",
+    "availability_alert": "static-host-unavailable",
+    "runbook": "docs/ROLLBACK.md"
+  }
+}

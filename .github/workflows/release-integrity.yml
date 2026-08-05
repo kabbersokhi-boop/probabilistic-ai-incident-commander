@@ -37,6 +37,20 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: .artifacts/web-bundle/*
+      - name: Verify keyless attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/release-integrity.yml
+        run: |
+          for artifact in .artifacts/web-bundle/bundle.json \
+            .artifacts/web-bundle/manifest.json \
+            .artifacts/web-bundle/SHA256SUMS; do
+            gh attestation verify "$artifact" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$SIGNER_WORKFLOW" \
+              --source-ref "$GITHUB_REF" \
+              --predicate-type "https://slsa.dev/provenance/v1"
+          done
       - name: Upload release integrity evidence
         uses: actions/upload-artifact@v4
         with:

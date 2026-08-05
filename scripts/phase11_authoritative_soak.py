@@ -10,12 +10,14 @@ import json
 import math
 import os
 import resource
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 import tracemalloc
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -136,6 +138,27 @@ def _validate_thresholds(min_iterations: int, min_duration_seconds: float) -> No
         raise RuntimeError("specify a positive iteration count or finite duration")
 
 
+@contextmanager
+def _inspection_deadline(seconds: float) -> Iterator[None]:
+    """Fail closed when a single authoritative inspection stops progressing."""
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise RuntimeError("per-iteration timeout must be finite and positive")
+    if not hasattr(signal, "setitimer") or not hasattr(signal, "ITIMER_REAL"):
+        raise RuntimeError("per-iteration timeout is unavailable on this platform")
+
+    def _expired(_signum: int, _frame: Any) -> None:
+        raise RuntimeError(f"authoritative inspection exceeded {seconds:g} seconds")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    signal.signal(signal.SIGALRM, _expired)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, *previous_timer)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def _minimums_satisfied(
     completed: Sequence[Iteration], *, min_iterations: int, min_duration_seconds: float
 ) -> bool:
@@ -187,6 +210,8 @@ def _authoritative_snapshot(snapshot: Any) -> bool:
 
 def run(args: argparse.Namespace) -> int:
     _validate_thresholds(args.iterations, args.duration_seconds)
+    if not math.isfinite(args.max_iteration_seconds) or args.max_iteration_seconds <= 0:
+        raise RuntimeError("per-iteration timeout must be finite and positive")
     workspace = Path(args.workspace)
     config = load_workspace_config(workspace)
     output = Path(args.output_dir)
@@ -230,7 +255,8 @@ def run(args: argparse.Namespace) -> int:
     ):
         begun = time.perf_counter()
         try:
-            snapshot = inspect_workspace(config)
+            with _inspection_deadline(args.max_iteration_seconds):
+                snapshot = inspect_workspace(config)
             if not _authoritative_snapshot(snapshot):
                 raise RuntimeError("workspace is not 9/9 healthy and authoritative")
         except Exception as exc:
@@ -287,6 +313,7 @@ def run(args: argparse.Namespace) -> int:
         "warmup_iterations": args.warmup,
         "minimum_iterations": args.iterations,
         "minimum_duration_seconds": args.duration_seconds,
+        "max_iteration_seconds": args.max_iteration_seconds,
         "iterations": len(completed),
         "elapsed_seconds": cumulative_inspection_seconds,
         "cumulative_inspection_seconds": cumulative_inspection_seconds,
@@ -340,6 +367,7 @@ def main() -> int:
     parser.add_argument("--mode", choices=("inspection", "endurance"), default="inspection")
     parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--warmup", type=int, default=10)
+    parser.add_argument("--max-iteration-seconds", type=float, default=180.0)
     parser.add_argument("--max-fd-delta", type=int, default=0)
     parser.add_argument("--max-gc-delta", type=int, default=2048)
     parser.add_argument("--max-rss-delta", type=int, default=64 * 1024 * 1024)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -88,3 +89,12 @@ def test_invalid_thresholds_fail_closed(iterations: int, duration: float) -> Non
     module = _load_module()
     with pytest.raises(RuntimeError):
         module._validate_thresholds(iterations, duration)
+
+
+def test_inspection_deadline_interrupts_a_hung_operation() -> None:
+    module = _load_module()
+    with (
+        pytest.raises(RuntimeError, match=r"exceeded 0\.01 seconds"),
+        module._inspection_deadline(0.01),
+    ):
+        time.sleep(0.1)

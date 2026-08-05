@@ -71,6 +71,7 @@ jobs:
           --mode "$CERTIFICATION_MODE"
           --fresh
           --warmup 10
+          --max-iteration-seconds 180
           --max-fd-delta 0
           --max-gc-delta 2048
           --max-rss-delta 67108864

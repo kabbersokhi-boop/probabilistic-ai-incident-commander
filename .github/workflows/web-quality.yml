@@ -13,6 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
       - uses: actions/setup-python@v6
         with: {python-version: '3.11'}
       - uses: actions/setup-node@v6
@@ -28,8 +34,11 @@ jobs:
         run: |
           npm ci
           npm run lint
+          npm run test
           npm run build
           npm audit --omit=dev --audit-level=high
+      - name: Enforce compressed bundle budget
+        run: test "$(find web/dist/assets -name '*.js' -printf '%s\n' | awk '{sum += $1} END {print sum+0}')" -le 300000
       - name: Check public build has no machine paths or secrets
         run: |
           test -f web/dist/data/bundle.json

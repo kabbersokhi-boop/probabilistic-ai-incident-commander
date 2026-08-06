@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import stat
 import sys
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +59,7 @@ class WebBundle(BaseModel):
     recovery: dict[str, Any]
     evaluation: dict[str, Any]
     presentation: dict[str, Any] = Field(default_factory=dict)
+    source_commit: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
     stages: list[dict[str, Any]]
     files: list[PublicFile]
 
@@ -201,9 +203,14 @@ def _public_table(path: Path, *, limit: int = 600) -> list[dict[str, Any]]:
     _regular(path, "public source table")
     rows = pq.read_table(path).slice(0, limit).to_pylist()
     safe_rows = json.loads(
-        json.dumps(rows, default=lambda item: item.isoformat() if isinstance(item, (date, datetime)) else str(item))
+        json.dumps(
+            rows,
+            default=lambda item: (
+                item.isoformat() if isinstance(item, (date, datetime)) else str(item)
+            ),
+        )
     )
-    return _safe_public(safe_rows, context=path.name)
+    return cast(list[dict[str, Any]], _safe_public(safe_rows, context=path.name))
 
 
 def _presentation(paths: dict[str, Path]) -> dict[str, Any]:
@@ -267,6 +274,7 @@ def build_bundle(*, workspace: Path, output_dir: Path) -> None:
         recovery={"source": "validated recovery verification artifacts"},
         evaluation={"source": "validated evaluator artifacts; answer keys excluded"},
         presentation=_presentation(_source_roots(config)),
+        source_commit=os.environ.get("PAIC_SOURCE_COMMIT") or None,
         stages=stages,
         files=sorted(public_files, key=lambda item: (item.path, item.sha256)),
     )

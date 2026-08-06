@@ -27,7 +27,7 @@ jobs:
           python -m pip install --no-deps --no-build-isolation -e .
       - name: Generate and validate deterministic public bundle
         run: |
-          make web-bundle
+          PAIC_SOURCE_COMMIT="${GITHUB_SHA}" make web-bundle
           make web-validate
       - uses: actions/setup-node@v6
         with: {node-version: '22', cache: npm, cache-dependency-path: web/package-lock.json}

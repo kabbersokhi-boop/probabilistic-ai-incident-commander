@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import stat
 import sys
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,6 +58,8 @@ class WebBundle(BaseModel):
     remediation: dict[str, Any]
     recovery: dict[str, Any]
     evaluation: dict[str, Any]
+    presentation: dict[str, Any] = Field(default_factory=dict)
+    source_commit: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
     stages: list[dict[str, Any]]
     files: list[PublicFile]
 
@@ -190,6 +194,45 @@ def _section(
     }
 
 
+def _public_table(path: Path, *, limit: int = 600) -> list[dict[str, Any]]:
+    """Export bounded, source-derived tabular data required by the public UI."""
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:  # pragma: no cover - runtime dependency is pinned
+        raise WebReadinessError("pyarrow is required for the public table export") from exc
+    _regular(path, "public source table")
+    rows = pq.read_table(path).slice(0, limit).to_pylist()
+    safe_rows = json.loads(
+        json.dumps(
+            rows,
+            default=lambda item: (
+                item.isoformat() if isinstance(item, (date, datetime)) else str(item)
+            ),
+        )
+    )
+    return cast(list[dict[str, Any]], _safe_public(safe_rows, context=path.name))
+
+
+def _presentation(paths: dict[str, Path]) -> dict[str, Any]:
+    """Small, explicit public projection; never exposes arbitrary artifacts to the browser."""
+    requested = {
+        "metrics": ("metrics.analytics", "tables/metric_observations.parquet", 600),
+        "detectors": ("metrics.detection", "tables/detector_observations.parquet", 600),
+        "anomaly_events": ("metrics.detection", "tables/anomaly_events.parquet", 200),
+        "change_points": ("metrics.detection", "tables/change_point_events.parquet", 200),
+        "timeline": ("incident.evidence", "tables/incident_timeline.parquet", 600),
+        "impact": ("incident.impact", "tables/financial_impact.parquet", 10),
+        "segments": ("incident.impact", "tables/segment_impact.parquet", 100),
+        "causal_estimates": ("incident.impact", "tables/causal_estimates.parquet", 100),
+    }
+    result: dict[str, Any] = {}
+    for name, (stage, relative, limit) in requested.items():
+        root = paths.get(stage)
+        source = root / relative if root is not None else None
+        result[name] = _public_table(source, limit=limit) if source and source.is_file() else []
+    return result
+
+
 def build_bundle(*, workspace: Path, output_dir: Path) -> None:
     try:
         config = load_workspace_config(workspace)
@@ -230,6 +273,8 @@ def build_bundle(*, workspace: Path, output_dir: Path) -> None:
         remediation={"source": "validated simulated plan, approval, and execution artifacts"},
         recovery={"source": "validated recovery verification artifacts"},
         evaluation={"source": "validated evaluator artifacts; answer keys excluded"},
+        presentation=_presentation(_source_roots(config)),
+        source_commit=os.environ.get("PAIC_SOURCE_COMMIT") or None,
         stages=stages,
         files=sorted(public_files, key=lambda item: (item.path, item.sha256)),
     )

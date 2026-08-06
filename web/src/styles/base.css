@@ -1,0 +1,4 @@
+@import './tokens.css';
+@import './components.css';
+@import './responsive.css';
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}.app{max-width:1480px;margin:auto;padding:20px 30px}.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:var(--focus);padding:8px;z-index:2}.state{min-height:100vh;display:grid;place-content:center;padding:30px}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}@media print{.top,footer,.skip{display:none}.app{padding:0;max-width:none}body{background:#fff;color:#111}}

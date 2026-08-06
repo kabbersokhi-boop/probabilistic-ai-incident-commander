@@ -1,0 +1,50 @@
+name: public dashboard
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: {python-version: '3.11'}
+      - name: Install validated exporter
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: Generate and validate deterministic public bundle
+        run: |
+          PAIC_SOURCE_COMMIT="${GITHUB_SHA}" make web-bundle
+          make web-validate
+      - uses: actions/setup-node@v6
+        with: {node-version: '22', cache: npm, cache-dependency-path: web/package-lock.json}
+      - name: Build static dashboard
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Bind build to exact commit
+        run: echo "${GITHUB_SHA}" > web/dist/SOURCE_COMMIT
+      - uses: actions/upload-pages-artifact@v4
+        with: {path: web/dist}
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,11 @@
+import { asRows, isRecord, type Bundle, type RecordValue } from './schema';
+export const file = (b:Bundle, suffix:string): RecordValue | undefined => { const value=b.files.find(f=>f.path.endsWith(suffix))?.content; return isRecord(value)?value:undefined; };
+export const rows = (b:Bundle, name:string) => asRows(b.presentation?.[name]);
+export const report = (b:Bundle) => file(b,'investigation-smoke/report.json');
+export const hypotheses = (b:Bundle) => asRows(report(b)?.hypotheses).sort((a,z)=>Number(z.posterior_probability??-Infinity)-Number(a.posterior_probability??-Infinity));
+export const lead = (b:Bundle) => hypotheses(b)[0];
+export const impact = (b:Bundle) => rows(b,'impact')[0];
+export const timeline = (b:Bundle) => rows(b,'timeline').sort((a,z)=>String(a.occurred_at).localeCompare(String(z.occurred_at)));
+export const recovery = (b:Bundle) => file(b,'report-recovered/report.json');
+export const plan = (b:Bundle) => file(b,'remediation-plan/plan.json');
+export const receipt = (b:Bundle) => file(b,'remediation-execution/receipt.json');

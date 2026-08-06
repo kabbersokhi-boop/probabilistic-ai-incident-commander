@@ -83,6 +83,11 @@
       "title": "Operations",
       "type": "object"
     },
+    "presentation": {
+      "additionalProperties": true,
+      "title": "Presentation",
+      "type": "object"
+    },
     "recovery": {
       "additionalProperties": true,
       "title": "Recovery",

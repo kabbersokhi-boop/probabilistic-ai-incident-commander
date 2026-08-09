@@ -1,8 +1,158 @@
-import { useEffect, useState } from 'react';
-import { loadBundle } from '../bundle/loadBundle';
-import { integrity, loadSourceCommit } from '../bundle/identity';
-import type { Bundle } from '../bundle/schema';
-import { Badge } from '../components/ui';
-import { Detection, Evaluation, Evidence, Impact, Investigation, Overview, Remediation, System } from '../pages/pages';
-const routes=[['overview','Overview'],['detection','Detection'],['investigation','Investigation'],['evidence','Evidence'],['impact','Impact'],['remediation-recovery','Remediation & Recovery'],['evaluation','Evaluation'],['system-limitations','System & Limitations']] as const;
-export function App(){const [bundle,setBundle]=useState<Bundle>(),[error,setError]=useState<string>(),[commit,setCommit]=useState<string>(),[theme,setTheme]=useState(()=>localStorage.getItem('paic-theme')||'system'),[route,setRoute]=useState(()=>location.hash.slice(2)||'overview'),[open,setOpen]=useState(false);useEffect(()=>{void loadBundle().then(x=>x.bundle?setBundle(x.bundle):setError(x.error));void loadSourceCommit().then(setCommit);},[]);useEffect(()=>{const update=()=>setRoute(location.hash.slice(2)||'overview');addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update)},[]);useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('paic-theme',theme)},[theme]);useEffect(()=>{document.title=`PAIC — ${routes.find(x=>x[0]===route)?.[1]??'Overview'}`},[route]);if(error)return <main className="state"><h1>Public bundle unavailable</h1><p>{error} The interface does not substitute missing incident data.</p></main>;if(!bundle)return <main className="state" aria-live="polite"><h1>Loading public bundle…</h1></main>;const state=integrity(bundle,commit);const page=route==='detection'?<Detection b={bundle}/>:route==='investigation'?<Investigation b={bundle}/>:route==='evidence'?<Evidence b={bundle}/>:route==='impact'?<Impact b={bundle}/>:route==='remediation-recovery'?<Remediation b={bundle}/>:route==='evaluation'?<Evaluation b={bundle}/>:route==='system-limitations'?<System b={bundle} sourceCommit={commit} integrity={state}/>:<Overview b={bundle}/>;return <><a className="skip" href="#content">Skip to content</a><div className="app"><header className="top"><a className="brand" href="#/overview">◈ PAIC <small>Incident commander</small></a><button className="menu" onClick={()=>setOpen(!open)} aria-controls="nav" aria-expanded={open}>Menu</button><nav id="nav" className={open?'open':''} aria-label="Primary navigation">{routes.map(([id,label])=><a key={id} href={'#/'+id} className={route===id?'active':''} onClick={()=>setOpen(false)}>{label}</a>)}</nav><div className="tools"><Badge value={state==='verified'?'Integrity verified':state==='warning'?'Integrity warning':'Local bundle'}/><select aria-label="Color theme" value={theme} onChange={e=>setTheme(e.target.value)}><option value="system">System theme</option><option value="dark">Dark theme</option><option value="light">Light theme</option></select></div></header><main id="content">{page}</main><footer><span>Read-only · source-bound · deterministic public bundle</span><span>{bundle.files.length} sanitized files · schema {bundle.schema_version}</span></footer></div></>}
+import { useEffect, useState } from "react";
+import { loadBundle } from "../bundle/loadBundle";
+import { integrity, loadSourceCommit } from "../bundle/identity";
+import type { Bundle } from "../bundle/schema";
+import { Badge } from "../components/ui";
+import {
+    Detection,
+    Evaluation,
+    Evidence,
+    Impact,
+    Investigation,
+    Overview,
+    Remediation,
+    System,
+} from "../pages/pages";
+const routes = [
+    ["overview", "Overview"],
+    ["detection", "Detection"],
+    ["investigation", "Investigation"],
+    ["evidence", "Evidence"],
+    ["impact", "Impact"],
+    ["remediation-recovery", "Remediation & Recovery"],
+    ["evaluation", "Evaluation"],
+    ["system-limitations", "System & Limitations"],
+] as const;
+export function App() {
+    const [bundle, setBundle] = useState<Bundle>(),
+        [error, setError] = useState<string>(),
+        [commit, setCommit] = useState<string>(),
+        [theme, setTheme] = useState(
+            () => localStorage.getItem("paic-theme") || "system",
+        ),
+        [route, setRoute] = useState(
+            () => location.hash.slice(2) || "overview",
+        ),
+        [open, setOpen] = useState(false);
+    useEffect(() => {
+        void loadBundle().then((x) =>
+            x.bundle ? setBundle(x.bundle) : setError(x.error),
+        );
+        void loadSourceCommit().then(setCommit);
+    }, []);
+    useEffect(() => {
+        const update = () => setRoute(location.hash.slice(2) || "overview");
+        addEventListener("hashchange", update);
+        return () => removeEventListener("hashchange", update);
+    }, []);
+    useEffect(() => {
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem("paic-theme", theme);
+    }, [theme]);
+    useEffect(() => {
+        document.title = `PAIC — ${routes.find((x) => x[0] === route)?.[1] ?? "Overview"}`;
+    }, [route]);
+    if (error)
+        return (
+            <main className="state">
+                <h1>Public bundle unavailable</h1>
+                <p>
+                    {error} The interface does not substitute missing incident
+                    data.
+                </p>
+            </main>
+        );
+    if (!bundle)
+        return (
+            <main className="state" aria-live="polite">
+                <h1>Loading public bundle…</h1>
+            </main>
+        );
+    const state = integrity(bundle, commit);
+    const page =
+        route === "detection" ? (
+            <Detection b={bundle} />
+        ) : route === "investigation" ? (
+            <Investigation b={bundle} />
+        ) : route === "evidence" ? (
+            <Evidence b={bundle} />
+        ) : route === "impact" ? (
+            <Impact b={bundle} />
+        ) : route === "remediation-recovery" ? (
+            <Remediation b={bundle} />
+        ) : route === "evaluation" ? (
+            <Evaluation b={bundle} />
+        ) : route === "system-limitations" ? (
+            <System b={bundle} sourceCommit={commit} integrity={state} />
+        ) : (
+            <Overview b={bundle} />
+        );
+    return (
+        <>
+            <a className="skip" href="#content">
+                Skip to content
+            </a>
+            <div className="app">
+                <header className="top">
+                    <a className="brand" href="#/overview">
+                        ◈ PAIC <small>Incident commander</small>
+                    </a>
+                    <button
+                        className="menu"
+                        onClick={() => setOpen(!open)}
+                        aria-controls="nav"
+                        aria-expanded={open}
+                    >
+                        Menu
+                    </button>
+                    <nav
+                        id="nav"
+                        className={open ? "open" : ""}
+                        aria-label="Primary navigation"
+                    >
+                        {routes.map(([id, label]) => (
+                            <a
+                                key={id}
+                                href={"#/" + id}
+                                className={route === id ? "active" : ""}
+                                onClick={() => setOpen(false)}
+                            >
+                                {label}
+                            </a>
+                        ))}
+                    </nav>
+                    <div className="tools">
+                        <Badge
+                            value={
+                                state === "verified"
+                                    ? "Integrity verified"
+                                    : state === "warning"
+                                      ? "Integrity warning"
+                                      : "Local bundle"
+                            }
+                        />
+                        <select
+                            aria-label="Color theme"
+                            value={theme}
+                            onChange={(e) => setTheme(e.target.value)}
+                        >
+                            <option value="system">System theme</option>
+                            <option value="dark">Dark theme</option>
+                            <option value="light">Light theme</option>
+                        </select>
+                    </div>
+                </header>
+                <main id="content">{page}</main>
+                <footer>
+                    <span>
+                        Read-only · source-bound · deterministic public bundle
+                    </span>
+                    <span>
+                        {bundle.files.length} sanitized files · schema{" "}
+                        {bundle.schema_version}
+                    </span>
+                </footer>
+            </div>
+        </>
+    );
+}

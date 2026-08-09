@@ -20,9 +20,14 @@ jobs:
           EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
       - uses: actions/setup-python@v6
-        with: {python-version: '3.11'}
+        with: { python-version: "3.11" }
       - uses: actions/setup-node@v6
-        with: {node-version: '22', cache: npm, cache-dependency-path: web/package-lock.json}
+        with:
+          {
+            node-version: "22",
+            cache: npm,
+            cache-dependency-path: web/package-lock.json,
+          }
       - name: Install exporter
         run: |
           python -m pip install --require-hashes -r requirements-dev.lock
@@ -33,9 +38,12 @@ jobs:
         working-directory: web
         run: |
           npm ci
+          npm run format:check
           npm run lint
           npm run test
           npm run build
+          npx playwright install --with-deps chromium
+          npm run test:browser
           npm audit --omit=dev --audit-level=high
       - name: Enforce compressed bundle budget
         run: test "$(find web/dist/assets -name '*.js' -printf '%s\n' | awk '{sum += $1} END {print sum+0}')" -le 300000
@@ -43,3 +51,14 @@ jobs:
         run: |
           test -f web/dist/data/bundle.json
           ! rg -n --hidden '/home/|\\\\|PAIC_APPROVAL_SECRET|BEGIN .*PRIVATE' web/dist
+      - name: Upload frontend validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-quality-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            web/dist
+            web/test-results
+            web/playwright-report
+          if-no-files-found: warn
+          retention-days: 14

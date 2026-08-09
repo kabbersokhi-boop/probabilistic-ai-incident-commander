@@ -1,5 +1,17 @@
 # Probabilistic AI Incident Commander
 
+## Public dashboard
+
+The read-only public incident command dashboard lives in [`web/`](web/). It presents a deterministic synthetic incident bundle from detection through governed, simulated remediation and recovery verification. It does not control a production system, execute remediation, accept approvals, or make production-performance claims.
+
+```bash
+make web-bundle
+make web-validate
+cd web && npm ci && npm run build && npm run preview
+```
+
+It supports current evergreen desktop and mobile browsers, system/dark/light themes, keyboard navigation, reduced motion, and print. See [web-product architecture and deployment](docs/WEB_PRODUCT.md) and the [guided demo](docs/WEB_DEMO_SCRIPT.md).
+
 [![CI](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml)
 
 **Evidence-grounded, governed agentic AI for diagnosing commerce incidents under uncertainty.**

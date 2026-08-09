@@ -82,7 +82,7 @@ jobs:
         if: always() && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
-          name: web-readiness-${{ github.sha }}
+          name: web-readiness-${{ github.event.pull_request.head.sha || github.sha }}
           path: .artifacts/web-bundle
           if-no-files-found: error
           retention-days: 14

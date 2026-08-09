@@ -1,0 +1,21 @@
+import type { Bundle } from "./schema";
+export type LoadResult = { bundle?: Bundle; error?: string };
+export async function loadBundle(
+    fetcher: typeof fetch = fetch,
+): Promise<LoadResult> {
+    try {
+        const r = await fetcher("data/bundle.json");
+        if (!r.ok) return { error: "Public bundle is unavailable." };
+        const value = (await r.json()) as Bundle;
+        if (
+            value.schema_version !== "1.0" ||
+            value.bundle_kind !== "paic-public-demo"
+        )
+            return { error: "Unsupported public bundle contract." };
+        if (!Array.isArray(value.files) || !Array.isArray(value.stages))
+            return { error: "Malformed public bundle." };
+        return { bundle: value };
+    } catch {
+        return { error: "Malformed or unreadable public bundle." };
+    }
+}

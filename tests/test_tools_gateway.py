@@ -62,6 +62,9 @@ def test_gateway_evidence_handlers(
     assert evidence.execution_status == "success"
     assert len(evidence.result) == 3
     assert evidence.evidence_record_ids
+    assert [(row["observed_at"], row["evidence_record_id"]) for row in evidence.result] == sorted(
+        (row["observed_at"], row["evidence_record_id"]) for row in evidence.result
+    )
 
     changes = gateway.invoke(
         _request(

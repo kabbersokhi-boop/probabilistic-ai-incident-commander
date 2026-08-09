@@ -1,0 +1,278 @@
+.top {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border-bottom: 1px solid var(--line);
+    padding: 6px 0 18px;
+}
+.brand,
+a {
+    color: var(--blue);
+}
+.brand {
+    font-weight: 750;
+    text-decoration: none;
+    color: var(--text);
+    white-space: nowrap;
+}
+.brand small,
+small {
+    color: var(--muted);
+    font-weight: 500;
+}
+nav {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+    justify-content: center;
+}
+nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+}
+nav a.active,
+nav a:hover {
+    color: var(--text);
+    background: var(--surface2);
+}
+.tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.menu,
+select {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    color: var(--text);
+    padding: 7px;
+}
+.menu {
+    display: none;
+}
+.pageHead {
+    padding: 42px 0 25px;
+}
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 0 7px;
+}
+h1 {
+    font-size: clamp(29px, 4vw, 48px);
+    letter-spacing: -0.045em;
+    line-height: 1.05;
+    margin: 0 0 12px;
+}
+h2 {
+    font-size: 15px;
+    margin: 0 0 16px;
+}
+.pageHead p:not(.eyebrow),
+.empty {
+    color: var(--muted);
+    margin: 0;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 15px;
+}
+.card {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 20px;
+    border-radius: var(--r);
+    min-width: 0;
+}
+.wide {
+    grid-column: span 2;
+}
+.badge {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+}
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 13px;
+}
+.metric {
+    display: grid;
+    gap: 3px;
+}
+.metric span,
+.metric small {
+    color: var(--muted);
+    font-size: 12px;
+}
+.metric strong {
+    font-size: 20px;
+    letter-spacing: -0.03em;
+}
+.stageList {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+.stageList div,
+.recovery div {
+    display: grid;
+    gap: 5px;
+    border-top: 1px solid var(--line);
+    padding-top: 9px;
+}
+.tableWrap {
+    overflow: auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 550;
+}
+th,
+td {
+    padding: 9px 5px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+.hypotheses {
+    display: grid;
+    gap: 10px;
+}
+.hypotheses article {
+    border-top: 1px solid var(--line);
+    padding: 14px 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 7px;
+}
+.hypotheses p,
+.timeline p {
+    margin: 4px 0;
+    color: var(--muted);
+}
+details {
+    grid-column: 1/-1;
+    color: var(--muted);
+}
+summary {
+    color: var(--blue);
+    cursor: pointer;
+}
+.timeline article {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 10px;
+    border-left: 1px solid var(--line);
+    padding: 0 0 16px 16px;
+    margin-left: 12px;
+}
+.timeline i {
+    margin-left: -29px;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-style: normal;
+    font-size: 11px;
+}
+.timeline b,
+.timeline small {
+    display: block;
+    margin-top: 4px;
+}
+.recovery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+.recovery span {
+    color: var(--good);
+}
+.architecture {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.architecture div {
+    padding: 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface2);
+    font-weight: 650;
+}
+.architecture span {
+    color: var(--accent);
+    font-size: 20px;
+}
+footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 35px;
+    padding: 18px 0;
+}
+.chart {
+    margin: 0;
+}
+.chart svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-top: 12px;
+}
+.chartLine {
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 2;
+}
+.chartBand {
+    fill: var(--blue);
+    fill-opacity: 0.16;
+}
+.chartPoint {
+    fill: var(--accent);
+    stroke: var(--surface);
+    stroke-width: 2;
+    cursor: pointer;
+}
+.chartPoint:focus {
+    outline: none;
+    stroke: var(--focus);
+    stroke-width: 4;
+}
+.chartAnomaly {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.chartChange {
+    stroke: var(--good);
+    stroke-dasharray: 4 4;
+    stroke-width: 2;
+}

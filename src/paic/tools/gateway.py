@@ -130,7 +130,13 @@ class Gateway:
 
     def _evidence_search(self, frames: dict[str, pl.DataFrame], args: dict[str, Any]) -> Any:
         frame = frames.get("evidence__evidence_records", pl.DataFrame())
-        return _json_rows(self._search(frame, str(args.get("query", ""))).head(int(args["limit"])))
+        result = self._search(frame, str(args.get("query", "")))
+        # Preserve a semantic, rather than incidental parquet-row, ordering.  The
+        # order is part of the governed result hash and must replay identically.
+        sort_columns = [name for name in ("observed_at", "evidence_record_id") if name in result]
+        if sort_columns:
+            result = result.sort(sort_columns, nulls_last=True)
+        return _json_rows(result.head(int(args["limit"])))
 
     def _lineage_trace(self, frames: dict[str, pl.DataFrame], args: dict[str, Any]) -> Any:
         nodes = frames.get("evidence__lineage_nodes", pl.DataFrame())

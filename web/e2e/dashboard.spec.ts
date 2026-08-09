@@ -32,9 +32,14 @@ test("deep links, preserves read-only controls, has no console errors, and is ac
 
 test("overview has a stable visual baseline", async ({ page }) => {
     await page.goto("/#/overview");
-    await expect(page).toHaveScreenshot("overview.png", {
+    const snapshot =
+        process.env.GITHUB_ACTIONS === "true"
+            ? "overview-github-actions.png"
+            : "overview.png";
+
+    await expect(page).toHaveScreenshot(snapshot, {
         fullPage: true,
         animations: "disabled",
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.001,
     });
 });

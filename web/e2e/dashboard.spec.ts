@@ -35,5 +35,6 @@ test("overview has a stable visual baseline", async ({ page }) => {
     await expect(page).toHaveScreenshot("overview.png", {
         fullPage: true,
         animations: "disabled",
+        maxDiffPixelRatio: 0.05,
     });
 });

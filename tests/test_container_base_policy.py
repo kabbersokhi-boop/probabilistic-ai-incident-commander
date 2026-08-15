@@ -8,6 +8,9 @@ import pytest
 from paic.container_base_policy import BasePolicyError, main, validate_base_policy
 
 DIGEST = "sha256:" + "a" * 64
+ROOT = Path(__file__).parents[1]
+CA_CERTIFICATES_VERSION = "20250419~deb12u1"
+CA_CERTIFICATES_SHA256 = "62b08a77d985d4253894b1f69aebda5925034ca4e294add364167fad8cb64a44"
 
 
 def _policy() -> dict[str, object]:
@@ -70,6 +73,16 @@ def test_accepts_reviewed_patch_refresh_within_series(tmp_path: Path) -> None:
     )
     evidence = validate_base_policy(dockerfile_path=dockerfile, policy_path=policy)
     assert evidence["base"]["python_version"] == "3.12.14"
+
+
+def test_runtime_security_update_is_exactly_version_and_hash_pinned() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2" in dockerfile
+    assert f"ARG CA_CERTIFICATES_VERSION={CA_CERTIFICATES_VERSION}" in dockerfile
+    assert f"ARG CA_CERTIFICATES_SHA256={CA_CERTIFICATES_SHA256}" in dockerfile
+    assert 'apt-get download "ca-certificates=${CA_CERTIFICATES_VERSION}"' in dockerfile
+    assert 'sha256sum --check --strict' in dockerfile
+    assert 'dpkg --install "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb"' in dockerfile
 
 
 def test_rejects_missing_or_incomplete_digest(tmp_path: Path) -> None:

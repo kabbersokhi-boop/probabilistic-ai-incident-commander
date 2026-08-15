@@ -49,6 +49,9 @@ jobs:
           test "$(docker image inspect paic:test --format '{{.Config.User}}')" = "10001:10001"
           test "$(docker image inspect paic:test --format '{{json .Config.Entrypoint}}')" = '["paic"]'
           test "$(docker image inspect paic:test --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Verify the pinned Debian security update is present
+        run: |
+          test "$(docker run --rm --entrypoint dpkg-query paic:test -W '-f=${Version}' ca-certificates)" = "20250419~deb12u1"
       - name: Validate bundled contracts without network or root filesystem writes
         run: |
           docker run --rm \

@@ -1,388 +1,360 @@
 # Probabilistic AI Incident Commander
 
-**Evidence-grounded AI for investigating operational incidents under uncertainty — without giving the model uncontrolled production authority.**
+**An evidence-grounded incident-response system for investigating commerce failures under uncertainty, while deterministic software retains control of evidence, probability, approvals, execution, recovery, and evaluation.**
+
+In the included scenario, a synthetic Indian marketplace declares a checkout incident in India South. PAIC scopes affected customers, inspects an address-validation rollout and a plausible payment-service decoy, compares competing causes, calculates their posterior probabilities, governs a simulated rollback, and verifies recovery from later metric windows.
+
+The unusual part is the authority boundary: a model can choose bounded read-only tools and propose an explanation, but it cannot invent a valid citation, directly set the accepted probability, approve or execute a change, or declare that the business recovered.
 
 [![CI](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander/actions/workflows/ci.yml)
 
-> **Public reference / portfolio project.** PAIC operates on deterministic synthetic commerce data and simulated remediations. It does not control a real production environment and does not make production-performance claims.
+> **Synthetic reference environment.** No record represents a real customer or company, and every remediation changes local simulated state only. The dashboard is implemented, but no public deployment is currently verified; use the [local demo](#run-the-dashboard-locally).
 
-![Probabilistic AI Incident Commander dashboard](web/e2e/dashboard.spec.ts-snapshots/overview-desktop-linux.png)
+![PAIC read-only incident dashboard showing lifecycle, diagnosis, governed execution, recovery, and measured impact](web/e2e/dashboard.spec.ts-snapshots/overview-desktop-linux.png)
 
-## The problem
+## The incident you are investigating
 
-Imagine an e-commerce company suddenly sees checkout conversion fall.
+The demo models an online marketplace with checkout, payments, inventory, fulfilment, seller-feed, and returns services. Its declared incident window is **16–17 January 2026**, scoped to **India South**.
 
-The on-call team needs to answer several questions quickly:
+Two changes make the investigation non-trivial:
 
-- Is this a real incident or normal statistical variation?
-- Which customers, regions, devices, funnel stages, or services are affected?
-- What changed immediately before the degradation?
-- Which explanation best fits the evidence — checkout, payments, inventory, data quality, or something else?
-- How much customer and financial impact is there?
-- What remediation is permitted?
-- Did the system actually recover after the intervention?
+- at 23:40 UTC, 20 minutes before the incident window, `address_validation.strict_mode` changes from `false` to `true` for India South and the corresponding feature flag is enabled;
+- six hours earlier, a global payment retry timeout changes from 1200 ms to 1300 ms.
 
-**Probabilistic AI Incident Commander (PAIC)** is an end-to-end reference implementation for that workflow.
+The configured evidence says the address-validation rollout aligns with the affected service, stage, region, and time. The payment change is retained as a competing explanation, but its scope and checkout stage do not align. The investigator searches the governed evidence store for both, then submits two structured hypotheses with evidence references, falsifiers, priors, and bounded likelihood ratios.
 
-It combines deterministic analytics, statistical anomaly detection, source-bound operational evidence, bounded AI investigation, probabilistic root-cause ranking, governed simulated remediation, recovery verification, and reproducible evaluation.
+Ordinary Python code validates that every citation was actually observed, applies the configured likelihood-ratio bounds, normalizes the scores, and decides whether the evidence is strong enough to conclude or abstain. In the reproducible smoke artifact, equal 50% priors become:
 
-The goal is not to build another chatbot. The project explores a harder engineering question:
+| Hypothesis | Posterior | Evidence in the accepted report |
+|---|---:|---|
+| Primary checkout-service change regression | 99.47% | two supporting address-validation records |
+| Unrelated downstream degradation | 0.53% | two contradicting records, including the payment decoy |
 
-> **How do you let AI reason about a serious operational incident while keeping evidence, probability, security, and authority under deterministic control?**
+That produces 94.72% computed confidence after the entropy penalty. This is a result for one scripted synthetic investigation, not a production root-cause accuracy claim.
 
-## The demo incident
+The rest of the recorded incident lifecycle is equally concrete:
 
-The repository contains a deterministic synthetic commerce environment representing an online marketplace.
+- impact analysis finds **53 exposed synthetic customers** and **14 failed checkout interactions** in the declared incident window;
+- deterministic policy allows one high-risk, single-service rollback only after **two approvals from distinct configured groups**;
+- the simulated executor changes `service/checkout-address-validator` from revision `2026.07.18-bad` to `2026.07.17-good` and records an inverse action;
+- recovery is not inferred from successful execution: four post-action observations for checkout conversion and the payment-approval guardrail are tested against their baselines, both pass sustained recovery criteria, and the incident is recorded as recovered.
 
-The public demonstration follows a controlled checkout incident in which stricter address validation is enabled for **India South** shortly before checkout performance deteriorates. Other operational changes also exist around the incident window, including a payment-service change that can initially look suspicious.
+The lifecycle engine can later reopen a recovered incident after a severe guardrail breach or the configured number of consecutive failed evaluations. It does not silently retry remediation.
 
-The investigator therefore has to do more than notice a bad metric. It must gather evidence, compare competing hypotheses, search for contradictory observations, rank likely causes, and preserve an auditable chain from source data to conclusion.
-
-The current synthetic scenario ultimately favors a checkout-service change regression as the leading explanation, but that conclusion is produced from the governed incident artifacts rather than hard-coded into the browser.
-
-## How it works
+## Follow the complete lifecycle
 
 ```text
-Synthetic commerce activity
-          |
-          v
-Deterministic analytics
-          |
-          v
-Statistical anomaly detection
-          |
-          v
-Customer + financial impact analysis
-          |
-          v
-Operational evidence and lineage
-          |
-          v
-Bounded AI investigation
-          |
-          v
-Competing hypotheses + posterior probabilities
-          |
-          v
-Deterministic policy / approval boundary
-          |
-          v
-Simulated remediation
-          |
-          v
-Statistical recovery verification
-          |
-          v
-Evaluation against known ground truth
-          |
-          v
-Read-only public incident dashboard
+Generated commerce and operational records
+                    |
+                    v
+Build metrics and test for abnormal behaviour
+                    |
+                    v
+Scope customers, cohorts, funnel stages, and impact
+                    |
+                    v
+Search source-bound changes, health records, lineage, and runbooks
+                    |
+                    v
+Propose competing hypotheses and actively retain falsifiers
+                    |
+                    v
+Validate citations and calculate posterior probabilities
+                    |
+                    v
+Apply deterministic remediation policy and exact approvals
+                    |
+                    v
+Commit a reversible simulated state transition
+                    |
+                    v
+Verify sustained recovery on primary and guardrail metrics
+                    |
+                    v
+Score synthetic runs against evaluator-only ground truth
+                    |
+                    v
+Export a sanitized bundle to the read-only React dashboard
 ```
-
-### 1. Detect
-
-Statistical detectors decide whether observed behavior is actually unusual. The language model is not asked to look at a chart and decide whether something merely "looks anomalous."
-
-### 2. Scope
-
-The analytics layer determines where the problem is concentrated across regions, devices, customer cohorts, funnel stages, services, and operational changes.
-
-### 3. Gather evidence
-
-The investigator can use a governed, read-only tool layer for approved operations such as anomaly lookup, evidence search, change inspection, lineage tracing, historical-incident search, impact summaries, runbook retrieval, and bounded SQL queries.
-
-### 4. Investigate competing hypotheses
-
-The system maintains multiple candidate explanations instead of immediately anchoring on one cause. Hypotheses can carry expected observations, supporting evidence, contradictory evidence, falsifiers, and probability updates.
-
-### 5. Rank likely causes
-
-Posterior probabilities are calculated outside the language model. The model may help reason over evidence, but it does not get to invent its own confidence score or bypass the evidence model.
-
-### 6. Govern remediation
-
-Potential remediation is evaluated by deterministic policy. Sensitive actions require exact approval and state binding. The demonstration performs only simulated, reversible remediation.
-
-### 7. Verify recovery
-
-A successful command is not treated as proof of recovery. Subsequent observations and guardrail metrics must support the recovery decision, and the lifecycle can reopen when regression is detected.
-
-### 8. Evaluate
-
-Because the scenarios are synthetic, the project can compare predictions against known hidden ground truth. Evaluation is therefore reproducible rather than based on whether a demo explanation sounds convincing.
-
-## What the public dashboard shows
-
-The React/TypeScript dashboard is a **read-only presentation layer over a validated deterministic public bundle**.
-
-It contains eight views:
-
-1. **Overview** — lifecycle, diagnosis, governance, impact, and bundle integrity
-2. **Detection** — anomaly and change-point evidence
-3. **Investigation** — competing hypotheses and posterior probabilities
-4. **Evidence** — source-bound operational timeline
-5. **Impact** — affected customers and cohort analysis
-6. **Remediation & Recovery** — historical governed remediation and recovery records
-7. **Evaluation** — benchmark and safety results
-8. **System & Limitations** — architecture, source identity, and authority boundaries
-
-The browser cannot execute remediation, approve actions, access production credentials, run unrestricted SQL, execute shell commands, control recovery state, or override evaluator results. Missing information is rendered as unavailable instead of being fabricated.
 
 ## Where the data comes from
 
-PAIC includes its own deterministic commerce simulator.
+PAIC generates its own artificial commerce world. The impact profile used by the public bundle covers 40 days and contains 400 customers, 12 sellers, 120 products, four warehouses, six promotions, and 8,538 checkout sessions. It models four Indian regions, Android/iOS/web clients, acquisition channels, payment methods, issuers, carriers, orders, inventory, delivery scans, returns, refunds, service deployments, seller feeds, and analytical pipeline runs.
 
-The impact demonstration generates **40 days of synthetic activity** for an environment with **400 customers, 12 sellers, 120 products, 4 warehouses, and 6 promotions**. It models four Indian regions, Android/iOS/web clients, acquisition channels, payment methods, fake issuers and carriers, and backend services such as checkout, payments, inventory, fulfilment, seller feeds, and returns.
+Reproducibility means more than calling a random-number generator with a seed. Generation is bound to a validated YAML configuration, package version, and top-level seed; independent random streams are namespaced by domain so a new draw in one subsystem does not reorder all others. Manifests retain schemas, primary and foreign keys, row counts, time bounds, dependency versions, and SHA-256 hashes for the generated Parquet tables.
 
-A fixed random seed makes the scenario reproducible. The same code and configuration regenerate the same synthetic world, which supports deterministic replay, regression testing, and hidden-ground-truth evaluation.
+### The benchmark boundaries matter
 
-**No customer or company data in the demo represents a real person or production business.**
+The repository deliberately separates three different ideas that are easy to blur in an AI demo:
 
-## Why this project is different from a typical AI demo
+1. **Baseline commerce data** models healthy normal variation. The simulator currently records no raw-event incident injection.
+2. **Detector benchmarks** apply ten deterministic perturbations to a copy of metric observations. They do not rewrite the underlying commerce tables.
+3. **Impact benchmarks** apply a known synthetic outcome effect in the analysis copy so estimators can be checked against both potential outcomes.
 
-Many AI demonstrations reduce to:
+The public incident bundle combines validated smoke artifacts for metrics/detection, impact/evidence/investigation, remediation/recovery, and evaluation. Its one-day detection smoke input has insufficient history, so its two detector observations are correctly marked ineligible and it exports no anomaly event or change point. The **Detection** page therefore demonstrates explicit no-evidence handling; the separate standard detector benchmark demonstrates actual anomaly detection. The configured incident window, operational changes, investigation, impact projection, remediation, and recovery should not be misread as a single raw-event causal simulation.
+
+This separation provides known ground truth, deterministic replay, safe adversarial testing, and measurable evaluation without customer privacy risk. It also makes the limitations inspectable instead of hiding them behind a persuasive narrative.
+
+## What the AI does—and what it does not do
+
+PAIC includes an OpenAI-compatible provider layer with NVIDIA NIM and Groq configurations, routing/fallback, budgets, and structured tool calls. The credential-free demo and CI use an offline scripted provider, so rebuilding the dashboard does not call an external model and the displayed run is not evidence of live-provider quality.
+
+### Model-assisted investigation
+
+When a live provider is used, the model can:
+
+- choose one allowed investigative tool per round;
+- search operational evidence, changes, anomalies, lineage, history, runbooks, impact summaries, or approved in-memory tables;
+- construct multiple hypotheses with priors, supporting or contradicting evidence, bounded likelihood ratios, explicit unknowns, and falsifiers;
+- recommend the next read-only check or submit a structured investigation proposal.
+
+Provider prose and hidden reasoning are not persisted. Artifacts retain bounded model-attempt metadata, structured tool calls, accepted proposals, result hashes, and source bindings.
+
+### Deterministic and statistical responsibilities
+
+Regular code—not the model—owns:
+
+- synthetic generation, schema validation, analytics, funnels, cohorts, and data-quality checks;
+- distribution-aware anomaly scoring, false-discovery correction, CUSUM and sequential signals;
+- customer exposure, survival, causal diagnostics, and financial-impact calculations;
+- tool authorization, SQL parsing, source-lineage validation, limits, and audit receipts;
+- citation validity, posterior normalization, entropy, confidence, and the conclude/abstain gate;
+- remediation risk, exact approvals, token binding, replay protection, and state mutation;
+- equivalence tests, sustain windows, guardrails, recovery, and lifecycle reopening;
+- hidden-answer scoring, calibration, safety checks, semantic replay, and artifact validation.
+
+### Outside model authority
+
+The model has no unrestricted filesystem, network, shell, database, cloud, deployment, approval, or recovery capability. It cannot expand its tool catalogue, cite evidence that no successful tool call returned, bypass an abstention gate, turn natural language into approval, mutate production infrastructure, change evaluator answer keys, or convert an execution receipt into proof of recovery.
+
+## What you see in the dashboard
+
+The frontend is not a control plane. It is a static React/TypeScript reader over a versioned `paic-public-demo` bundle.
+
+At build time, [`src/paic/web_readiness.py`](src/paic/web_readiness.py) validates every configured stage, excludes evaluator answer keys and secret/path-like fields, projects bounded tables for presentation, and emits `bundle.json`, `manifest.json`, and `SHA256SUMS`. [`web/scripts/prepare-bundle.mjs`](web/scripts/prepare-bundle.mjs) copies that closed-world export into the Vite public directory. The browser fetches only `data/bundle.json` and an optional deployment commit file; it has no backend, dynamic data source, account, analytics service, or provider connection.
+
+Each route answers a question in the incident story:
+
+| View | Question it answers |
+|---|---|
+| **Overview** | What is the recorded lifecycle state, leading diagnosis, policy outcome, execution state, recovery state, impact, and bundle integrity? |
+| **Detection** | What did the statistical detector observe, and did it have enough history to make an anomaly decision? |
+| **Investigation** | What explanations competed, what evidence or falsifiers belong to each, and how were they ranked? |
+| **Evidence** | Which source-bound operational events form the timeline? |
+| **Impact** | Which synthetic customers were exposed, which interactions failed, and what do the segment and causal diagnostics estimate? |
+| **Remediation & Recovery** | What governed action was recorded, how many approvals were required, and did independent recovery tests pass? |
+| **Evaluation** | How did the small synthetic benchmark score diagnosis, calibration, coverage, abstention, citations, and authority violations? |
+| **System & Limitations** | Which commit and artifact are being displayed, and what authority is explicitly absent from the browser? |
+
+Missing fields render as unavailable. Malformed or unsupported bundles produce an error state rather than substituted data.
+
+## Why this is more than `Prompt -> LLM -> answer`
+
+The hard problem is not producing plausible incident prose. It is deciding what may become authoritative.
+
+**Evidence is a data product.** Generated datasets, derived metrics, detector outputs, impact estimates, evidence records, and investigation reports are separate closed-world artifacts. Their manifests bind source lineage, configuration, schemas, file sizes, and hashes. A tool response is rejected if its validated sources change during the call.
+
+**Uncertainty is executable.** The model proposes hypotheses and evidence weights, but the probability module validates observed citations, constrains likelihood ratios, computes normalized posteriors and entropy, and abstains when thresholds are not met. Reports can be reconstructed from their proposal and trace.
+
+**Authority is explicit.** The tool gateway is deny-by-default and read-only. Investigative SQL is parsed into an AST, limited to registered in-memory tables, and denied access to files, HTTP, extensions, catalogs, multi-statements, and mutations. Remediation has a separate policy and transaction path; the browser has none of it.
+
+**Action success and business recovery are different facts.** A committed simulated rollback produces a receipt and inverse action. Only later source-bound observations can satisfy recovery equivalence, sample, trend, sustain, and guardrail rules.
+
+**The evaluator is not the model.** Visible cases and hidden answers live in separate roots. Deterministic scoring, semantic replay, real ablations, and adversarial cases test unsupported citations, unsafe authority claims, prompt injection, destructive SQL, path traversal, and artifact substitution.
+
+## Architecture and authority boundaries
 
 ```text
-Prompt -> LLM -> Answer
+                         REASONING SIDE
+ Optional live LLM ── structured tool calls / hypotheses / likelihood ratios
+        |                                  |
+        | no direct data credentials       v
+        +----------------------- Governed Tool Gateway
+                                      | read-only, parsed, bounded,
+                                      | role-checked, source-bound, audited
+                                      v
+TRUTH SIDE                   Validated synthetic artifacts
+──────────                   dataset -> analytics -> detection
+                                      -> impact -> evidence
+                                               |
+                                               v
+                              Deterministic probability + abstention
+                                               |
+                                               v
+AUTHORITY SIDE               Remediation policy + exact approvals
+──────────────                                |
+                              simulated atomic state transition
+                                               |
+                              statistical recovery + reopening
+                                               |
+                              hidden-answer deterministic evaluation
+                                               |
+                                               v
+PUBLIC SIDE                  sanitized hash-bound export
+───────────                                |
+                              static read-only React dashboard
 ```
 
-PAIC deliberately separates reasoning from authority.
+The most important boundary is horizontal: model reasoning may influence a proposal, but only deterministic code can turn validated sources into an accepted conclusion, authorized simulated state transition, recovery decision, or evaluation result.
 
-- **Statistics detect anomalies.** A language model does not decide whether a metric moved abnormally.
-- **Evidence precedes conclusions.** Hypotheses reference source-bound records and can contain contradictory observations.
-- **Probability is explicit.** Root-cause confidence comes from deterministic posterior calculations rather than model-generated confidence language.
-- **Authority stays outside the model.** Permissions, SQL restrictions, approvals, remediation rules, recovery state, and evaluation remain ordinary deterministic software.
-- **Recovery must be proven.** "Execution succeeded" is not treated as evidence that the business recovered.
-- **Evaluation uses hidden answers.** Synthetic scenarios provide known ground truth for reproducible scoring.
+## Engineering depth
 
-## Engineering highlights
+### Applied AI and agent orchestration
 
-### Applied AI
+The investigation runtime has strict Pydantic message/tool schemas, ordered single-tool rounds, token/round/tool/response budgets, provider route classification and fallback, offline scripted replay, structured abstention, and transcript hashing. It preserves tool calls and integrity receipts instead of model chain-of-thought.
 
-- bounded agentic investigation;
-- competing-hypothesis reasoning;
-- evidence-grounded tool use;
-- provider-neutral model integration;
-- deterministic posterior ranking;
-- prompt-injection and fabricated-evidence defenses.
+### Statistics and data
 
-### Data and statistics
-
-- deterministic synthetic commerce generation;
-- funnel, cohort, and contribution analytics;
-- statistical anomaly and change detection;
-- customer-impact, churn, causal, and financial-risk analysis;
-- recovery verification;
-- hidden-ground-truth evaluation.
+The analytics layer defines versioned metrics, cohorts, funnels, contribution analysis, and source-quality gates. Detection uses robust seasonal/rolling baselines, distribution-aware predictive tests, Benjamini–Hochberg correction, CUSUM, and sequential likelihood evidence. Impact analysis includes Kaplan–Meier curves, Cox modelling, propensity matching, stabilized weighting, difference-in-differences, placebo checks, balance diagnostics, and bootstrap intervals. Recovery uses robust baselines, two one-sided equivalence tests, Theil–Sen trends, sustain windows, and guardrails.
 
 ### Safety and governance
 
-- deny-by-default read-only tool gateway;
-- parsed SQL policy;
-- hash-chained audit records;
-- exact approval binding and replay protection;
-- deterministic remediation authority;
-- deterministic recovery and evaluator authority;
-- explicit browser authority boundaries.
+The read-only gateway enforces strict argument models, roles, source bindings, parsed SQL policy, time/row/byte/complexity limits, and a redacted SHA-256-chained ledger. Simulated remediation is limited to rollback, feature-flag, and configuration-restore actions; plans are bound to the exact investigation and control state. High-risk execution requires distinct trusted approver groups, per-identity attestations, a short-lived exact-plan token, one-time nonces, and local atomic generation pointers.
 
-### Production engineering
+### Reproducibility and evaluation
 
-- Python 3.11 / 3.12 validation;
-- deterministic dependency locks;
-- hardened non-root containers;
-- digest-pinned base images;
-- vulnerability policy and retained scan evidence;
-- CycloneDX supply-chain evidence;
-- exact-commit artifact binding;
-- backup/restore and rollback validation;
-- resilience and authoritative soak testing;
-- GitHub Actions CI.
+Artifacts use resolved configs, manifests, checksums, success markers, closed-world validation, and deterministic replay. Evaluation separates visible cases from hidden answer keys and refuses mismatched benchmark lineage. The suite includes a 15-case standard offline benchmark, a no-lineage ablation, paired bootstrap comparison, and 12 adversarial boundary cases.
 
-### Frontend
+### Delivery and supply chain
 
-- React 19 + TypeScript;
-- Vite static build;
-- responsive desktop/mobile interface;
-- system/light/dark themes;
-- keyboard navigation and semantic accessibility;
-- reduced-motion support;
-- Playwright browser and visual-regression testing;
-- automated accessibility checks.
+GitHub Actions validates the exact pull-request head on Python 3.11 and 3.12. Committed dependency locks require hashes and freshness checks. The container runs as UID/GID `10001:10001` and is exercised with no network, a read-only root filesystem, dropped capabilities, `no-new-privileges`, and a bounded temporary filesystem. Separate workflows retain vulnerability evidence, validate a digest-pinned Python base policy, generate CycloneDX evidence, exercise backup/restore and rollback, run bounded resilience/soak checks, and create keyless provenance for release bundles.
 
-## Example benchmark results
+### Web product and accessibility
 
-The standard deterministic detector benchmark currently reports:
+The static React 19 application supports desktop and mobile layouts, system/light/dark themes, keyboard navigation, a skip link, semantic landmarks and tables, visible focus, reduced motion, print styles, and accessible chart alternatives. Vitest covers bundle parsing and pages; Playwright covers deep links, console errors, visual baselines, and automated axe accessibility checks. A compressed JavaScript budget and public-build secret/path scan run in CI.
 
-| Measure | Result |
+## Synthetic evaluation results
+
+The standard detector benchmark applies ten known perturbations to metric copies and reconstructs these results from the generated detector artifact:
+
+| Detector measure | Synthetic result |
 |---|---:|
-| Injected scenarios | 10 |
+| Scenarios | 10 |
 | Scenario recall | 100% |
 | Observation precision | 81.25% |
 | False-positive rate | 0.24% |
 | Mean detection delay | 1.2 periods |
 
-These are **synthetic evaluator results** intended to demonstrate reproducibility and evaluation methodology. They are not claims about production performance.
+The dashboard's separate smoke evaluator uses only three scripted cases: a checkout diagnosis, an insufficient-evidence case that should abstain, and a prompt-injection/approval-control case. Its checked-in predictions produce 100% Top-1 accuracy, a 0.175 Brier score, 66.67% coverage, 22.5% expected calibration error, zero unsupported claims, and zero authorized prohibited actions.
+
+These numbers demonstrate deterministic scoring, abstention, and control integrity on small synthetic fixtures. They do **not** measure a live language model, real incident-response accuracy, causal validity in production, latency, cost, or production safety. See [anomaly detection](docs/ANOMALY_DETECTION.md) and [evaluation](docs/EVALUATION.md) for definitions and reproduction commands.
+
+## Security and trust model
+
+The design rule is simple:
+
+> **AI may reason about evidence. It does not get to redefine evidence, create authority, or decide that its own action succeeded.**
+
+This is enforced in code rather than left to the system prompt:
+
+- retrieved text—including runbooks and historical incidents—is untrusted data;
+- only successful governed tool calls add citable evidence IDs;
+- SQL is parsed and executed only over registered in-memory read models;
+- model-proposed probabilities are inputs to bounded deterministic calculation, never accepted output fields;
+- natural-language approval is invalid, and requester self-approval is denied;
+- remediation mutates only local validated control-state artifacts;
+- execution and recovery are separate source-bound decisions;
+- hidden answers are excluded from agent tools and the public bundle;
+- the browser receives no secrets, arbitrary URLs, filesystem paths, or mutation interface.
+
+The full boundary, including deliberate local-only and single-filesystem limitations, is in [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
 
 ## Run the dashboard locally
 
 ### Requirements
 
-- Python 3.11+
-- Node.js 22+
-- npm
 - Git
-
-Clone the repository:
+- Python 3.11 or 3.12
+- Node.js 22.22.2 or newer and npm
 
 ```bash
 git clone https://github.com/kabbersokhi-boop/probabilistic-ai-incident-commander.git
 cd probabilistic-ai-incident-commander
-```
 
-Create and activate a Python environment:
-
-```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-Install the locked Python dependencies:
-
-```bash
 python -m pip install --require-hashes -r requirements-dev.lock
 python -m pip install --no-deps --no-build-isolation -e .
-```
 
-Generate the deterministic public incident bundle:
+make web-bundle web-validate
 
-```bash
-.venv/bin/python -m paic.web_readiness build \
-  --workspace configs/tui/smoke.yaml \
-  --output-dir .artifacts/web-bundle
-```
-
-Build and start the frontend:
-
-```bash
 cd web
 npm ci
 npm run build
 npm run preview
 ```
 
-Open the local URL printed by Vite, normally:
+Open the URL printed by Vite, normally [`http://localhost:4173/`](http://localhost:4173/).
+
+`make web-bundle` builds the complete credential-free smoke lifecycle before creating the public export; it does not contact an LLM provider. The frontend copies that validated bundle into its static build. For deployment details and hosting limitations, see [`docs/WEB_PRODUCT.md`](docs/WEB_PRODUCT.md).
+
+## A guided reviewer walkthrough
+
+Use the application in this order:
 
 ```text
-http://localhost:4173/
+Overview -> Detection -> Investigation -> Evidence -> Impact
+         -> Remediation & Recovery -> Evaluation -> System & Limitations
 ```
 
-For the full product and deployment notes, see [`docs/WEB_PRODUCT.md`](docs/WEB_PRODUCT.md). For a guided walkthrough, see [`docs/WEB_DEMO_SCRIPT.md`](docs/WEB_DEMO_SCRIPT.md).
+As you move through it, answer:
 
-## Suggested demo walkthrough
+1. Which facts are generated commerce data, configured operational context, evaluator perturbations, or simulated post-action observations?
+2. Why does the Detection view decline to call its one-day smoke input anomalous?
+3. Which two root-cause hypotheses compete, and which returned evidence moves their probabilities?
+4. Who is counted as exposed, and which impact values are synthetic estimates rather than accounting facts?
+5. Why does the high-risk rollback require two independent approvals?
+6. Which tests establish recovery after execution?
+7. What can the model propose, and what can only deterministic software authorize or declare?
 
-If you are reviewing the project for the first time, navigate in this order:
+For a shorter scripted tour, see [`docs/WEB_DEMO_SCRIPT.md`](docs/WEB_DEMO_SCRIPT.md).
+
+## Repository guide
 
 ```text
-Overview
-   |
-Detection
-   |
-Investigation
-   |
-Evidence
-   |
-Impact
-   |
-Remediation & Recovery
-   |
-Evaluation
-   |
-System & Limitations
+src/paic/simulator/      Synthetic marketplace generation and validation
+src/paic/analytics/      Metrics, cohorts, funnels, contributions, and quality
+src/paic/detection/      Statistical detection and detector benchmarks
+src/paic/impact/         Exposure, survival, causal, churn, and financial estimates
+src/paic/evidence/       Operational facts, service health, lineage, and timelines
+src/paic/tools/          Governed read-only tools, SQL policy, and audit ledger
+src/paic/investigation/ Provider routing, orchestration, probability, and reports
+src/paic/remediation/   Policy, approvals, replay protection, and simulated execution
+src/paic/recovery/      Recovery tests and lifecycle reopening
+src/paic/evaluation/    Hidden benchmarks, calibration, ablations, and attacks
+src/paic/web_readiness.py  Sanitized deterministic public-bundle exporter
+web/                    Static React/TypeScript dashboard
+configs/                Reproducible runtime and benchmark profiles
+specs/                  Product, incident, evaluation, and safety contracts
+schemas/                Generated JSON Schemas for artifacts and requests
+tests/                  Unit, integration, integrity, reliability, and adversarial tests
+.github/workflows/      Exact-head quality, web, container, security, and release gates
 ```
 
-Try to answer five questions while navigating:
+## Current status and limitations
 
-1. What happened?
-2. What evidence shows the behavior was abnormal?
-3. Why does the system favor one root cause over the alternatives?
-4. Who was affected, what remediation occurred, and was recovery verified?
-5. What prevents the AI or browser from exceeding its authority?
+The Python incident lifecycle and read-only web interface are implemented on `main`. GitHub Pages deployment is configured, but repository metadata reports Pages disabled, the only Pages workflow run failed, and the expected site currently returns HTTP 404. No **Live Demo** link is published until a deployment is both successful and reachable.
 
-## Security and authority model
+Important scope boundaries remain:
 
-The central architecture rule is that **reasoning capability and operational authority are separate concerns**.
+- this is a local synthetic reference system, not a production incident-management service;
+- the smoke dashboard is a composition of validated stage artifacts, not one causally coupled raw-event incident simulation;
+- the displayed investigation uses a scripted provider; optional live providers require credentials and separate evaluation;
+- impact methods adjust only for observed synthetic covariates, and their estimates are not business forecasts;
+- approvals use a local registry and environment-held HMAC keys rather than SSO or a managed key service;
+- state transaction and exactly-once guarantees are scoped to one local filesystem store;
+- GitHub Pages cannot supply the security headers described by the deployment policy.
 
-Important boundaries include:
+## Further technical reading
 
-- no unrestricted infrastructure credentials for the language model;
-- no production credentials in the public browser;
-- read-only investigative access;
-- approved tool schemas, limits, and timeouts;
-- parsed SQL policy;
-- source-bound evidence and audit trails;
-- exact approval checks for sensitive simulated actions;
-- blocked high-risk actions;
-- explicit prompt-injection defenses;
-- deterministic remediation, recovery, and evaluation authority outside the model.
-
-See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) for the full security model.
-
-## Quality gates
-
-```bash
-python -m ruff format --check .
-python -m ruff check .
-python -m mypy src tests
-python -m pytest --cov=paic --cov-report=term-missing
-make locks-validate locks-freshness
-make web-bundle web-validate web-backup-restore
-make deployment-validate deployment-rollback-smoke
-```
-
-CI also exercises deterministic evidence generation, container resilience, vulnerability and public-artifact policy, deployment/rollback policy, package builds, backup/restore, release-integrity checks, adversarial cases, browser/accessibility checks, and authoritative soak certification.
-
-## Repository map
-
-```text
-configs/                Reproducible simulation, analytics, detection, and evaluation scenarios
-specs/                  Product, incident, safety, and evaluation contracts
-src/paic/contracts/     Contract models and validation
-src/paic/simulator/     Synthetic commerce generation and validation
-src/paic/analytics/     Metrics, cohorts, funnels, contributions, and data quality
-src/paic/detection/     Statistical anomaly and change detection
-src/paic/impact/        Customer and financial impact analysis
-src/paic/evidence/      Operational evidence, lineage, and timelines
-src/paic/tools/         Governed tools, SQL policy, and audit ledger
-src/paic/investigation/ Agent orchestration, probability, and reports
-src/paic/remediation/   Policy, approval, tokens, and simulated execution
-src/paic/recovery/      Recovery verification and lifecycle reopening
-src/paic/evaluation/    Hidden benchmarks, ablations, replay, and attacks
-src/paic/tui/           Read-only terminal control room
-web/                    Public React/TypeScript incident dashboard
-schemas/                Generated JSON Schemas
-tests/                  Unit, integrity, reliability, and adversarial tests
-docs/                   Architecture, security, operations, and decisions
-.github/                 CI and deployment workflows
-```
-
-## Project status
-
-The core incident lifecycle, deterministic evaluation system, production-engineering controls, and public web interface are implemented on `main`.
-
-The dashboard can be built and tested locally today. The GitHub Pages deployment workflow is also implemented, but this README deliberately does **not** claim a hosted public URL until repository Pages hosting has been enabled and the deployed site has been independently verified.
-
-See [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md) and [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md) for detailed engineering history and current status.
-
-## Design principle
-
-> **AI may help reason about evidence. It should not get to redefine the evidence, invent confidence, or grant itself authority.**
-
-That principle shapes the system from detection through investigation, remediation, recovery, and evaluation.
-
-## Contributing
-
-Issues and pull requests are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before proposing changes. New functionality must preserve deterministic tests, explicit contracts, measurable acceptance criteria, and the existing authority boundaries.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — subsystem and artifact architecture
+- [`docs/GOVERNED_TOOL_GATEWAY.md`](docs/GOVERNED_TOOL_GATEWAY.md) — tools, SQL, source binding, and audit
+- [`docs/PROBABILISTIC_AGENTIC_INVESTIGATION.md`](docs/PROBABILISTIC_AGENTIC_INVESTIGATION.md) — provider and hypothesis workflow
+- [`docs/CONTROLLED_REMEDIATION.md`](docs/CONTROLLED_REMEDIATION.md) — approval and simulated transaction model
+- [`docs/RECOVERY_VERIFICATION.md`](docs/RECOVERY_VERIFICATION.md) — statistical recovery and reopening
+- [`docs/CONTAINERS.md`](docs/CONTAINERS.md) and [`docs/PROVENANCE_AND_SIGNING.md`](docs/PROVENANCE_AND_SIGNING.md) — runtime and supply-chain controls
+- [`docs/WEB_PRODUCT.md`](docs/WEB_PRODUCT.md) — bundle, browser, accessibility, and deployment
 
 ## License
 
-This project is available under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).

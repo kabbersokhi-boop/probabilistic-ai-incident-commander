@@ -77,11 +77,14 @@ def test_accepts_reviewed_patch_refresh_within_series(tmp_path: Path) -> None:
 
 def test_runtime_security_update_is_exactly_version_and_hash_pinned() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2" in dockerfile
+    assert (
+        "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2"
+        in dockerfile
+    )
     assert f"ARG CA_CERTIFICATES_VERSION={CA_CERTIFICATES_VERSION}" in dockerfile
     assert f"ARG CA_CERTIFICATES_SHA256={CA_CERTIFICATES_SHA256}" in dockerfile
     assert 'apt-get download "ca-certificates=${CA_CERTIFICATES_VERSION}"' in dockerfile
-    assert 'sha256sum --check --strict' in dockerfile
+    assert "sha256sum --check --strict" in dockerfile
     assert 'dpkg --install "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb"' in dockerfile
 
 

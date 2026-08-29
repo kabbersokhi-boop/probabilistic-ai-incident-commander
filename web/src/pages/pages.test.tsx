@@ -27,16 +27,21 @@ const bundle = {
 } as unknown as Bundle;
 
 describe("Detection", () => {
-    it("uses the same source observation in its chart label and accessible table", () => {
+    it("uses an exact table rather than plotting unrelated metric observations", () => {
         render(<Detection b={bundle} />);
 
         expect(
-            screen.getByRole("button", {
-                name: /observed 10; expected 8 to 12/,
+            screen.queryByLabelText("Interactive detector observations"),
+        ).toBeNull();
+        expect(
+            screen.getByRole("region", {
+                name: "Exact exported detector observations",
             }),
         ).not.toBeNull();
-        expect(screen.getAllByRole("table")[0]).not.toBeNull();
         expect(screen.getByText("Conversion")).not.toBeNull();
-        expect(screen.getByText("8 – 12")).not.toBeNull();
+        expect(screen.getByText("8 - 12")).not.toBeNull();
+        expect(
+            screen.getByText(/Connecting the two different metrics/),
+        ).not.toBeNull();
     });
 });

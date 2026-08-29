@@ -27,3 +27,38 @@ export const time = (v: unknown) =>
     typeof v === "string" && !Number.isNaN(Date.parse(v))
         ? `${new Date(v).toLocaleString("en-US", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" })} UTC`
         : unavailable;
+
+export const date = (v: unknown) =>
+    typeof v === "string" && !Number.isNaN(Date.parse(v))
+        ? new Date(v).toLocaleDateString("en-US", {
+              timeZone: "UTC",
+              dateStyle: "medium",
+          })
+        : unavailable;
+
+export const humanize = (v: unknown) =>
+    typeof v === "string" && v
+        ? v
+              .replace(/[._-]+/g, " ")
+              .toLowerCase()
+              .replace(/\b\w/g, (character) => character.toUpperCase())
+        : unavailable;
+
+export const region = (v: unknown) => {
+    if (typeof v !== "string" || !v) return unavailable;
+    const [country, ...area] = v.split("-");
+    let countryName = country;
+    try {
+        countryName =
+            new Intl.DisplayNames(["en"], { type: "region" }).of(country) ??
+            country;
+    } catch {
+        // The source code remains visible if the runtime cannot resolve it.
+    }
+    return `${countryName}${area.length ? ` ${humanize(area.join(" "))}` : ""}`;
+};
+
+export const compactHash = (v: unknown) =>
+    typeof v === "string" && /^[0-9a-f]{40,64}$/.test(v)
+        ? `${v.slice(0, 8)}...${v.slice(-6)}`
+        : unavailable;

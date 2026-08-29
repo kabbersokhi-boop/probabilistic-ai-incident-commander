@@ -1,54 +1,439 @@
-@media (max-width: 950px) {
+@media (max-width: 1180px) {
     .app {
-        padding: 16px;
+        padding-inline: 24px;
     }
-    .top {
-        flex-wrap: wrap;
+    .masthead {
+        grid-template-columns: minmax(230px, 0.8fr) 1fr auto;
     }
-    nav {
-        order: 3;
-        width: 100%;
-        justify-content: flex-start;
-        overflow: auto;
+    .incidentIdentity > span:first-child {
+        display: none;
     }
-    .grid {
+    .integrityStatus {
+        font-size: 0;
+    }
+    .integrityStatus i {
+        margin-right: 4px;
+    }
+    nav a {
+        padding-inline: 8px;
+        font-size: 11px;
+    }
+    nav a span {
+        display: none;
+    }
+    .pageGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .spanFull {
+        grid-column: 1 / -1;
+    }
+    .spanTwo {
+        grid-column: span 2;
+    }
+    .incidentHero {
+        grid-column: 1 / -1;
+    }
+    .commandSequence {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px 0;
+    }
+    .methodGrid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px 0;
+    }
+    .methodGrid > div:nth-child(3) {
+        border-left: 0;
+        padding-left: 0;
+    }
+    .metricsFour {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
-@media (max-width: 620px) {
-    .menu {
-        display: block;
-        margin-left: auto;
+
+@media (max-width: 900px) {
+    .app {
+        padding-inline: 20px;
     }
-    .tools {
-        width: 100%;
-        justify-content: space-between;
+    .masthead {
+        grid-template-columns: 1fr auto;
+        min-height: 76px;
     }
-    nav {
+    .incidentIdentity {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        border: 0;
+        border-top: 1px solid var(--line);
+        padding: 10px 0;
+    }
+    .brand small {
         display: none;
     }
-    nav.open {
-        display: flex;
-        flex-direction: column;
-        order: 4;
+    nav {
+        grid-template-columns: repeat(4, 1fr);
     }
-    .grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    .wide {
-        grid-column: auto;
-    }
-    .card {
-        padding: 16px;
+    nav a:nth-of-type(5) {
+        border-left: 1px solid var(--line);
     }
     .pageHead {
-        padding: 28px 0 18px;
+        padding-top: 42px;
     }
-    .stageList {
+    .incidentHero {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+    .factRail {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding: 24px 0 0;
+    }
+    .authorityBanner {
+        align-items: start;
+        flex-direction: column;
+    }
+    .authorityFacts {
+        width: 100%;
+    }
+    .trustZones {
+        grid-template-columns: 1fr;
+    }
+    .trustZones article {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .trustZones article:last-child {
+        border-bottom: 0;
+    }
+    .governanceFlow {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px 0;
+    }
+}
+
+@media (max-width: 700px) {
+    body {
+        background-size:
+            auto,
+            56px 56px,
+            auto;
+    }
+    .app {
+        padding-inline: 16px;
+    }
+    .masthead {
+        min-height: 68px;
+    }
+    .brandMark {
+        width: 30px;
+        height: 30px;
+        flex-basis: 30px;
+    }
+    .brandMark::before {
+        left: 14px;
+        top: 4px;
+        height: 20px;
+    }
+    .brandMark::after {
+        top: 14px;
+        left: 4px;
+        width: 20px;
+    }
+    .brandMark i:first-child {
+        left: 12px;
+        top: 2px;
+    }
+    .brandMark i:last-child {
+        left: 12px;
+        bottom: 2px;
+    }
+    .tools {
+        gap: 7px;
+    }
+    .integrityStatus {
+        display: none;
+    }
+    .themeControl > span {
+        display: none;
+    }
+    .themeControl select {
+        max-width: 88px;
+    }
+    .menu {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface);
+        padding: 7px 10px;
+    }
+    .menu > span,
+    .menu > span::before,
+    .menu > span::after {
+        content: "";
+        display: block;
+        width: 15px;
+        height: 1px;
+        background: currentColor;
+    }
+    .menu > span {
+        position: relative;
+    }
+    .menu > span::before {
+        position: absolute;
+        top: -5px;
+    }
+    .menu > span::after {
+        position: absolute;
+        top: 5px;
+    }
+    .navScrim {
+        position: fixed;
+        inset: 0;
+        z-index: 49;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: rgb(0 0 0 / 0.55);
+        opacity: 0;
+        pointer-events: none;
+        display: block;
+        transition: opacity 160ms ease;
+    }
+    .top:has(nav.open) .navScrim {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    nav {
+        position: fixed;
+        z-index: 50;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(88vw, 370px);
+        display: grid;
+        grid-template-columns: 1fr;
+        align-content: start;
+        border: 0;
+        border-left: 1px solid var(--line);
+        background: var(--bg-raised);
+        box-shadow: -24px 0 60px rgb(0 0 0 / 0.3);
+        padding: 14px;
+        overflow: auto;
+        transform: translateX(105%);
+        transition: transform 180ms ease;
+    }
+    nav.open {
+        transform: translateX(0);
+    }
+    nav a,
+    nav a:first-of-type,
+    nav a:nth-of-type(5) {
+        min-height: 52px;
+        border: 0;
+        border-top: 1px solid var(--line);
+        padding: 10px;
+        font-size: 14px;
+    }
+    nav a span {
+        display: inline;
+    }
+    nav a.active::after {
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        right: auto;
+        width: 2px;
+        height: auto;
+    }
+    .mobileNavHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 55px;
+    }
+    .mobileNavHead span {
+        color: var(--muted);
+        font:
+            10px ui-monospace,
+            monospace;
+        text-transform: uppercase;
+    }
+    .mobileNavHead button {
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 6px 9px;
+    }
+    .pageHead {
+        display: grid;
+        gap: 15px;
+        padding: 36px 0 22px;
+    }
+    .pageAside {
+        padding: 0;
+    }
+    h1 {
+        font-size: clamp(34px, 12vw, 49px);
+    }
+    .pageHead > div > p:last-child {
+        font-size: 14px;
+    }
+    .pageGrid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+    .spanFull,
+    .spanTwo,
+    .incidentHero {
+        grid-column: auto;
+    }
+    .card,
+    .hypothesisPanel {
+        border-radius: 15px;
+        padding: 19px;
+    }
+    .incidentHero {
+        padding: 24px 19px;
+    }
+    .incidentLead h2 {
+        font-size: 29px;
+    }
+    .factRail {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+    .heroLinks {
+        display: grid;
+        gap: 10px;
+    }
+    .commandSequence,
+    .governanceFlow {
+        grid-template-columns: 1fr;
+        gap: 17px;
+    }
+    .commandSequence li {
+        grid-template-columns: 26px 1fr;
+    }
+    .governanceFlow li:not(:last-child)::after {
+        display: none;
+    }
+    .evidencePreview p {
+        min-height: 0;
+    }
+    .metricsTwo,
+    .metricsFour {
+        grid-template-columns: 1fr 1fr;
+    }
+    .methodGrid {
+        grid-template-columns: 1fr;
+    }
+    .methodGrid > div,
+    .methodGrid > div:nth-child(3) {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding: 16px 0 0;
+    }
+    .methodGrid > div:first-child {
+        border-top: 0;
+        padding-top: 0;
+    }
+    .authorityFacts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+    .authorityFacts b {
+        font-size: 21px;
+    }
+    .sectionHeading {
+        display: grid;
+        padding: 19px;
+    }
+    .hypothesis {
+        padding: 19px;
+    }
+    .hypothesis > header strong {
+        font-size: 27px;
+    }
+    .hypothesisStats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 9px;
+    }
+    .evidenceAssessments > div {
+        grid-template-columns: 1fr;
+    }
+    .falsifier {
+        grid-template-columns: 1fr;
+    }
+    .evidenceLedger article {
+        grid-template-columns: 35px 1fr;
+    }
+    .ledgerMeta {
+        display: grid;
+        gap: 4px;
+    }
+    .historicalNotice {
+        display: grid;
+        gap: 3px;
+    }
+    .stateTransition {
+        grid-template-columns: 1fr;
+    }
+    .stateTransition > span {
+        transform: rotate(90deg);
+        justify-self: center;
+    }
+    .recoveryMetrics {
+        grid-template-columns: 1fr;
+    }
+    .caseGrid {
+        grid-template-columns: 1fr;
+    }
+    .identityGrid {
         grid-template-columns: 1fr;
     }
     footer {
         display: grid;
+    }
+    footer > div:last-child {
+        text-align: left;
+    }
+}
+
+@media (max-width: 420px) {
+    .brand {
+        gap: 8px;
+    }
+    .brand b {
+        font-size: 15px;
+    }
+    .themeControl select {
+        max-width: 74px;
+        font-size: 12px;
+    }
+    .menu {
+        font-size: 12px;
+    }
+    .incidentIdentity b {
+        font-size: 11px;
+    }
+    .metricsTwo,
+    .metricsFour {
+        grid-template-columns: 1fr;
+    }
+    .authorityFacts {
+        grid-template-columns: 1fr;
+    }
+    .hypothesisStats {
+        grid-template-columns: 1fr;
+    }
+    th,
+    td {
+        padding: 9px 10px;
     }
 }

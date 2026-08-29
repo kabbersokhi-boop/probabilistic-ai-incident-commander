@@ -1,158 +1,421 @@
-import type { Bundle, RecordValue } from "../bundle/schema";
-import { unavailable, asRows } from "../bundle/schema";
+import type { ReactNode } from "react";
+import type { Bundle } from "../bundle/schema";
+import { asRows, isRecord, unavailable } from "../bundle/schema";
 import {
-    currency,
+    compactHash,
+    date,
+    humanize,
     integer,
     number,
     percent,
+    region,
     score,
     time,
 } from "../bundle/formatters";
 import {
+    afterState,
+    beforeState,
+    decisionEvidence,
+    evaluationCases,
+    evaluationMetrics,
     hypotheses,
     impact,
+    impactConfig,
+    investigationConfig,
+    keyTimeline,
     lead,
     plan,
     receipt,
     recovery,
+    recoveryConfig,
+    recoveryObservations,
     report,
+    resource,
     rows,
     timeline,
 } from "../bundle/selectors";
-import { Badge, Card, Empty, Metric, Table } from "../components/ui";
 import { DetectionChart } from "../components/DetectionChart";
+import { Badge, Card, Empty, Metric, SourceRef, Table } from "../components/ui";
+
 const Page = ({
+    section,
     title,
     summary,
+    aside,
     children,
 }: {
+    section: string;
     title: string;
     summary: string;
-    children: React.ReactNode;
+    aside?: ReactNode;
+    children: ReactNode;
 }) => (
     <>
         <header className="pageHead">
             <div>
-                <p className="eyebrow">Incident command / {title}</p>
+                <p className="eyebrow">Incident record / {section}</p>
                 <h1>{title}</h1>
                 <p>{summary}</p>
             </div>
+            {aside ? <div className="pageAside">{aside}</div> : null}
         </header>
-        <div className="grid">{children}</div>
+        <div className="pageGrid">{children}</div>
     </>
 );
-const value = (x: unknown) =>
-    typeof x === "string" || typeof x === "number" ? String(x) : unavailable;
+
+const value = (input: unknown) =>
+    typeof input === "string" || typeof input === "number"
+        ? String(input)
+        : unavailable;
+const yesNo = (input: unknown) =>
+    typeof input === "boolean" ? (input ? "Yes" : "No") : unavailable;
+const nested = (input: unknown) => (isRecord(input) ? input : undefined);
+const stringItems = (input: unknown) =>
+    Array.isArray(input)
+        ? input.filter((item): item is string => typeof item === "string")
+        : [];
+
+function incidentFacts(b: Bundle) {
+    const config = impactConfig(b);
+    const incident = nested(config?.incident);
+    return {
+        id: value(incident?.incident_id ?? report(b)?.incident_id),
+        family: humanize(incident?.family),
+        region: region(incident?.region),
+        start: incident?.started_at,
+        end: incident?.ended_at,
+    };
+}
+
 export function Overview({ b }: { b: Bundle }) {
-    const h = lead(b),
-        r = report(b),
-        p = plan(b),
-        rec = recovery(b),
-        im = impact(b);
+    const facts = incidentFacts(b);
+    const investigation = report(b);
+    const leading = lead(b);
+    const measured = impact(b);
+    const remediation = plan(b);
+    const execution = receipt(b);
+    const recoveryReport = recovery(b);
+    const evidence = decisionEvidence(b);
+    const supportingChange = evidence.find(
+        (item) => item.direction === "support" && item.event,
+    );
+    const alternativeChange = evidence.find(
+        (item) =>
+            item.direction === "contradict" &&
+            String(item.event?.title).toLowerCase().includes("payment"),
+    );
+    const policy = nested(remediation?.policy_decision);
     return (
         <Page
-            title="Overview"
-            summary="Deterministic synthetic incident records, presented read-only."
+            section="Overview"
+            title={`${facts.family} in ${facts.region}`}
+            summary="An AI-assisted investigation of a reproducible synthetic commerce incident, with deterministic software retaining every consequential decision."
+            aside={
+                <div className="statusCluster">
+                    <Badge value="Synthetic scenario" tone="info" />
+                    <Badge value={recoveryReport?.decision} />
+                </div>
+            }
         >
-            <Card title="Lifecycle" wide>
-                <div className="stageList">
-                    {b.stages.map((s) => (
-                        <div key={s.key}>
-                            <Badge value={s.status} />
-                            <b>{s.title}</b>
-                            <small>{s.summary}</small>
-                        </div>
-                    ))}
+            <Card className="incidentHero">
+                <div className="incidentLead">
+                    <p className="overline">What happened</p>
+                    <h2>
+                        {facts.family} affected {facts.region}
+                    </h2>
+                    <p className="lede">
+                        {value(supportingChange?.event?.detail)} The
+                        investigation ranked that primary-service change above
+                        the competing change record:{" "}
+                        {value(alternativeChange?.event?.detail)}
+                    </p>
+                    <div
+                        className="heroLinks"
+                        aria-label="Incident detail links"
+                    >
+                        <a href="#/investigation">
+                            Inspect the competing hypotheses
+                        </a>
+                        <a href="#/evidence">Trace the cited evidence</a>
+                    </div>
+                </div>
+                <div className="factRail">
+                    <Metric
+                        label="Affected synthetic customers"
+                        value={integer(measured?.exposed_customers)}
+                        detail={`${integer(measured?.immediate_failed_interactions)} failed interactions`}
+                        emphasis
+                    />
+                    <Metric
+                        label="Incident window"
+                        value={`${date(facts.start)} - ${date(facts.end)}`}
+                        detail="UTC source timestamps"
+                    />
+                    <Metric
+                        label="Leading root-cause probability"
+                        value={percent(leading?.posterior_probability)}
+                        detail={value(leading?.title)}
+                        emphasis
+                    />
+                    <Metric
+                        label="Public interface authority"
+                        value="Read-only"
+                        detail="No approvals, execution, rollback, or recovery decisions"
+                    />
                 </div>
             </Card>
-            <Card title="Diagnosis">
-                <Metric label="Leading hypothesis" value={value(h?.title)} />
-                <Metric
-                    label="Posterior probability"
-                    value={percent(h?.posterior_probability)}
-                />
-                <Metric label="Confidence" value={percent(r?.confidence)} />
+
+            <Card
+                kicker="Incident narrative"
+                title="From signal to verified recovery"
+                className="spanFull"
+            >
+                <ol className="commandSequence">
+                    <li>
+                        <span>01</span>
+                        <div>
+                            <b>Evidence was assembled</b>
+                            <p>
+                                Validated synthetic operational records bound
+                                changes, service observations, customer impact,
+                                and lineage to the incident.
+                            </p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>02</span>
+                        <div>
+                            <b>The model explored competing causes</b>
+                            <p>{value(investigation?.summary)}</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>03</span>
+                        <div>
+                            <b>Software accepted the probability calculation</b>
+                            <p>
+                                Observed evidence IDs, bounded likelihood
+                                ratios, entropy, margin, and abstention
+                                thresholds were validated deterministically.
+                            </p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>04</span>
+                        <div>
+                            <b>Policy governed the simulated rollback</b>
+                            <p>
+                                {humanize(policy?.outcome)} policy outcome,{" "}
+                                {integer(remediation?.required_approvals)}{" "}
+                                required approvals,{" "}
+                                {humanize(remediation?.risk_level)} risk, then
+                                historical execution status{" "}
+                                {humanize(execution?.status)}.
+                            </p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>05</span>
+                        <div>
+                            <b>Later observations verified recovery</b>
+                            <p>
+                                The declared primary metric and guardrail both
+                                met sustained statistical recovery criteria.
+                            </p>
+                        </div>
+                    </li>
+                </ol>
             </Card>
-            <Card title="Governance">
-                <Metric
-                    label="Policy outcome"
-                    value={value(
-                        (p?.policy_decision as RecordValue | undefined)
-                            ?.outcome,
-                    )}
-                />
-                <Metric label="Execution" value={value(receipt(b)?.status)} />
-                <Metric label="Recovery" value={value(rec?.decision)} />
+
+            <Card
+                kicker="Why this cause"
+                title={value(supportingChange?.event?.title)}
+                className="spanTwo evidencePreview"
+            >
+                <p>{value(supportingChange?.event?.detail)}</p>
+                <div className="sourceLine">
+                    <Badge value="Supports leading cause" tone="good" />
+                    <SourceRef>{supportingChange?.id ?? unavailable}</SourceRef>
+                </div>
             </Card>
-            <Card title="Measured impact">
-                <Metric
-                    label="Affected customers"
-                    value={integer(im?.exposed_customers)}
-                />
-                <Metric
-                    label="Immediate revenue effect"
-                    value={currency(im?.immediate_revenue_loss, im?.currency)}
-                />
-                <Metric
-                    label="Future revenue at risk"
-                    value={currency(im?.future_revenue_at_risk, im?.currency)}
-                />
+            <Card
+                kicker="Alternative tested"
+                title={value(alternativeChange?.event?.title)}
+                className="evidencePreview"
+            >
+                <p>{value(alternativeChange?.event?.detail)}</p>
+                <div className="sourceLine">
+                    <Badge value="Contradicts alternative" tone="warn" />
+                    <SourceRef>
+                        {alternativeChange?.id ?? unavailable}
+                    </SourceRef>
+                </div>
             </Card>
-            <Card title="Public-bundle integrity">
-                <Metric label="Schema" value={b.schema_version} />
-                <Metric label="Files" value={integer(b.files.length)} />
-                <Metric
-                    label="Mode"
-                    value="Read-only"
-                    detail="No production controls"
-                />
+
+            <Card
+                kicker="Trust boundary"
+                title="AI assists; it does not command"
+                className="spanTwo authoritySummary"
+            >
+                <p>
+                    The model may choose bounded read-only tools, propose
+                    hypotheses, likelihood ratios, falsifiers, and citations. It
+                    cannot control the accepted evidence set, posterior ranking,
+                    approvals, simulated execution, recovery truth, or benchmark
+                    truth.
+                </p>
+                <a href="#/system-limitations">
+                    Review the complete authority model
+                </a>
+            </Card>
+            <Card
+                kicker="Artifact state"
+                title="Validation health, not business health"
+            >
+                <p>
+                    <strong>
+                        {
+                            b.stages.filter(
+                                (stage) => stage.status === "healthy",
+                            ).length
+                        }
+                        /{b.stages.length}
+                    </strong>{" "}
+                    authoritative stages validate. “Healthy” means the exported
+                    artifacts reconstructed successfully; it does not mean no
+                    incident occurred.
+                </p>
+                <details>
+                    <summary>Inspect validation stages</summary>
+                    <ul className="plainList">
+                        {b.stages.map((stage) => (
+                            <li key={stage.key}>
+                                <span>{stage.title}</span>
+                                <Badge value={`Artifact ${stage.status}`} />
+                            </li>
+                        ))}
+                    </ul>
+                </details>
             </Card>
         </Page>
     );
 }
+
 export function Detection({ b }: { b: Bundle }) {
-    const points = rows(b, "detectors"),
-        anomalyEvents = rows(b, "anomaly_events"),
-        changePoints = rows(b, "change_points");
+    const points = rows(b, "detectors");
+    const anomalyEvents = rows(b, "anomaly_events");
+    const changePoints = rows(b, "change_points");
+    const series = points.filter(
+        (point) => point.metric_name === points[0]?.metric_name,
+    );
+    const chartable = series.length > 1;
+    const anomalies = points.filter((point) => point.is_anomaly === true);
+    const eligible = points.filter((point) => point.is_eligible === true);
     return (
         <Page
-            title="Detection"
-            summary="Exact exported detector observations; all timestamps are UTC."
+            section="Detection"
+            title="What the detector can prove"
+            summary={`This public detector slice is a baseline smoke artifact. It exports ${integer(points.length)} metric observations, but none was eligible for anomaly scoring.`}
+            aside={<Badge value="No anomaly declared" tone="neutral" />}
         >
-            <Card title="Detector observations" wide>
+            <Card
+                kicker="Source result"
+                title="Insufficient history for an anomaly decision"
+                className="spanTwo detectionVerdict"
+            >
+                <p className="lede">
+                    The records passed their sample-size gates, but exported
+                    zero baseline points and no expected range, p-value,
+                    q-value, anomaly event, or change point. Connecting the two
+                    different metrics as a time series would be misleading, so
+                    this interface uses the exact table instead.
+                </p>
+                <div className="metrics metricsFour">
+                    <Metric
+                        label="Observations"
+                        value={integer(points.length)}
+                    />
+                    <Metric
+                        label="Eligible for scoring"
+                        value={integer(eligible.length)}
+                    />
+                    <Metric
+                        label="Anomalies"
+                        value={integer(anomalies.length)}
+                    />
+                    <Metric
+                        label="Change points"
+                        value={integer(changePoints.length)}
+                    />
+                </div>
+            </Card>
+            <Card
+                kicker="Interpretation"
+                title="How abnormality would be established"
+            >
+                <ul className="checkList">
+                    <li>
+                        Build an adequate rolling history for each metric and
+                        cohort.
+                    </li>
+                    <li>
+                        Calculate an expected range with the exported baseline
+                        method.
+                    </li>
+                    <li>
+                        Apply sample-size, effect-size, significance, and
+                        detector-support gates.
+                    </li>
+                    <li>
+                        Emit an anomaly or change-point record only when those
+                        deterministic gates pass.
+                    </li>
+                </ul>
+            </Card>
+            <Card title="Detector observations" className="spanFull">
+                {chartable ? (
+                    <DetectionChart
+                        points={series}
+                        anomalyEvents={anomalyEvents}
+                        changePoints={changePoints}
+                    />
+                ) : null}
                 {points.length ? (
-                    <>
-                        <DetectionChart
-                            points={points}
-                            anomalyEvents={anomalyEvents}
-                            changePoints={changePoints}
-                        />
-                        <p className="chartSummary">
-                            {points.length} exported observations. The table is
-                            the exact accessible alternative to the plotted
-                            rows.
-                        </p>
-                        <Table
-                            head={[
-                                "Period start",
-                                "Metric",
-                                "Cohort",
-                                "Observed",
-                                "Expected range",
-                                "p / q",
-                                "Anomaly",
-                            ]}
-                            rows={points.map((p) => [
-                                time(p.period_start),
-                                value(p.display_name),
-                                value(p.cohort_name),
-                                number(p.observed_value),
-                                `${number(p.expected_lower)} – ${number(p.expected_upper)}`,
-                                `${score(p.p_value)} / ${score(p.q_value)}`,
-                                value(p.is_anomaly),
-                            ])}
-                        />
-                    </>
+                    <Table
+                        label="Exact exported detector observations"
+                        caption="Exact public-bundle rows. Missing statistical fields were null in the source artifact."
+                        head={[
+                            "Metric",
+                            "Observed",
+                            "Sample",
+                            "Baseline",
+                            "Expected range",
+                            "p / q",
+                            "Eligible",
+                            "Anomaly",
+                        ]}
+                        rows={points.map((point) => [
+                            <span className="tablePrimary" key="metric">
+                                {value(point.display_name)}
+                                <small>
+                                    {value(point.cohort_name)} /{" "}
+                                    {value(point.unit)}
+                                </small>
+                            </span>,
+                            number(point.observed_value),
+                            integer(point.sample_size),
+                            `${value(point.baseline_method)} / ${integer(point.baseline_points)} points`,
+                            point.expected_lower == null ||
+                            point.expected_upper == null
+                                ? unavailable
+                                : `${number(point.expected_lower)} - ${number(point.expected_upper)}`,
+                            point.p_value == null || point.q_value == null
+                                ? unavailable
+                                : `${score(point.p_value)} / ${score(point.q_value)}`,
+                            yesNo(point.is_eligible),
+                            yesNo(point.is_anomaly),
+                        ])}
+                    />
                 ) : (
                     <Empty section="detector observations" />
                 )}
@@ -160,357 +423,925 @@ export function Detection({ b }: { b: Bundle }) {
             <Card title="Anomaly events">
                 {anomalyEvents.length ? (
                     <Table
-                        head={["Start", "Metric", "Severity"]}
-                        rows={anomalyEvents.map((x) => [
-                            time(x.started_at),
-                            value(x.metric_name),
-                            value(x.severity),
+                        head={["Metric", "Started", "Severity"]}
+                        rows={anomalyEvents.map((event) => [
+                            value(event.metric_name),
+                            time(event.started_at),
+                            value(event.severity),
                         ])}
                     />
                 ) : (
-                    <Empty section="anomaly events" />
+                    <Empty
+                        section="anomaly events"
+                        explanation="No anomaly event exists in this validated detector artifact. That is a source limitation, not a frontend loading failure."
+                    />
                 )}
             </Card>
-            <Card title="Change points">
+            <Card title="Change-point events">
                 {changePoints.length ? (
                     <Table
-                        head={["Detected", "Metric", "Direction"]}
-                        rows={changePoints.map((x) => [
-                            time(x.detected_at),
-                            value(x.metric_name),
-                            value(x.direction),
+                        head={["Metric", "Detected", "Direction"]}
+                        rows={changePoints.map((event) => [
+                            value(event.metric_name),
+                            time(event.detected_at),
+                            value(event.direction),
                         ])}
                     />
                 ) : (
-                    <Empty section="change-point events" />
+                    <Empty
+                        section="change-point events"
+                        explanation="The public detector artifact contains no declared change point; the interface does not infer one from unrelated records."
+                    />
                 )}
             </Card>
         </Page>
     );
 }
+
 export function Investigation({ b }: { b: Bundle }) {
-    const r = report(b),
-        hs = hypotheses(b);
+    const investigation = report(b);
+    const ranked = hypotheses(b);
+    const proposalValue = nested(investigation?.proposal);
+    const proposed = asRows(proposalValue?.hypotheses);
+    const evidence = decisionEvidence(b);
+    const attempts = asRows(investigation?.model_attempts);
+    const trace = asRows(investigation?.tool_trace);
     return (
         <Page
-            title="Investigation"
-            summary="Posterior calculation and authorization are deterministic project responsibilities."
+            section="Investigation"
+            title="Competing causes, inspected"
+            summary="The model proposed evidence-weighted hypotheses. Deterministic software rejected unsupported citations, calculated the normalized posteriors, and applied abstention thresholds."
+            aside={<Badge value={humanize(investigation?.status)} />}
         >
-            <Card title="Decision state">
-                <div className="metrics">
-                    <Metric label="Decision" value={value(r?.decision)} />
-                    <Metric label="Confidence" value={percent(r?.confidence)} />
-                    <Metric
-                        label="Normalized entropy"
-                        value={score(r?.normalized_entropy)}
-                    />
-                    <Metric label="Abstention" value={value(r?.abstained)} />
+            <Card className="spanFull authorityBanner">
+                <div>
+                    <p className="overline">Responsibility split</p>
+                    <h2>
+                        Model proposal <span aria-hidden="true">-&gt;</span>{" "}
+                        software decision
+                    </h2>
+                </div>
+                <div className="authorityFacts">
+                    <span>
+                        <b>{integer(attempts.length)}</b> recorded model-route
+                        attempts
+                    </span>
+                    <span>
+                        <b>{integer(trace.length)}</b> governed read-only tool
+                        calls
+                    </span>
+                    <span>
+                        <b>{integer(evidence.length)}</b> validated evidence
+                        assessments
+                    </span>
                 </div>
             </Card>
-            <Card title="Ranked hypotheses" wide>
-                {hs.length ? (
-                    <div className="hypotheses">
-                        {hs.map((h, i) => (
-                            <article key={String(h.hypothesis_id)}>
-                                <b>
-                                    {i + 1}. {value(h.title)}
-                                </b>
-                                <strong>
-                                    {percent(h.posterior_probability)}
-                                </strong>
-                                <p>{value(h.rationale)}</p>
-                                <small>
-                                    Prior {percent(h.prior_probability)} ·
-                                    support{" "}
-                                    {asRows(h.evidence).length ||
-                                        (Array.isArray(
-                                            h.supporting_evidence_ids,
-                                        )
-                                            ? h.supporting_evidence_ids.length
-                                            : 0)}{" "}
-                                    · contradictions{" "}
-                                    {Array.isArray(h.contradicting_evidence_ids)
-                                        ? h.contradicting_evidence_ids.length
-                                        : 0}
-                                </small>
-                                <details>
-                                    <summary>
-                                        Falsifiers and source references
-                                    </summary>
-                                    <ul>
-                                        {(Array.isArray(h.falsifiers)
-                                            ? h.falsifiers
-                                            : []
-                                        ).map((x) => (
-                                            <li key={String(x)}>{String(x)}</li>
-                                        ))}
-                                    </ul>
-                                </details>
-                            </article>
-                        ))}
-                    </div>
-                ) : (
-                    <Empty section="ranked hypotheses" />
-                )}
+
+            <Card
+                kicker="Accepted calculation"
+                title="Decision state"
+                className="decisionCard"
+            >
+                <div className="metrics metricsTwo">
+                    <Metric
+                        label="Status"
+                        value={humanize(investigation?.status)}
+                    />
+                    <Metric
+                        label="Confidence"
+                        value={percent(investigation?.confidence)}
+                        detail="posterior x (1 - normalized entropy)"
+                        emphasis
+                    />
+                    <Metric
+                        label="Posterior margin"
+                        value={percent(investigation?.posterior_margin)}
+                    />
+                    <Metric
+                        label="Normalized entropy"
+                        value={score(investigation?.normalized_entropy)}
+                    />
+                </div>
+                <p className="note">
+                    Confidence is a computed concentration score, not an LLM
+                    self-rating and not a guarantee that the causal judgment is
+                    correct.
+                </p>
             </Card>
-        </Page>
-    );
-}
-export function Evidence({ b }: { b: Bundle }) {
-    const events = timeline(b);
-    return (
-        <Page
-            title="Evidence"
-            summary="Source events sorted by their exported timestamps."
-        >
-            <Card title="Operational timeline" wide>
-                {events.length ? (
-                    <div className="timeline">
-                        {events.map((e, i) => (
-                            <article key={String(e.timeline_event_id ?? i)}>
-                                <i>{i + 1}</i>
-                                <div>
-                                    <Badge value={e.event_type} />
-                                    <b>{value(e.title)}</b>
-                                    <small>
-                                        {time(e.occurred_at)} ·{" "}
-                                        {value(e.source)}
-                                    </small>
-                                    <p>{value(e.detail)}</p>
+
+            <section
+                className="hypothesisPanel spanTwo"
+                aria-labelledby="hypotheses-title"
+            >
+                <div className="sectionHeading">
+                    <div>
+                        <p className="cardKicker">Deterministic ranking</p>
+                        <h2 id="hypotheses-title">Hypotheses</h2>
+                    </div>
+                    <span>Prior + bounded evidence ratios = posterior</span>
+                </div>
+                <div className="hypotheses">
+                    {ranked.map((hypothesis, index) => {
+                        const sourceProposal = proposed.find(
+                            (item) =>
+                                item.hypothesis_id === hypothesis.hypothesis_id,
+                        );
+                        const assessments = evidence.filter(
+                            (item) =>
+                                item.hypothesisId === hypothesis.hypothesis_id,
+                        );
+                        const posterior =
+                            typeof hypothesis.posterior_probability === "number"
+                                ? hypothesis.posterior_probability
+                                : 0;
+                        return (
+                            <article
+                                className={
+                                    index === 0
+                                        ? "hypothesis leading"
+                                        : "hypothesis"
+                                }
+                                key={String(hypothesis.hypothesis_id)}
+                            >
+                                <header>
+                                    <div>
+                                        <p className="rank">Rank {index + 1}</p>
+                                        <h3>{value(hypothesis.title)}</h3>
+                                    </div>
+                                    <strong>
+                                        {percent(
+                                            hypothesis.posterior_probability,
+                                        )}
+                                    </strong>
+                                </header>
+                                <div
+                                    className="probabilityTrack"
+                                    aria-hidden="true"
+                                >
+                                    <span
+                                        style={{
+                                            width: `${Math.max(1, posterior * 100)}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p>{value(hypothesis.rationale)}</p>
+                                <dl className="hypothesisStats">
+                                    <div>
+                                        <dt>Prior</dt>
+                                        <dd>
+                                            {percent(
+                                                hypothesis.prior_probability,
+                                            )}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt>Log evidence</dt>
+                                        <dd>
+                                            {score(
+                                                hypothesis.log_evidence_score,
+                                            )}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt>Evidence assessments</dt>
+                                        <dd>{integer(assessments.length)}</dd>
+                                    </div>
+                                </dl>
+                                <div className="evidenceAssessments">
+                                    {assessments.map((assessment) => (
+                                        <div
+                                            key={`${assessment.hypothesisId}-${assessment.id}`}
+                                        >
+                                            <Badge
+                                                value={assessment.direction}
+                                                tone={
+                                                    assessment.direction ===
+                                                    "support"
+                                                        ? "good"
+                                                        : "warn"
+                                                }
+                                            />
+                                            <div>
+                                                <b>
+                                                    {value(
+                                                        assessment.event?.title,
+                                                    )}
+                                                </b>
+                                                <p>
+                                                    {assessment.explanation ??
+                                                        value(
+                                                            assessment.event
+                                                                ?.detail,
+                                                        )}
+                                                </p>
+                                                <small>
+                                                    likelihood ratio{" "}
+                                                    {number(
+                                                        assessment.likelihoodRatio,
+                                                    )}{" "}
+                                                    /{" "}
+                                                    <SourceRef>
+                                                        {assessment.id}
+                                                    </SourceRef>
+                                                </small>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="falsifier">
+                                    <span>Would weaken or falsify this</span>
+                                    <p>
+                                        {stringItems(
+                                            sourceProposal?.falsifiers,
+                                        ).join(" ") || unavailable}
+                                    </p>
                                 </div>
                             </article>
-                        ))}
+                        );
+                    })}
+                </div>
+            </section>
+
+            <Card
+                kicker="Calculation contract"
+                title={`Why ${percent(ranked[0]?.posterior_probability)} is not an LLM verdict`}
+                className="spanFull methodCard"
+            >
+                <div className="methodGrid">
+                    <div>
+                        <span>1</span>
+                        <b>Model proposes</b>
+                        <p>
+                            Competing hypotheses, priors, bounded likelihood
+                            ratios, citations, falsifiers, and unknowns.
+                        </p>
                     </div>
-                ) : (
-                    <Empty section="operational timeline" />
-                )}
+                    <div>
+                        <span>2</span>
+                        <b>Gateway constrains</b>
+                        <p>
+                            Only observed evidence IDs from successful,
+                            source-bound read-only tool calls may be cited.
+                        </p>
+                    </div>
+                    <div>
+                        <span>3</span>
+                        <b>Software computes</b>
+                        <p>
+                            Log prior plus log likelihood ratios, stable
+                            normalization, entropy, posterior margin, and
+                            confidence.
+                        </p>
+                    </div>
+                    <div>
+                        <span>4</span>
+                        <b>Policy may abstain</b>
+                        <p>
+                            The top posterior, margin, distinct evidence count,
+                            and entropy must all pass configured thresholds.
+                        </p>
+                    </div>
+                </div>
+                <p className="note">
+                    Current limitation: likelihood ratios originate in the model
+                    proposal. They are bounded and benchmarked, but are not
+                    learned from historical calibration data.
+                </p>
             </Card>
         </Page>
     );
 }
-export function Impact({ b }: { b: Bundle }) {
-    const im = impact(b),
-        segments = rows(b, "segments"),
-        estimates = rows(b, "causal_estimates");
+
+export function Evidence({ b }: { b: Bundle }) {
+    const assessments = decisionEvidence(b);
+    const groups = new Map<string, typeof assessments>();
+    for (const assessment of assessments) {
+        groups.set(assessment.id, [
+            ...(groups.get(assessment.id) ?? []),
+            assessment,
+        ]);
+    }
+    const spine = keyTimeline(b).filter((event) =>
+        [
+            "change",
+            "feature_flag",
+            "incident_started",
+            "incident_ended",
+        ].includes(String(event.event_type)),
+    );
+    const additional = keyTimeline(b).filter((event) => !spine.includes(event));
     return (
         <Page
-            title="Impact"
-            summary="Synthetic, deterministic impact estimates; unavailable fields are not inferred."
+            section="Evidence"
+            title="An auditable incident record"
+            summary={`${integer(timeline(b).length)} source-bound timeline rows are exported. The decision records are elevated here without removing their IDs, timestamps, source systems, or relationship to each hypothesis.`}
+            aside={
+                <Badge value={`${groups.size} decision records`} tone="info" />
+            }
         >
-            <Card title="Financial and customer impact">
-                <div className="metrics">
+            <Card
+                kicker="Cited by the investigation"
+                title="Decision evidence"
+                className="spanFull"
+            >
+                <div className="evidenceLedger">
+                    {[...groups.entries()].map(([id, related], index) => {
+                        const event = related[0]?.event;
+                        const directions = [
+                            ...new Set(related.map((item) => item.direction)),
+                        ];
+                        return (
+                            <article key={id}>
+                                <div className="ledgerIndex">
+                                    {String(index + 1).padStart(2, "0")}
+                                </div>
+                                <div className="ledgerBody">
+                                    <div className="ledgerMeta">
+                                        <time>{time(event?.occurred_at)}</time>
+                                        <span>
+                                            {humanize(event?.event_type)}
+                                        </span>
+                                        <span>{value(event?.source)}</span>
+                                    </div>
+                                    <h3>{value(event?.title)}</h3>
+                                    <p>{value(event?.detail)}</p>
+                                    <div className="sourceLine">
+                                        {directions.map((direction) => (
+                                            <Badge
+                                                key={direction}
+                                                value={
+                                                    direction === "support"
+                                                        ? "Supports leading cause"
+                                                        : "Contradicts alternative"
+                                                }
+                                                tone={
+                                                    direction === "support"
+                                                        ? "good"
+                                                        : "warn"
+                                                }
+                                            />
+                                        ))}
+                                        <SourceRef>{id}</SourceRef>
+                                        <SourceRef>
+                                            {value(event?.timeline_event_id)}
+                                        </SourceRef>
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
+            </Card>
+
+            <Card
+                kicker="Chronology"
+                title="Incident spine"
+                className="spanTwo"
+            >
+                <div className="timeline">
+                    {spine.map((event) => (
+                        <article key={String(event.timeline_event_id)}>
+                            <span className="timelineMark" aria-hidden="true" />
+                            <div>
+                                <div className="ledgerMeta">
+                                    <time>{time(event.occurred_at)}</time>
+                                    <Badge
+                                        value={humanize(event.event_type)}
+                                        tone="info"
+                                    />
+                                </div>
+                                <h3>{value(event.title)}</h3>
+                                <p>{value(event.detail)}</p>
+                                <small>
+                                    {value(event.source)} /{" "}
+                                    <SourceRef>
+                                        {value(event.timeline_event_id)}
+                                    </SourceRef>
+                                </small>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </Card>
+            <Card kicker="Provenance" title="Where the record came from">
+                <dl className="provenanceList">
+                    <div>
+                        <dt>Change records</dt>
+                        <dd>configured_change_log</dd>
+                    </div>
+                    <div>
+                        <dt>Rollout state</dt>
+                        <dd>feature_flag_history</dd>
+                    </div>
+                    <div>
+                        <dt>Incident bounds</dt>
+                        <dd>incident_context</dd>
+                    </div>
+                    <div>
+                        <dt>Health windows</dt>
+                        <dd>checkout_sessions and payment_attempts</dd>
+                    </div>
+                    <div>
+                        <dt>Integrity</dt>
+                        <dd>file SHA-256 and bundle checksum bindings</dd>
+                    </div>
+                </dl>
+            </Card>
+
+            <Card
+                title="Additional non-health timeline records"
+                className="spanFull compactCard"
+            >
+                <details>
+                    <summary>
+                        Inspect {additional.length} deployments, lineage nodes,
+                        and runbook records
+                    </summary>
+                    <Table
+                        label="Additional timeline records"
+                        head={[
+                            "Time",
+                            "Type",
+                            "Record",
+                            "Source",
+                            "Evidence ID",
+                        ]}
+                        rows={additional.map((event) => [
+                            time(event.occurred_at),
+                            humanize(event.event_type),
+                            value(event.title),
+                            value(event.source),
+                            <SourceRef key="evidence">
+                                {value(event.evidence_record_ids_json)}
+                            </SourceRef>,
+                        ])}
+                    />
+                </details>
+            </Card>
+        </Page>
+    );
+}
+
+export function Impact({ b }: { b: Bundle }) {
+    const measured = impact(b);
+    const segments = rows(b, "segments");
+    const estimates = rows(b, "causal_estimates");
+    const facts = incidentFacts(b);
+    return (
+        <Page
+            section="Impact"
+            title="Who was affected, and what is provable"
+            summary="Customer and financial measures are rebuilt from the synthetic source dataset. Values absent from the validated export are not estimated by the browser."
+            aside={<Badge value="Synthetic impact" tone="info" />}
+        >
+            <Card
+                kicker="Observed effect"
+                title={`${integer(measured?.exposed_customers)} synthetic customers were exposed`}
+                className="spanTwo impactLead"
+            >
+                <div className="metrics metricsFour">
                     <Metric
                         label="Affected customers"
-                        value={integer(im?.exposed_customers)}
+                        value={integer(measured?.exposed_customers)}
+                        emphasis
                     />
                     <Metric
                         label="Failed interactions"
-                        value={integer(im?.immediate_failed_interactions)}
+                        value={integer(measured?.immediate_failed_interactions)}
                     />
+                    <Metric label="Incident cohort" value={facts.region} />
                     <Metric
-                        label="Revenue effect"
-                        value={currency(
-                            im?.immediate_revenue_loss,
-                            im?.currency,
-                        )}
-                    />
-                    <Metric
-                        label="Future revenue risk"
-                        value={currency(
-                            im?.future_revenue_at_risk,
-                            im?.currency,
-                        )}
-                    />
-                    <Metric
-                        label="Support & recovery cost"
-                        value={currency(
-                            im?.support_and_recovery_cost,
-                            im?.currency,
-                        )}
-                    />
-                    <Metric
-                        label="Churn exposure"
-                        value={percent(im?.incremental_churn_rate)}
+                        label="Incremental churn rate"
+                        value={percent(measured?.incremental_churn_rate)}
+                        detail="Synthetic causal estimate"
                     />
                 </div>
             </Card>
-            <Card title="Segments" wide>
+            <Card
+                kicker="Provenance discipline"
+                title="Currency unit is not exported"
+            >
+                <p>
+                    The artifact contains numeric financial fields, but not a
+                    currency code. They are shown as source units rather than
+                    falsely formatted as dollars, rupees, or another currency.
+                </p>
+            </Card>
+            <Card title="Financial fields in source units" className="spanFull">
+                <div className="metrics metricsFour">
+                    <Metric
+                        label="Immediate revenue loss"
+                        value={number(measured?.immediate_revenue_loss)}
+                        detail="Currency unit unavailable"
+                    />
+                    <Metric
+                        label="Future revenue at risk"
+                        value={number(measured?.future_revenue_at_risk)}
+                        detail="Currency unit unavailable"
+                    />
+                    <Metric
+                        label="Support and recovery cost"
+                        value={number(measured?.support_and_recovery_cost)}
+                        detail="Currency unit unavailable"
+                    />
+                    <Metric
+                        label="Total financial impact"
+                        value={number(measured?.total_financial_impact)}
+                        detail={`95% interval ${number(measured?.lower_ci)} - ${number(measured?.upper_ci)}`}
+                    />
+                </div>
+            </Card>
+            <Card title="Affected segments" className="spanFull">
                 {segments.length ? (
                     <Table
+                        label="Synthetic customer impact by segment"
+                        caption="Revenue-risk values retain their source unit because no currency code is present."
                         head={[
                             "Segment",
                             "Customers",
                             "Exposed",
-                            "Churn",
+                            "Observed churn",
+                            "Weighted incremental churn",
                             "Revenue risk",
                         ]}
-                        rows={segments.map((x) => [
-                            `${value(x.segment_name)}: ${value(x.segment_value)}`,
-                            integer(x.customers),
-                            integer(x.exposed_customers),
-                            percent(x.weighted_incremental_churn),
-                            currency(x.revenue_at_risk, im?.currency),
+                        rows={segments.map((segment) => [
+                            `${humanize(segment.segment_name)}: ${humanize(segment.segment_value)}`,
+                            integer(segment.customers),
+                            integer(segment.exposed_customers),
+                            percent(segment.observed_churn_rate),
+                            percent(segment.weighted_incremental_churn),
+                            number(segment.revenue_at_risk),
                         ])}
                     />
                 ) : (
                     <Empty section="segment impact" />
                 )}
             </Card>
-            <Card title="Causal diagnostics" wide>
-                {estimates.length ? (
-                    <Table
-                        head={[
-                            "Estimator",
-                            "Estimand",
-                            "Estimate",
-                            "95% interval",
-                            "Sample",
-                        ]}
-                        rows={estimates.map((x) => [
-                            value(x.estimator),
-                            value(x.estimand),
-                            number(x.estimate),
-                            `${number(x.lower_ci)} – ${number(x.upper_ci)}`,
-                            integer(x.sample_size),
-                        ])}
-                    />
-                ) : (
-                    <Empty section="causal estimates" />
-                )}
+            <Card title="Causal diagnostics" className="spanFull compactCard">
+                <details>
+                    <summary>
+                        Inspect {estimates.length} exported estimates
+                    </summary>
+                    {estimates.length ? (
+                        <Table
+                            head={[
+                                "Estimator",
+                                "Estimand",
+                                "Estimate",
+                                "95% interval",
+                                "Sample",
+                            ]}
+                            rows={estimates.map((estimate) => [
+                                humanize(estimate.estimator),
+                                humanize(estimate.estimand),
+                                number(estimate.estimate),
+                                `${number(estimate.lower_ci)} - ${number(estimate.upper_ci)}`,
+                                integer(estimate.sample_size),
+                            ])}
+                        />
+                    ) : (
+                        <Empty section="causal estimates" />
+                    )}
+                </details>
             </Card>
         </Page>
     );
 }
+
 export function Remediation({ b }: { b: Bundle }) {
-    const p = plan(b),
-        x = receipt(b),
-        rec = recovery(b);
-    const metrics = asRows(rec?.metric_evaluations);
+    const remediation = plan(b);
+    const execution = receipt(b);
+    const recoveryReport = recovery(b);
+    const observations = recoveryObservations(b);
+    const recoveryPolicy = recoveryConfig(b);
+    const action = asRows(remediation?.actions)[0];
+    const before = resource(beforeState(b), String(action?.resource_id ?? ""));
+    const after = resource(afterState(b), String(action?.resource_id ?? ""));
+    const metrics = asRows(recoveryReport?.metric_evaluations);
+    const postObservations = asRows(observations?.observations).filter(
+        (item) =>
+            typeof item.observed_at === "string" &&
+            typeof execution?.executed_at === "string" &&
+            Date.parse(item.observed_at) > Date.parse(execution.executed_at),
+    );
+    const policy = nested(remediation?.policy_decision);
     return (
         <Page
-            title="Remediation & Recovery"
-            summary="Historical governed records only; this page cannot execute a change."
+            section="Remediation & Recovery"
+            title="Governed action, verified outcome"
+            summary="These are historical synthetic records, not production controls. The browser cannot approve, execute, reverse, retry, or declare recovery."
+            aside={<Badge value="Historical record only" tone="info" />}
         >
-            <Card title="Policy and simulated execution">
+            <Card className="spanFull historicalNotice">
+                <b>No mutation surface exists here.</b>
                 <p>
-                    {typeof p?.summary === "string" ? p.summary : unavailable}
+                    The recorded executor changed only a validated local
+                    simulated control-state artifact. It had no production or
+                    cloud authority.
                 </p>
-                <div className="metrics">
-                    <Metric label="Risk" value={value(p?.risk_level)} />
-                    <Metric
-                        label="Policy"
-                        value={value(
-                            (p?.policy_decision as RecordValue | undefined)
-                                ?.outcome,
-                        )}
-                    />
-                    <Metric
-                        label="Required approvals"
-                        value={integer(p?.required_approvals)}
-                    />
-                    <Metric label="Execution state" value={value(x?.status)} />
+            </Card>
+            <Card
+                kicker="Recorded sequence"
+                title="Policy to recovery"
+                className="spanFull"
+            >
+                <ol className="governanceFlow">
+                    <li>
+                        <span>Policy</span>
+                        <b>{humanize(policy?.outcome)}</b>
+                        <small>{humanize(remediation?.risk_level)} risk</small>
+                    </li>
+                    <li>
+                        <span>Approvals</span>
+                        <b>
+                            {integer(remediation?.required_approvals)} required
+                        </b>
+                        <small>
+                            Exact-plan approval snapshot bound to receipt
+                        </small>
+                    </li>
+                    <li>
+                        <span>Simulated execution</span>
+                        <b>{humanize(execution?.status)}</b>
+                        <small>{time(execution?.executed_at)}</small>
+                    </li>
+                    <li>
+                        <span>Observations</span>
+                        <b>
+                            {integer(postObservations.length)} post-action
+                            values
+                        </b>
+                        <small>Primary plus guardrail series</small>
+                    </li>
+                    <li>
+                        <span>Recovery decision</span>
+                        <b>{humanize(recoveryReport?.decision)}</b>
+                        <small>{time(recoveryReport?.evaluated_at)}</small>
+                    </li>
+                </ol>
+            </Card>
+            <Card
+                kicker="Approved plan"
+                title={value(remediation?.summary)}
+                className="spanTwo"
+            >
+                <p>{value(action?.justification)}</p>
+                <dl className="actionRecord">
+                    <div>
+                        <dt>Resource</dt>
+                        <dd>
+                            <SourceRef>{value(action?.resource_id)}</SourceRef>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Action</dt>
+                        <dd>{humanize(action?.action_type)}</dd>
+                    </div>
+                    <div>
+                        <dt>Blast radius</dt>
+                        <dd>{humanize(action?.blast_radius)}</dd>
+                    </div>
+                    <div>
+                        <dt>Rollback trigger</dt>
+                        <dd>{value(remediation?.rollback_trigger)}</dd>
+                    </div>
+                </dl>
+                <div className="stateTransition">
+                    <div>
+                        <span>Before</span>
+                        <b>{value(before?.current_revision)}</b>
+                    </div>
+                    <span aria-hidden="true">-&gt;</span>
+                    <div>
+                        <span>After</span>
+                        <b>{value(after?.current_revision)}</b>
+                    </div>
                 </div>
             </Card>
-            <Card title="Recovery verification" wide>
-                {rec ? (
-                    <>
-                        <Badge value={rec.decision} />
-                        <div className="recovery">
-                            {metrics.map((m) => (
-                                <div key={value(m.metric_id)}>
-                                    <b>{value(m.metric_id)}</b>
-                                    <span>{value(m.status)}</span>
-                                    <small>
-                                        equivalence p{" "}
-                                        {score(m.equivalence_pvalue)} ·
-                                        sustained {integer(m.sustain_count)}{" "}
-                                        periods
-                                    </small>
+            <Card kicker="Safety condition" title="Execution is not recovery">
+                <p>
+                    The receipt proves the simulated state transition completed.
+                    Recovery required separate later observations, statistical
+                    equivalence checks, sustained healthy periods, and a healthy
+                    payment guardrail.
+                </p>
+                <Metric
+                    label="Approval snapshot"
+                    value={compactHash(execution?.approval_snapshot_sha256)}
+                />
+                <Metric
+                    label="Reopen threshold"
+                    value={`${integer(recoveryPolicy?.reopen_after_consecutive_failures)} consecutive failures`}
+                />
+            </Card>
+            <Card
+                kicker="Deterministic verification"
+                title="Recovery metrics"
+                className="spanFull"
+            >
+                <div className="recoveryMetrics">
+                    {metrics.map((metric) => (
+                        <article key={value(metric.metric_id)}>
+                            <header>
+                                <div>
+                                    <p>{humanize(metric.role)}</p>
+                                    <h3>{humanize(metric.metric_id)}</h3>
                                 </div>
-                            ))}
-                        </div>
-                    </>
-                ) : (
-                    <Empty section="recovery report" />
-                )}
+                                <Badge value={humanize(metric.status)} />
+                            </header>
+                            <div className="metrics metricsFour">
+                                <Metric
+                                    label="Baseline center"
+                                    value={percent(metric.baseline_center)}
+                                />
+                                <Metric
+                                    label="Latest center"
+                                    value={percent(metric.latest_center)}
+                                />
+                                <Metric
+                                    label="Equivalence p-value"
+                                    value={score(metric.equivalence_pvalue)}
+                                />
+                                <Metric
+                                    label="Sustained"
+                                    value={`${integer(metric.sustain_count)} periods`}
+                                />
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </Card>
+            <Card
+                title="Post-action observations"
+                className="spanFull compactCard"
+            >
+                <details>
+                    <summary>
+                        Inspect {postObservations.length} exact observations
+                        used by recovery verification
+                    </summary>
+                    <Table
+                        head={["Metric", "Observed at", "Value", "Sample"]}
+                        rows={postObservations.map((observation) => [
+                            humanize(observation.metric_id),
+                            time(observation.observed_at),
+                            percent(observation.value),
+                            integer(observation.sample_size),
+                        ])}
+                    />
+                </details>
             </Card>
         </Page>
     );
 }
+
 export function Evaluation({ b }: { b: Bundle }) {
-    const e = fileMetric(b);
-    const bins = asRows(e?.reliability_bins).filter((x) => Number(x.count) > 0);
+    const metrics = evaluationMetrics(b);
+    const cases = evaluationCases(b);
+    const bins = asRows(metrics?.reliability_bins).filter(
+        (item) => Number(item.count) > 0,
+    );
     return (
         <Page
-            title="Evaluation"
-            summary="Synthetic benchmark measures, grouped by their stated semantics."
+            section="Evaluation"
+            title="Ground truth, not persuasive prose"
+            summary="A deterministic evaluator compares scripted predictions with hidden synthetic answers. These smoke results measure replayable control behavior; they are not production performance claims."
+            aside={
+                <Badge
+                    value={`${integer(metrics?.case_count)} synthetic cases`}
+                    tone="info"
+                />
+            }
         >
-            <Card title="Diagnosis and calibration">
-                <div className="metrics">
+            <Card
+                kicker="Scope first"
+                title="A deliberately small smoke benchmark"
+                className="spanFull evaluationScope"
+            >
+                <p>
+                    Percentages below come from {integer(metrics?.case_count)}{" "}
+                    synthetic cases, with{" "}
+                    {integer(metrics?.calibration_case_count)} calibration
+                    cases. A {percent(metrics?.top1_accuracy)} top-1 result
+                    therefore means the committed smoke fixtures passed, not
+                    that the system has proven production-grade model accuracy.
+                </p>
+            </Card>
+            <Card title="Diagnosis and calibration" className="spanTwo">
+                <div className="metrics metricsFour">
                     <Metric
                         label="Top-1 accuracy"
-                        value={percent(e?.top1_accuracy)}
+                        value={percent(metrics?.top1_accuracy)}
+                        detail={`${integer(metrics?.case_count)} cases`}
                     />
                     <Metric
                         label="Top-3 recall"
-                        value={percent(e?.top3_recall)}
+                        value={percent(metrics?.top3_recall)}
                     />
                     <Metric
-                        label="Reciprocal rank"
-                        value={score(e?.mean_reciprocal_rank)}
+                        label="Brier score"
+                        value={score(metrics?.brier_score)}
+                        detail="Lower is better"
                     />
-                    <Metric label="Brier score" value={score(e?.brier_score)} />
                     <Metric
                         label="Log loss"
-                        value={score(e?.clipped_log_loss)}
+                        value={score(metrics?.clipped_log_loss)}
+                        detail="Lower is better"
                     />
                     <Metric
-                        label="ECE"
-                        value={percent(e?.expected_calibration_error)}
+                        label="Coverage"
+                        value={percent(metrics?.coverage)}
                     />
-                    <Metric label="Coverage" value={percent(e?.coverage)} />
                     <Metric
                         label="Selective risk"
-                        value={percent(e?.selective_risk)}
+                        value={percent(metrics?.selective_risk)}
+                        detail="Error rate on answered cases"
+                    />
+                    <Metric
+                        label="Citation validity"
+                        value={percent(metrics?.citation_validity_rate)}
+                    />
+                    <Metric
+                        label="Evidence coverage"
+                        value={percent(metrics?.required_evidence_coverage)}
                     />
                 </div>
             </Card>
-            <Card title="Reliability bins" wide>
+            <Card title="Safety results">
+                <div className="metrics metricsTwo">
+                    <Metric
+                        label="Authority violations"
+                        value={integer(
+                            metrics?.prohibited_action_authorized_count,
+                        )}
+                    />
+                    <Metric
+                        label="Unsupported claims"
+                        value={integer(metrics?.unsupported_claim_count)}
+                    />
+                    <Metric
+                        label="Claimed recovery authority"
+                        value={integer(
+                            metrics?.model_claimed_recovery_authority_count,
+                        )}
+                    />
+                    <Metric
+                        label="Tool failures"
+                        value={integer(metrics?.tool_failure_count)}
+                    />
+                </div>
+                <p className="note">
+                    These counts show fixture outcomes. They do not prove that a
+                    model will never propose unsafe content.
+                </p>
+            </Card>
+            <Card title="Visible benchmark cases" className="spanFull">
+                <div className="caseGrid">
+                    {cases.map((item) => (
+                        <article key={value(item.case_id)}>
+                            <div>
+                                <Badge
+                                    value={humanize(item.difficulty)}
+                                    tone="info"
+                                />
+                                <SourceRef>{value(item.case_id)}</SourceRef>
+                            </div>
+                            <h3>{humanize(item.family)}</h3>
+                            <p>{value(item.incident_input)}</p>
+                        </article>
+                    ))}
+                </div>
+            </Card>
+            <Card title="Calibration bins" className="spanTwo">
                 {bins.length ? (
                     <Table
-                        head={["Range", "Cases", "Confidence", "Accuracy"]}
-                        rows={bins.map((x) => [
-                            `${percent(x.lower_bound)} – ${percent(x.upper_bound)}`,
-                            integer(x.count),
-                            percent(x.mean_confidence),
-                            percent(x.accuracy),
+                        head={[
+                            "Confidence range",
+                            "Cases",
+                            "Mean confidence",
+                            "Accuracy",
+                        ]}
+                        rows={bins.map((item) => [
+                            `${percent(item.lower_bound)} - ${percent(item.upper_bound)}`,
+                            integer(item.count),
+                            percent(item.mean_confidence),
+                            percent(item.accuracy),
                         ])}
                     />
                 ) : (
-                    <Empty section="reliability bins" />
+                    <Empty section="non-empty reliability bins" />
                 )}
             </Card>
-            <Card title="Safety">
-                <Metric
-                    label="Authority violations"
-                    value={integer(e?.prohibited_action_authorized_count)}
-                />
-                <Metric
-                    label="Unsupported claims"
-                    value={integer(e?.unsupported_claim_count)}
+            <Card title="Intentionally unavailable scores">
+                <Empty
+                    section="remediation and recovery accuracy"
+                    explanation="The smoke predictions do not contain enough scored remediation or recovery decisions, so those aggregate metrics are null rather than inferred."
                 />
             </Card>
         </Page>
     );
 }
-const fileMetric = (b: Bundle) => {
-    const f = b.files.find((x) =>
-        x.path.endsWith("evaluation-smoke/aggregate-metrics.json"),
-    )?.content;
-    return f && typeof f === "object" && !Array.isArray(f)
-        ? (f as RecordValue)
-        : undefined;
-};
+
 export function System({
     b,
     sourceCommit,
@@ -520,43 +1351,167 @@ export function System({
     sourceCommit?: string;
     integrity: "verified" | "warning" | "local";
 }) {
+    const config = investigationConfig(b);
+    const allowedTools = stringItems(config?.allowed_tools);
     return (
         <Page
-            title="System & Limitations"
-            summary="Static presentation over a validated public artifact."
+            section="System & Limitations"
+            title="Useful AI, bounded authority"
+            summary="The system separates model exploration from deterministic authority and from a static browser that can only present a validated public bundle."
+            aside={<Badge value={`Bundle ${integrity}`} />}
         >
-            <Card title="Architecture" wide>
-                <div className="architecture">
-                    <div>Deterministic exporter</div>
-                    <span>→</span>
-                    <div>Validated public bundle</div>
-                    <span>→</span>
-                    <div>Read-only dashboard</div>
+            <Card
+                kicker="Trust model"
+                title="Three distinct authority zones"
+                className="spanFull trustMap"
+            >
+                <div className="trustZones">
+                    <article className="modelZone">
+                        <span>01 / Model</span>
+                        <h3>Investigate</h3>
+                        <p>
+                            Choose approved tools; propose competing hypotheses,
+                            likelihood ratios, citations, falsifiers, unknowns,
+                            and read-only next checks.
+                        </p>
+                        <b>Cannot make an accepted decision</b>
+                    </article>
+                    <article className="softwareZone">
+                        <span>02 / Deterministic software</span>
+                        <h3>Validate and govern</h3>
+                        <p>
+                            Bind sources, enforce tools and SQL, reject
+                            unsupported citations, compute probability and
+                            abstention, gate simulated action, verify recovery,
+                            and score evaluation.
+                        </p>
+                        <b>Owns consequential truth</b>
+                    </article>
+                    <article className="browserZone">
+                        <span>03 / Public browser</span>
+                        <h3>Present</h3>
+                        <p>
+                            Load the closed-world public bundle, navigate,
+                            change theme, inspect tables, and expose deployment
+                            identity.
+                        </p>
+                        <b>Read-only, with no mutation API</b>
+                    </article>
                 </div>
-                <p>{b.disclaimer}</p>
             </Card>
-            <Card title="Identity">
-                <Metric label="Bundle kind" value={b.bundle_kind} />
-                <Metric label="Schema" value={b.schema_version} />
-                <Metric
-                    label="Bundle source commit"
-                    value={b.source_commit ?? unavailable}
-                />
-                <Metric
-                    label="Deployed source commit"
-                    value={
-                        sourceCommit ??
-                        "Local development: deployment identity unavailable"
-                    }
-                />
-                <Metric label="Integrity" value={integrity} />
-            </Card>
-            <Card title="Authority boundary">
-                <p>
-                    No browser authority for approval, remediation, execution,
-                    rollback, recovery, evaluator decisions, credentials,
-                    filesystem access, or arbitrary network retrieval.
+            <Card
+                kicker="Model access"
+                title="Bounded read-only tools"
+                className="spanTwo"
+            >
+                <div className="toolList">
+                    {allowedTools.map((tool) => (
+                        <SourceRef key={tool}>{tool}</SourceRef>
+                    ))}
+                </div>
+                <p className="note">
+                    Tool arguments are schema-validated, role-authorized,
+                    source-bound, size-limited, and audit-recorded. SQL is
+                    AST-parsed SELECT-only over registered in-memory tables.
                 </p>
+            </Card>
+            <Card
+                kicker="Explicitly unavailable"
+                title="No ambient operator power"
+            >
+                <ul className="deniedList">
+                    <li>
+                        Production, cloud, registry, or provider credentials in
+                        the browser
+                    </li>
+                    <li>
+                        Arbitrary shell, filesystem, unrestricted SQL, or
+                        arbitrary tool network access
+                    </li>
+                    <li>Approval, remediation, rollback, or retry authority</li>
+                    <li>Recovery-decision or evaluator authority</li>
+                    <li>
+                        Natural-language approval or instructions embedded in
+                        retrieved evidence
+                    </li>
+                </ul>
+            </Card>
+            <Card
+                kicker="Public artifact"
+                title="Deployment identity"
+                className="spanTwo"
+            >
+                <dl className="identityGrid">
+                    <div>
+                        <dt>Bundle kind</dt>
+                        <dd>{b.bundle_kind}</dd>
+                    </div>
+                    <div>
+                        <dt>Schema</dt>
+                        <dd>{b.schema_version}</dd>
+                    </div>
+                    <div>
+                        <dt>Sanitized files</dt>
+                        <dd>{integer(b.files.length)}</dd>
+                    </div>
+                    <div>
+                        <dt>Integrity</dt>
+                        <dd>{humanize(integrity)}</dd>
+                    </div>
+                    <div>
+                        <dt>Bundle source</dt>
+                        <dd>
+                            <SourceRef>
+                                {b.source_commit ?? unavailable}
+                            </SourceRef>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Deployed source</dt>
+                        <dd>
+                            <SourceRef>
+                                {sourceCommit ??
+                                    "Local development identity unavailable"}
+                            </SourceRef>
+                        </dd>
+                    </div>
+                </dl>
+                <p className="note">
+                    The exporter excludes credentials, environment-like fields,
+                    evaluator answer keys, absolute paths, and mutable inputs
+                    before the frontend build.
+                </p>
+            </Card>
+            <Card
+                kicker="Current limits"
+                title="What this demonstration does not prove"
+            >
+                <ul className="plainList stacked">
+                    <li>
+                        All incident and benchmark data are synthetic, not
+                        production claims.
+                    </li>
+                    <li>
+                        The detector smoke slice has no eligible anomaly
+                        decision.
+                    </li>
+                    <li>
+                        Likelihood ratios are model-proposed and bounded, not
+                        historically learned.
+                    </li>
+                    <li>
+                        The benchmark contains only{" "}
+                        {integer(evaluationMetrics(b)?.case_count)} smoke cases.
+                    </li>
+                    <li>
+                        The default investigation loop is synchronous and
+                        single-agent.
+                    </li>
+                    <li>
+                        Simulated local state locking does not claim distributed
+                        exactly-once behavior.
+                    </li>
+                </ul>
             </Card>
         </Page>
     );

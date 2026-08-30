@@ -1,0 +1,27 @@
+schema_version: "1.0"
+analytics_id: commerce-analytics-showcase
+timezone: UTC
+time_grains:
+  - day
+minimum_denominator: 5
+metrics:
+  - checkout_conversion_rate
+  - payment_approval_rate
+cohorts:
+  - name: overall
+    dimensions: []
+  - name: region
+    dimensions: [region]
+funnel_cohorts:
+  - overall
+  - region
+contributions:
+  - name: checkout-conversion-by-region
+    metric: checkout_conversion_rate
+    dimension: region
+    time_grain: day
+output:
+  compression: zstd
+  compression_level: 6
+  row_group_size: 50000
+  include_statistics: true

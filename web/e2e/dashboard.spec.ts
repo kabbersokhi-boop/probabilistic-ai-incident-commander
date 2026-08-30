@@ -2,8 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const routes = [
-    ["overview", "Checkout Failure in India South"],
-    ["detection", "What the detector can prove"],
+    ["overview", "A checkout defect, investigated end to end"],
+    ["detection", "How do we know something abnormal happened?"],
     ["investigation", "Competing causes, inspected"],
     ["evidence", "An auditable incident record"],
     ["impact", "Who was affected, and what is provable"],
@@ -26,7 +26,7 @@ test("all deep links render source-bound, accessible read-only records", async (
             page.getByRole("heading", { name: heading }),
         ).toBeVisible();
         await expect(page).toHaveTitle(
-            `PAIC — ${route === "remediation-recovery" ? "Remediation & Recovery" : route === "system-limitations" ? "System & Limitations" : heading === "Checkout Failure in India South" ? "Overview" : route[0].toUpperCase() + route.slice(1)}`,
+            `PAIC — ${route === "remediation-recovery" ? "Remediation & Recovery" : route === "system-limitations" ? "System & Limitations" : heading === "A checkout defect, investigated end to end" ? "Overview" : route[0].toUpperCase() + route.slice(1)}`,
         );
         await expect(page.locator("footer")).toContainText(
             "Read-only public artifact",
@@ -70,7 +70,9 @@ test("skip link exposes and moves focus to main content", async ({
     test.skip(testInfo.project.name !== "desktop-1440");
     await page.goto("/#/overview");
     await expect(
-        page.getByRole("heading", { name: "Checkout Failure in India South" }),
+        page.getByRole("heading", {
+            name: "A checkout defect, investigated end to end",
+        }),
     ).toBeVisible();
     await page.keyboard.press("Tab");
     const skip = page.getByRole("link", { name: "Skip to content" });
@@ -83,8 +85,11 @@ test("skip link exposes and moves focus to main content", async ({
 test("overview passes the 30-second comprehension facts", async ({ page }) => {
     await page.goto("/#/overview");
     await expect(
-        page.getByText("AI-assisted investigation", { exact: false }),
+        page.getByText("AI-assisted incident-response system", {
+            exact: false,
+        }),
     ).toBeVisible();
+    await expect(page.getByText(/detector fired/i)).toBeVisible();
     await expect(page.getByText("53", { exact: true }).first()).toBeVisible();
     await expect(
         page.getByText("99.5%", { exact: true }).first(),
@@ -92,11 +97,7 @@ test("overview passes the 30-second comprehension facts", async ({ page }) => {
     await expect(
         page.getByText(/payment\.retry_timeout_ms/i).first(),
     ).toBeVisible();
-    await expect(
-        page.getByText(
-            /No approvals, execution, rollback, or recovery decisions/i,
-        ),
-    ).toBeVisible();
+    await expect(page.getByText(/static read-only browser/i)).toBeVisible();
     await expect(
         page.getByText(/Validation health, not business health/i),
     ).toBeVisible();
@@ -129,6 +130,41 @@ test("theme selection persists without changing incident data", async ({
     await expect(page.getByText("53", { exact: true }).first()).toBeVisible();
 });
 
+test("200% reflow preserves every route without horizontal page overflow", async ({
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+    await page.setViewportSize({ width: 720, height: 800 });
+    for (const [route, heading] of routes) {
+        await page.goto(`/#/${route}`);
+        await expect(
+            page.getByRole("heading", { name: heading }),
+        ).toBeVisible();
+        expect(
+            await page.evaluate(
+                () => document.documentElement.scrollWidth - window.innerWidth,
+            ),
+            `${route} 200% equivalent reflow`,
+        ).toBeLessThanOrEqual(1);
+    }
+});
+
+test("print mode removes navigation and preserves the incident report", async ({
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+    await page.goto("/#/overview");
+    await page.emulateMedia({ media: "print", reducedMotion: "reduce" });
+    await expect(page.locator("nav")).toBeHidden();
+    await expect(
+        page.getByRole("heading", {
+            name: "A checkout defect, investigated end to end",
+        }),
+    ).toBeVisible();
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(accessibility.violations).toEqual([]);
+});
+
 test("bundle failure remains fail-closed", async ({ page }) => {
     await page.route("**/data/bundle.json", (route) =>
         route.fulfill({ status: 503, body: "" }),
@@ -155,7 +191,9 @@ test("representative pages have reviewed visual baselines", async ({
         await expect(page).toHaveScreenshot(`${route}.png`, {
             fullPage: true,
             animations: "disabled",
-            maxDiffPixelRatio: 0.001,
+            // Allow minor Linux font rasterization variance while retaining a
+            // threshold far below the structural differences this suite guards.
+            maxDiffPixelRatio: 0.003,
         });
     }
     expect(testInfo.project.name).toBeTruthy();

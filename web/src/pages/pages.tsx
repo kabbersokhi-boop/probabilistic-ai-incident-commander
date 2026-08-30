@@ -4,6 +4,7 @@ import { asRows, isRecord, unavailable } from "../bundle/schema";
 import {
     compactHash,
     date,
+    currency,
     humanize,
     integer,
     number,
@@ -16,6 +17,8 @@ import {
     afterState,
     beforeState,
     decisionEvidence,
+    detectionConfig,
+    detectorSeries,
     evaluationCases,
     evaluationMetrics,
     hypotheses,
@@ -24,6 +27,7 @@ import {
     investigationConfig,
     keyTimeline,
     lead,
+    leadingAnomaly,
     plan,
     receipt,
     recovery,
@@ -32,6 +36,7 @@ import {
     report,
     resource,
     rows,
+    simulationConfig,
     timeline,
 } from "../bundle/selectors";
 import { DetectionChart } from "../components/DetectionChart";
@@ -89,7 +94,6 @@ function incidentFacts(b: Bundle) {
 
 export function Overview({ b }: { b: Bundle }) {
     const facts = incidentFacts(b);
-    const investigation = report(b);
     const leading = lead(b);
     const measured = impact(b);
     const remediation = plan(b);
@@ -105,11 +109,12 @@ export function Overview({ b }: { b: Bundle }) {
             String(item.event?.title).toLowerCase().includes("payment"),
     );
     const policy = nested(remediation?.policy_decision);
+    const anomaly = leadingAnomaly(b);
     return (
         <Page
             section="Overview"
-            title={`${facts.family} in ${facts.region}`}
-            summary="An AI-assisted investigation of a reproducible synthetic commerce incident, with deterministic software retaining every consequential decision."
+            title="A checkout defect, investigated end to end"
+            summary="PAIC is an AI-assisted incident-response system. It detects abnormal behavior, scopes customer impact, tests competing causes, governs a simulated rollback, and verifies recovery—without giving the model operational authority."
             aside={
                 <div className="statusCluster">
                     <Badge value="Synthetic scenario" tone="info" />
@@ -120,14 +125,14 @@ export function Overview({ b }: { b: Bundle }) {
             <Card className="incidentHero">
                 <div className="incidentLead">
                     <p className="overline">What happened</p>
-                    <h2>
-                        {facts.family} affected {facts.region}
-                    </h2>
+                    <h2>Checkout performance deteriorated in {facts.region}</h2>
                     <p className="lede">
-                        {value(supportingChange?.event?.detail)} The
-                        investigation ranked that primary-service change above
-                        the competing change record:{" "}
-                        {value(alternativeChange?.event?.detail)}
+                        A controlled synthetic defect lowered checkout
+                        conversion to {percent(anomaly?.observed_value)}, versus
+                        a {percent(anomaly?.expected_value)} baseline. The
+                        investigation then ranked {value(leading?.title)} above
+                        the competing record:{" "}
+                        {value(alternativeChange?.event?.title)}.
                     </p>
                     <div
                         className="heroLinks"
@@ -141,9 +146,9 @@ export function Overview({ b }: { b: Bundle }) {
                 </div>
                 <div className="factRail">
                     <Metric
-                        label="Affected synthetic customers"
+                        label="Who was affected"
                         value={integer(measured?.exposed_customers)}
-                        detail={`${integer(measured?.immediate_failed_interactions)} failed interactions`}
+                        detail={`synthetic customers exposed; ${integer(measured?.immediate_failed_interactions)} failed interactions counted`}
                         emphasis
                     />
                     <Metric
@@ -152,15 +157,15 @@ export function Overview({ b }: { b: Bundle }) {
                         detail="UTC source timestamps"
                     />
                     <Metric
-                        label="Leading root-cause probability"
+                        label="Leading explanation"
                         value={percent(leading?.posterior_probability)}
-                        detail={value(leading?.title)}
+                        detail={`${value(leading?.title)}; deterministic posterior, not model confidence`}
                         emphasis
                     />
                     <Metric
-                        label="Public interface authority"
-                        value="Read-only"
-                        detail="No approvals, execution, rollback, or recovery decisions"
+                        label="What happened next"
+                        value={humanize(recoveryReport?.decision)}
+                        detail="governed simulated rollback, then independent recovery checks"
                     />
                 </div>
             </Card>
@@ -174,29 +179,32 @@ export function Overview({ b }: { b: Bundle }) {
                     <li>
                         <span>01</span>
                         <div>
-                            <b>Evidence was assembled</b>
+                            <b>The detector fired</b>
                             <p>
-                                Validated synthetic operational records bound
-                                changes, service observations, customer impact,
-                                and lineage to the incident.
+                                {facts.region} checkout conversion fell outside
+                                its statistically expected range after adequate
+                                history.
                             </p>
                         </div>
                     </li>
                     <li>
                         <span>02</span>
                         <div>
-                            <b>The model explored competing causes</b>
-                            <p>{value(investigation?.summary)}</p>
+                            <b>Impact and facts were assembled</b>
+                            <p>
+                                Source-bound records scoped customers, funnel
+                                failures, changes, service health, and lineage.
+                            </p>
                         </div>
                     </li>
                     <li>
                         <span>03</span>
                         <div>
-                            <b>Software accepted the probability calculation</b>
+                            <b>The model investigated; software decided</b>
                             <p>
-                                Observed evidence IDs, bounded likelihood
-                                ratios, entropy, margin, and abstention
-                                thresholds were validated deterministically.
+                                Scripted model responses proposed two causes.
+                                Code validated citations, computed posteriors,
+                                and enforced abstention gates.
                             </p>
                         </div>
                     </li>
@@ -225,6 +233,38 @@ export function Overview({ b }: { b: Bundle }) {
                         </div>
                     </li>
                 </ol>
+            </Card>
+
+            <Card
+                kicker="Product boundary"
+                title="The model investigates. Deterministic software retains authority."
+                className="spanFull productBoundary"
+            >
+                <div className="boundaryColumns">
+                    <div>
+                        <b>AI contribution</b>
+                        <p>
+                            Choose bounded read-only checks; propose competing
+                            hypotheses, evidence weights, falsifiers, and next
+                            steps.
+                        </p>
+                    </div>
+                    <div>
+                        <b>Software authority</b>
+                        <p>
+                            Validate evidence; calculate accepted probability;
+                            enforce policy and approvals; execute only simulated
+                            state changes; decide recovery.
+                        </p>
+                    </div>
+                    <div>
+                        <b>Public demo</b>
+                        <p>
+                            Reproducible synthetic data, committed scripted
+                            provider responses, and a static read-only browser.
+                        </p>
+                    </div>
+                </div>
             </Card>
 
             <Card
@@ -305,85 +345,86 @@ export function Detection({ b }: { b: Bundle }) {
     const points = rows(b, "detectors");
     const anomalyEvents = rows(b, "anomaly_events");
     const changePoints = rows(b, "change_points");
-    const series = points.filter(
-        (point) => point.metric_name === points[0]?.metric_name,
+    const series = detectorSeries(b);
+    const leading = leadingAnomaly(b);
+    const config = detectionConfig(b);
+    const scenario = asRows(config?.benchmark_scenarios).find(
+        (item) => item.scenario_id === leading?.scenario_id,
     );
-    const chartable = series.length > 1;
     const anomalies = points.filter((point) => point.is_anomaly === true);
     const eligible = points.filter((point) => point.is_eligible === true);
     return (
         <Page
             section="Detection"
-            title="What the detector can prove"
-            summary={`This public detector slice is a baseline smoke artifact. It exports ${integer(points.length)} metric observations, but none was eligible for anomaly scoring.`}
-            aside={<Badge value="No anomaly declared" tone="neutral" />}
+            title="How do we know something abnormal happened?"
+            summary={`The detector had ${integer(leading?.baseline_points)} prior daily observations for this cohort, calculated an expected range, and flagged the controlled ${region(leading?.region)} checkout drop only after its deterministic evidence gates passed.`}
+            aside={<Badge value="Anomaly detected" tone="warn" />}
         >
             <Card
-                kicker="Source result"
-                title="Insufficient history for an anomaly decision"
+                kicker="Detection verdict"
+                title={`${humanize(leading?.display_name)} fell outside its expected range`}
                 className="spanTwo detectionVerdict"
             >
                 <p className="lede">
-                    The records passed their sample-size gates, but exported
-                    zero baseline points and no expected range, p-value,
-                    q-value, anomaly event, or change point. Connecting the two
-                    different metrics as a time series would be misleading, so
-                    this interface uses the exact table instead.
+                    On {date(leading?.period_start)}, conversion in{" "}
+                    {region(leading?.region)} was{" "}
+                    {percent(leading?.observed_value)}. The expected center was{" "}
+                    {percent(leading?.expected_value)}, with a{" "}
+                    {percent(leading?.expected_lower)}–
+                    {percent(leading?.expected_upper)} range. All{" "}
+                    {integer(leading?.detector_support_count)} configured
+                    statistical signals supported the alert.
                 </p>
                 <div className="metrics metricsFour">
                     <Metric
-                        label="Observations"
-                        value={integer(points.length)}
+                        label="Observed"
+                        value={percent(leading?.observed_value)}
+                        emphasis
                     />
                     <Metric
-                        label="Eligible for scoring"
-                        value={integer(eligible.length)}
+                        label="Expected"
+                        value={percent(leading?.expected_value)}
                     />
                     <Metric
-                        label="Anomalies"
-                        value={integer(anomalies.length)}
+                        label="Adjusted significance"
+                        value={score(leading?.q_value)}
+                        detail="Benjamini–Hochberg q-value"
                     />
                     <Metric
-                        label="Change points"
-                        value={integer(changePoints.length)}
+                        label="Sample"
+                        value={integer(leading?.sample_size)}
+                        detail={`${integer(leading?.baseline_points)} baseline days`}
                     />
                 </div>
             </Card>
             <Card
-                kicker="Interpretation"
-                title="How abnormality would be established"
+                kicker="Scenario provenance"
+                title="A controlled detector input—not a production observation"
             >
-                <ul className="checkList">
-                    <li>
-                        Build an adequate rolling history for each metric and
-                        cohort.
-                    </li>
-                    <li>
-                        Calculate an expected range with the exported baseline
-                        method.
-                    </li>
-                    <li>
-                        Apply sample-size, effect-size, significance, and
-                        detector-support gates.
-                    </li>
-                    <li>
-                        Emit an anomaly or change-point record only when those
-                        deterministic gates pass.
-                    </li>
-                </ul>
+                <p>
+                    The showcase deterministically applies a{" "}
+                    {percent(Math.abs(Number(scenario?.magnitude)))} level
+                    decrease to the {region(leading?.region)} metric copy on{" "}
+                    {date(scenario?.start_at)}. This gives the detector known
+                    truth without pretending a real customer incident occurred.
+                </p>
+                <SourceRef>{value(leading?.scenario_id)}</SourceRef>
             </Card>
-            <Card title="Detector observations" className="spanFull">
-                {chartable ? (
+            <Card
+                title="Baseline, expected range, and observed drop"
+                className="spanFull"
+            >
+                {series.length > 1 ? (
                     <DetectionChart
                         points={series}
                         anomalyEvents={anomalyEvents}
                         changePoints={changePoints}
                     />
                 ) : null}
-                {points.length ? (
+                {series.length ? (
                     <Table
                         label="Exact exported detector observations"
-                        caption="Exact public-bundle rows. Missing statistical fields were null in the source artifact."
+                        caption={`Exact source-bound series for ${region(leading?.region)} checkout conversion. Scroll horizontally to inspect every field.`}
                         head={[
                             "Metric",
                             "Observed",
@@ -394,7 +435,7 @@ export function Detection({ b }: { b: Bundle }) {
                             "Eligible",
                             "Anomaly",
                         ]}
-                        rows={points.map((point) => [
+                        rows={series.map((point) => [
                             <span className="tablePrimary" key="metric">
                                 {value(point.display_name)}
                                 <small>
@@ -420,39 +461,45 @@ export function Detection({ b }: { b: Bundle }) {
                     <Empty section="detector observations" />
                 )}
             </Card>
-            <Card title="Anomaly events">
-                {anomalyEvents.length ? (
-                    <Table
-                        head={["Metric", "Started", "Severity"]}
-                        rows={anomalyEvents.map((event) => [
-                            value(event.metric_name),
-                            time(event.started_at),
-                            value(event.severity),
-                        ])}
-                    />
-                ) : (
-                    <Empty
-                        section="anomaly events"
-                        explanation="No anomaly event exists in this validated detector artifact. That is a source limitation, not a frontend loading failure."
-                    />
-                )}
+            <Card title="Why the alert was allowed">
+                <ul className="checkList">
+                    <li>
+                        {integer(leading?.baseline_points)} baseline
+                        observations satisfied the history gate.
+                    </li>
+                    <li>
+                        {integer(leading?.sample_size)} interactions satisfied
+                        the sample gate.
+                    </li>
+                    <li>
+                        The drop satisfied the configured effect-size threshold.
+                    </li>
+                    <li>
+                        {integer(leading?.detector_support_count)} independent
+                        detector signals supported the decision.
+                    </li>
+                </ul>
             </Card>
-            <Card title="Change-point events">
-                {changePoints.length ? (
-                    <Table
-                        head={["Metric", "Detected", "Direction"]}
-                        rows={changePoints.map((event) => [
-                            value(event.metric_name),
-                            time(event.detected_at),
-                            value(event.direction),
-                        ])}
+            <Card title="Artifact scope">
+                <div className="metrics metricsTwo">
+                    <Metric
+                        label="Scored observations"
+                        value={integer(points.length)}
                     />
-                ) : (
-                    <Empty
-                        section="change-point events"
-                        explanation="The public detector artifact contains no declared change point; the interface does not infer one from unrelated records."
+                    <Metric label="Eligible" value={integer(eligible.length)} />
+                    <Metric
+                        label="Anomaly observations"
+                        value={integer(anomalies.length)}
                     />
-                )}
+                    <Metric
+                        label="Anomaly events"
+                        value={integer(anomalyEvents.length)}
+                    />
+                </div>
+                <p className="note">
+                    No separate change-point event was required for this alert;
+                    anomaly and change-point outputs remain distinct.
+                </p>
             </Card>
         </Page>
     );
@@ -887,6 +934,10 @@ export function Impact({ b }: { b: Bundle }) {
     const segments = rows(b, "segments");
     const estimates = rows(b, "causal_estimates");
     const facts = incidentFacts(b);
+    const simulation = simulationConfig(b);
+    const currencyCode = asRows(simulation?.regions).find(
+        (item) => item.code === nested(impactConfig(b)?.incident)?.region,
+    )?.currency;
     return (
         <Page
             section="Impact"
@@ -895,7 +946,7 @@ export function Impact({ b }: { b: Bundle }) {
             aside={<Badge value="Synthetic impact" tone="info" />}
         >
             <Card
-                kicker="Observed effect"
+                kicker="Directly counted in the synthetic incident slice"
                 title={`${integer(measured?.exposed_customers)} synthetic customers were exposed`}
                 className="spanTwo impactLead"
             >
@@ -911,43 +962,56 @@ export function Impact({ b }: { b: Bundle }) {
                     />
                     <Metric label="Incident cohort" value={facts.region} />
                     <Metric
-                        label="Incremental churn rate"
+                        label="Estimated incremental churn"
                         value={percent(measured?.incremental_churn_rate)}
                         detail="Synthetic causal estimate"
                     />
                 </div>
             </Card>
             <Card
-                kicker="Provenance discipline"
-                title="Currency unit is not exported"
+                kicker="Observed versus estimated"
+                title="Counts and modeled consequences are kept separate"
             >
                 <p>
-                    The artifact contains numeric financial fields, but not a
-                    currency code. They are shown as source units rather than
-                    falsely formatted as dollars, rupees, or another currency.
+                    Exposure and failed-interaction counts come directly from
+                    the synthetic incident slice. Churn and financial values are
+                    benchmark estimates from an analysis copy with a known
+                    injected outcome effect—not company accounting facts.
                 </p>
             </Card>
-            <Card title="Financial fields in source units" className="spanFull">
+            <Card title="Modeled financial impact" className="spanFull">
                 <div className="metrics metricsFour">
                     <Metric
                         label="Immediate revenue loss"
-                        value={number(measured?.immediate_revenue_loss)}
-                        detail="Currency unit unavailable"
+                        value={currency(
+                            measured?.immediate_revenue_loss,
+                            currencyCode,
+                        )}
+                        detail="Synthetic estimate"
                     />
                     <Metric
                         label="Future revenue at risk"
-                        value={number(measured?.future_revenue_at_risk)}
-                        detail="Currency unit unavailable"
+                        value={currency(
+                            measured?.future_revenue_at_risk,
+                            currencyCode,
+                        )}
+                        detail="Synthetic estimate"
                     />
                     <Metric
                         label="Support and recovery cost"
-                        value={number(measured?.support_and_recovery_cost)}
-                        detail="Currency unit unavailable"
+                        value={currency(
+                            measured?.support_and_recovery_cost,
+                            currencyCode,
+                        )}
+                        detail="Configured synthetic cost model"
                     />
                     <Metric
                         label="Total financial impact"
-                        value={number(measured?.total_financial_impact)}
-                        detail={`95% interval ${number(measured?.lower_ci)} - ${number(measured?.upper_ci)}`}
+                        value={currency(
+                            measured?.total_financial_impact,
+                            currencyCode,
+                        )}
+                        detail={`95% interval ${currency(measured?.lower_ci, currencyCode)} - ${currency(measured?.upper_ci, currencyCode)}`}
                     />
                 </div>
             </Card>
@@ -955,7 +1019,7 @@ export function Impact({ b }: { b: Bundle }) {
                 {segments.length ? (
                     <Table
                         label="Synthetic customer impact by segment"
-                        caption="Revenue-risk values retain their source unit because no currency code is present."
+                        caption={`Synthetic customer impact by segment; financial values use the source region currency (${value(currencyCode)}).`}
                         head={[
                             "Segment",
                             "Customers",
@@ -970,7 +1034,7 @@ export function Impact({ b }: { b: Bundle }) {
                             integer(segment.exposed_customers),
                             percent(segment.observed_churn_rate),
                             percent(segment.weighted_incremental_churn),
-                            number(segment.revenue_at_risk),
+                            currency(segment.revenue_at_risk, currencyCode),
                         ])}
                     />
                 ) : (
@@ -1400,6 +1464,18 @@ export function System({
                 </div>
             </Card>
             <Card
+                kicker="Public run mode"
+                title="Scripted provider: architecture validation, not live-model performance"
+                className="spanFull historicalNotice"
+            >
+                <p>
+                    The credential-free bundle replays committed structured
+                    provider responses through the same tool, probability,
+                    policy, and evaluation contracts. No external LLM generated
+                    this public result at build time.
+                </p>
+            </Card>
+            <Card
                 kicker="Model access"
                 title="Bounded read-only tools"
                 className="spanTwo"
@@ -1492,8 +1568,9 @@ export function System({
                         production claims.
                     </li>
                     <li>
-                        The detector smoke slice has no eligible anomaly
-                        decision.
+                        The detector receives a controlled metric perturbation;
+                        the repository does not inject one defect through every
+                        raw commerce event and downstream artifact.
                     </li>
                     <li>
                         Likelihood ratios are model-proposed and bounded, not

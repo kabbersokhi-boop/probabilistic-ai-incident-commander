@@ -35,8 +35,28 @@ function numeric(value: unknown): number | undefined {
 
 function eventMatches(point: RecordValue, event: RecordValue): boolean {
     const eventMetric = event.metric_name ?? event.metric_id;
+    if (eventMetric !== point.metric_name && eventMetric !== point.display_name)
+        return false;
+    if (event.series_id && event.series_id !== point.series_id) return false;
+    const pointTime =
+        typeof point.period_start === "string"
+            ? Date.parse(point.period_start)
+            : Number.NaN;
+    const started =
+        typeof event.started_at === "string"
+            ? Date.parse(event.started_at)
+            : typeof event.detected_at === "string"
+              ? Date.parse(event.detected_at)
+              : Number.NaN;
+    const ended =
+        typeof event.ended_at === "string"
+            ? Date.parse(event.ended_at)
+            : started;
     return (
-        eventMetric === point.metric_name || eventMetric === point.display_name
+        Number.isNaN(pointTime) ||
+        Number.isNaN(started) ||
+        (pointTime >= started &&
+            (ended > started ? pointTime < ended : pointTime === started))
     );
 }
 

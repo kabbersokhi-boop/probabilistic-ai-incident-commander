@@ -111,12 +111,6 @@
 }
 
 @media (max-width: 700px) {
-    body {
-        background-size:
-            auto,
-            56px 56px,
-            auto;
-    }
     .app {
         padding-inline: 16px;
     }
@@ -306,6 +300,19 @@
         grid-template-columns: 1fr;
         gap: 18px;
     }
+    .boundaryColumns {
+        grid-template-columns: 1fr;
+    }
+    .boundaryColumns > div,
+    .boundaryColumns > div:first-child {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding: 16px 0;
+    }
+    .boundaryColumns > div:first-child {
+        border-top: 0;
+        padding-top: 0;
+    }
     .heroLinks {
         display: grid;
         gap: 10px;
@@ -356,7 +363,12 @@
     .hypothesis {
         padding: 19px;
     }
+    .hypothesis > header {
+        flex-direction: column;
+        gap: 8px;
+    }
     .hypothesis > header strong {
+        align-self: flex-start;
         font-size: 27px;
     }
     .hypothesisStats {

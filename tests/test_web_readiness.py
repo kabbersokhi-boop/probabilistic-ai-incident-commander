@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,7 +8,7 @@ import pytest
 
 import paic.web_readiness as web
 from paic.tui.config import TUIConfigError
-from paic.web_readiness import WebReadinessError, validate_bundle
+from paic.web_readiness import PublicFile, WebReadinessError, validate_bundle
 
 
 def _fake_config(root: Path) -> SimpleNamespace:
@@ -268,3 +269,43 @@ def test_public_bundle_schema_excludes_environment_and_credentials() -> None:
     serialized = json.dumps(schema, sort_keys=True).lower()
     assert "api_key" not in serialized
     assert "environment" not in serialized
+
+
+def test_public_table_projection_is_bounded_and_json_safe(tmp_path: Path) -> None:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    source = tmp_path / "observations.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "observed_at": [
+                    datetime(2026, 1, 16, tzinfo=UTC),
+                    datetime(2026, 1, 17, tzinfo=UTC),
+                ],
+                "value": [0.456, 0.914],
+            }
+        ),
+        source,
+    )
+
+    assert web._public_table(source, limit=1) == [
+        {"observed_at": "2026-01-16T00:00:00+00:00", "value": 0.456}
+    ]
+    assert web._section(
+        [
+            PublicFile(
+                path="stage/observations.parquet",
+                sha256="0" * 64,
+                size=1,
+                content={},
+            )
+        ],
+        [{"key": "detection", "status": "healthy"}],
+        {"detection"},
+    ) == {
+        "available": True,
+        "source_files": ["stage/observations.parquet"],
+    }
+    with pytest.raises(WebReadinessError, match="not a regular file"):
+        web._regular(tmp_path, "projection")

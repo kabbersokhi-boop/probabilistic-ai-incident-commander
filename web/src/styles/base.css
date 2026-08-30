@@ -10,22 +10,7 @@ html {
 body {
     margin: 0;
     min-width: 320px;
-    background:
-        radial-gradient(
-            circle at 18% -10%,
-            color-mix(in srgb, var(--accent) 8%, transparent),
-            transparent 34rem
-        ),
-        linear-gradient(
-            90deg,
-            color-mix(in srgb, var(--line) 15%, transparent) 1px,
-            transparent 1px
-        ),
-        var(--bg);
-    background-size:
-        auto,
-        80px 80px,
-        auto;
+    background: var(--bg);
     color: var(--text);
     font:
         15px/1.6 "Avenir Next",

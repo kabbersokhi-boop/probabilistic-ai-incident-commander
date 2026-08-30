@@ -1,14 +1,16 @@
 schema_version: "1.0"
 workspace_id: smoke-control-room
-display_name: "PAIC smoke incident"
+display_name: "Synthetic checkout incident"
 root_dir: ../..
 paths:
   metrics:
-    dataset_dir: .artifacts/smoke
-    analytics_dir: .artifacts/analytics-smoke
-    detection_dir: .artifacts/detection-smoke
+    dataset_dir: .artifacts/impact-source-smoke
+    analytics_dir: .artifacts/analytics-showcase
+    detection_dir: .artifacts/detection-showcase
   incident:
     dataset_dir: .artifacts/impact-source-smoke
+    analytics_dir: .artifacts/analytics-showcase
+    detection_dir: .artifacts/detection-showcase
     impact_dir: .artifacts/impact-smoke
     evidence_dir: .artifacts/evidence-smoke
     investigation_dir: .artifacts/investigation-smoke

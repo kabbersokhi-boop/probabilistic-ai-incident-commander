@@ -86,13 +86,13 @@ def build_inputs(
                     "id": "smoke-submit",
                     "name": "submit_investigation",
                     "arguments": {
-                        "summary": "A primary-service change is better supported than an unrelated-service explanation.",
+                        "summary": "The regional address-validation strict-mode rollout is better supported than the earlier global payment retry-timeout change.",
                         "hypotheses": [
                             {
                                 "hypothesis_id": "primary-service-change",
-                                "title": "Primary-service change regression",
+                                "title": "Address-validation strict-mode regression",
                                 "prior_probability": 0.5,
-                                "rationale": "Two validated records align with the affected service and incident window.",
+                                "rationale": "The configuration and feature-flag records align with checkout, India South, and the incident start.",
                                 "evidence": [
                                     {
                                         "evidence_record_id": support_one,
@@ -113,9 +113,9 @@ def build_inputs(
                             },
                             {
                                 "hypothesis_id": "unrelated-service",
-                                "title": "Unrelated downstream degradation",
+                                "title": "Payment retry-timeout regression",
                                 "prior_probability": 0.5,
-                                "rationale": "Retained as a competing explanation.",
+                                "rationale": "The payment change is operationally plausible but earlier, global, and misaligned with the failing checkout stage.",
                                 "evidence": [
                                     {
                                         "evidence_record_id": contradiction,

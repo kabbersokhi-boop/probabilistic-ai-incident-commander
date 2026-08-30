@@ -36,6 +36,10 @@ export const recoveryConfig = (b: Bundle) =>
     file(b, "report-recovered/recovery.config.resolved.json");
 export const recoveryObservations = (b: Bundle) =>
     file(b, "obs-recovered/observation-set.json");
+export const detectionConfig = (b: Bundle) =>
+    file(b, "detection-showcase/detection.config.resolved.json");
+export const simulationConfig = (b: Bundle) =>
+    file(b, "impact-source-smoke/config.resolved.json");
 export const evaluationMetrics = (b: Bundle) =>
     file(b, "evaluation-smoke/aggregate-metrics.json");
 export const evaluationCases = (b: Bundle) => {
@@ -106,6 +110,34 @@ export const decisionEvidence = (b: Bundle): DecisionEvidence[] => {
 
 export const keyTimeline = (b: Bundle) =>
     timeline(b).filter((event) => event.event_type !== "service_health");
+
+export const leadingAnomaly = (b: Bundle) =>
+    rows(b, "detectors").find(
+        (item) =>
+            item.is_anomaly === true && typeof item.scenario_id === "string",
+    ) ?? rows(b, "detectors").find((item) => item.is_anomaly === true);
+
+export const detectorSeries = (b: Bundle) => {
+    const leading = leadingAnomaly(b);
+    if (!leading) return [];
+    const dimensions = [
+        "region",
+        "device",
+        "channel",
+        "customer_type",
+        "app_version",
+        "issuer",
+        "payment_method",
+        "service",
+    ];
+    return rows(b, "detectors").filter(
+        (item) =>
+            item.metric_name === leading.metric_name &&
+            item.time_grain === leading.time_grain &&
+            item.cohort_name === leading.cohort_name &&
+            dimensions.every((name) => item[name] === leading[name]),
+    );
+};
 
 export const resource = (state: RecordValue | undefined, resourceId: string) =>
     asRows(state?.resources).find((item) => item.resource_id === resourceId);

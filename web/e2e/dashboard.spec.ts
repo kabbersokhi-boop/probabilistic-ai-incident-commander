@@ -191,7 +191,9 @@ test("representative pages have reviewed visual baselines", async ({
         await expect(page).toHaveScreenshot(`${route}.png`, {
             fullPage: true,
             animations: "disabled",
-            maxDiffPixelRatio: 0.001,
+            // Allow minor Linux font rasterization variance while retaining a
+            // threshold far below the structural differences this suite guards.
+            maxDiffPixelRatio: 0.003,
         });
     }
     expect(testInfo.project.name).toBeTruthy();

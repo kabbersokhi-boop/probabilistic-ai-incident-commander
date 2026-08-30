@@ -817,6 +817,12 @@ tbody tr:hover {
     border-radius: var(--radius-small);
     padding: 13px;
 }
+.evidenceAssessments > div > div {
+    min-width: 0;
+}
+.evidenceAssessments strong {
+    overflow-wrap: anywhere;
+}
 .evidenceAssessments p {
     margin: 4px 0;
     font-size: 12px;

@@ -363,7 +363,12 @@
     .hypothesis {
         padding: 19px;
     }
+    .hypothesis > header {
+        flex-direction: column;
+        gap: 8px;
+    }
     .hypothesis > header strong {
+        align-self: flex-start;
         font-size: 27px;
     }
     .hypothesisStats {

@@ -2,14 +2,20 @@
 
 ## Expanded evaluation boundary
 
-Phase 10 keeps benchmark answer keys outside agent-visible inputs. Ordinary
+The evaluation boundary keeps benchmark answer keys outside agent-visible inputs. Ordinary
 deterministic evaluator code computes ranking, Brier, calibration, abstention,
 evidence, and safety results. Evaluation artifacts bind benchmark and answer-key
 digests and replay without a provider.
 
 ## Public web boundary
 
-The current web foundation is a deterministic static export, not a service. `paic.web_readiness` first loads the TUI workspace and invokes its authoritative validators/replay, then emits a versioned closed-world JSON bundle with source/file hashes, a manifest, and checksums. The future browser consumes this artifact read-only. It cannot select arbitrary source paths, execute SQL, alter lifecycle state, approve actions, perform remediation, declare recovery, or access evaluator answer keys. A runtime API or database is not justified by the current requirements and must not be introduced without a new bounded contract and ADR.
+The web interface is a deterministic static export, not a service. `paic.web_readiness` first
+loads the control-room workspace and invokes its authoritative validators and replay functions.
+It then emits a versioned, closed-world JSON bundle with source and file hashes, a manifest, and
+checksums. The browser consumes this artifact read-only. It cannot select arbitrary source paths,
+execute SQL, alter lifecycle state, approve actions, perform remediation, declare recovery, or
+access evaluator answer keys. A runtime API or database is not justified by the current
+requirements and must not be introduced without a new bounded contract and ADR.
 
 ## End-to-end control flow
 
@@ -182,8 +188,12 @@ Every exported impact artifact contains customer features, survival curves, Cox 
 
 ## Product interface boundaries
 
-- `tui`: Phase 11 read-only workspace inspection over existing validators and replay functions; it cannot approve, execute, mutate, or declare recovery
-- `api` and `web`: deferred until the TUI and Phase 12 containerized system meet reliability gates; they must use the same governed services and cannot reimplement authority
+- `tui`: read-only workspace inspection over existing validators and replay functions; it cannot
+  approve, execute, mutate, or declare recovery
+- `web`: a static, read-only view of the validated web-readiness bundle; it cannot reimplement
+  authority
+- `api`: not implemented; a future runtime API must use the governed services and requires a
+  separate bounded contract and ADR
 
 ## Operational evidence and lineage
 

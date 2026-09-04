@@ -66,7 +66,11 @@ Validation recomputes file hashes, transcript links, report probabilities, repor
 
 The exported transcript contains only bounded provider operational metadata: model, finish reason, usage, validated tool calls, and a presence/byte-count/SHA-256 receipt for free-form content. It never persists provider `content`, reasoning traces, or unrestricted model prose. Exports are closed-world: the six documented regular files are the only permitted paths.
 
-Benchmark cases use `investigation_dir`, not a standalone `report.json`. The legacy Phase 7 benchmark performs explicit diagnostic artifact replay; source-authoritative system evaluation is provided by Phase 10, whose benchmark artifacts bind the original visible cases, hidden answers, predictions, and resolved configuration. The multiclass Brier metric uses the project's sum-style convention; a true hypothesis omitted from the report contributes its full `(0 - 1)^2` error term.
+Benchmark cases use `investigation_dir`, not a standalone `report.json`. The legacy diagnostic
+benchmark performs explicit artifact replay. The source-authoritative benchmark also binds the
+original visible cases, hidden answers, predictions, and resolved configuration. The multiclass
+Brier metric uses the project's sum-style convention; a true hypothesis omitted from the report
+contributes its full `(0 - 1)^2` error term.
 
 ## CLI
 

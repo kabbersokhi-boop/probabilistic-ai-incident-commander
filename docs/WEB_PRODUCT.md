@@ -22,7 +22,10 @@ GitHub Pages serves static files and cannot attach repository-controlled respons
 
 ## Deployment
 
-`.github/workflows/pages.yml` generates and validates the bundle, builds the site, binds it to `GITHUB_SHA`, and deploys only pushes to `main` through the official Pages actions. Pull requests never deploy. The expected public URL is `https://kabbersokhi-boop.github.io/probabilistic-ai-incident-commander/` once Pages is enabled by a repository administrator.
+`.github/workflows/pages.yml` generates and validates the bundle, builds the site, binds it to
+`GITHUB_SHA`, and deploys only pushes to `main` through the official Pages actions. Pull
+requests never deploy. The public dashboard is
+`https://kabbersokhi-boop.github.io/probabilistic-ai-incident-commander/`.
 
 ## Accessibility
 

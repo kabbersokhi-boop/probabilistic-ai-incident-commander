@@ -1,6 +1,6 @@
 # Quality Gates
 
-## Phase 10 evaluation gates
+## Evaluation gates
 
 Evaluation smoke uses a fixed-seed scripted provider, separate hidden answer
 keys, deterministic scoring, adversarial boundary checks, generated schemas, and

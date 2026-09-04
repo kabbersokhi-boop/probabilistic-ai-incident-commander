@@ -7,11 +7,11 @@ from types import ModuleType
 
 import pytest
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_phase11_evidence.py"
+SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_soak_evidence.py"
 
 
 def _module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("phase11_evidence_freshness", SCRIPT)
+    spec = importlib.util.spec_from_file_location("soak_evidence_freshness", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

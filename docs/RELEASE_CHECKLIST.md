@@ -14,5 +14,5 @@
   checks pass;
 - provenance/signing status is reported honestly, with any platform evidence independently verified;
 - no unresolved critical/high finding exists without an exact, justified, unexpired exception;
-- documentation and the final web-product handoff match the implementation;
+- public documentation and the web-product contract match the implementation;
 - no UI or mutation service is included in this foundation release.

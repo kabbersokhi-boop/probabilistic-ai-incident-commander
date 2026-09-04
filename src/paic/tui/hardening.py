@@ -1,4 +1,4 @@
-"""Deterministic corruption and endurance helpers for Phase 11 certification."""
+"""Deterministic corruption and endurance helpers for control-room certification."""
 
 from __future__ import annotations
 

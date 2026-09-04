@@ -1,8 +1,10 @@
 # Deployment foundation
 
-The supported target is immutable static hosting of the validated web bundle. No public URL
-is claimed by this repository and no deployment credential is present in CI. The machine-
-validated policy is `deployment/static-site-policy.json`, with host signal and alert
+The supported target is immutable static hosting of the validated web bundle. The reference
+deployment is available at
+`https://kabbersokhi-boop.github.io/probabilistic-ai-incident-commander/`. No deployment
+credential is stored in the repository. The machine-validated policy is
+`deployment/static-site-policy.json`, with host signal and alert
 definitions in `deployment/observability.json`. Build, validation, backup, promotion, and
 verification are separate steps. A deployment record must include the source commit, bundle
 checksum, manifest, lock digest, provenance/attestation result, and validation result.

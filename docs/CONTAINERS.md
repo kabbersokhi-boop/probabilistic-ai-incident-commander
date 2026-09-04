@@ -1,6 +1,8 @@
 # Container Baseline
 
-Phase 12 begins with a deliberately small container boundary for the existing PAIC command-line interface. The image packages the governed local reference implementation; it does not add a daemon, public endpoint, database, cloud integration, secret store, or new operational authority.
+The container has a deliberately small boundary around the PAIC command-line interface. The image
+packages the governed local reference implementation; it does not add a daemon, public endpoint,
+database, cloud integration, secret store, or new operational authority.
 
 ## Build
 
@@ -131,7 +133,7 @@ The baseline enforces:
 
 These controls reduce the container runtime and review boundaries. They do not make the synthetic reference implementation a production incident-management service and do not grant approval, remediation, recovery, shell, cloud, registry, or secret authority.
 
-## Phase 12 boundary
+## Container and release boundary
 
 The repository now includes hash-verified dependency locks, fail-closed Python/OS/image
 vulnerability policy, deterministic public-bundle export and restore tooling, release

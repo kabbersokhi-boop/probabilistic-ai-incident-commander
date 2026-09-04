@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resumable, source-authoritative Phase 11 workspace-inspection soak."""
+"""Resumable, source-authoritative workspace-inspection soak."""
 
 from __future__ import annotations
 
@@ -374,7 +374,7 @@ def main() -> int:
     try:
         return run(parser.parse_args())
     except (OSError, RuntimeError, ValueError) as exc:
-        print(f"phase11 authoritative soak failed: {exc}", file=sys.stderr)
+        print(f"authoritative soak failed: {exc}", file=sys.stderr)
         return 2
 
 

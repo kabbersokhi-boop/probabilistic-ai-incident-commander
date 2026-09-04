@@ -1,6 +1,7 @@
 # Terminal Control Room
 
-Phase 11 delivers a deliberately small, read-only terminal interface and its reliability gates. It is an engineering and validation surface, not a second implementation of incident authority.
+The terminal interface is a small, read-only engineering and validation surface. It is not a
+second implementation of incident authority.
 
 ## Design rules
 
@@ -71,10 +72,11 @@ never bypass locking or appear as authoritative health.
 
 Warnings intentionally return `0`: they describe incomplete provenance configuration, not a corrupted artifact. CI environments that require every stage to be authoritative should additionally inspect the JSON `authoritative` fields.
 
-## Phase 11 boundary
+## Authority boundary
 
-Phase 11 coverage is complete for repeated runs, corrupted artifacts, interruption handling, terminal resizing, non-interactive streams, long paths, Python 3.11, and Python 3.12. The TUI remains read-only: no production, approval, remediation, recovery, shell, cloud, or secret authority is added.
+Tests cover repeated runs, corrupted artifacts, interruption handling, terminal resizing,
+non-interactive streams, long paths, Python 3.11, and Python 3.12. The TUI remains read-only: it
+adds no production, approval, remediation, recovery, shell, cloud, or secret authority.
 
-The TUI is now packaged in the Phase 12 hardened container boundary. The public web
-product remains intentionally deferred: it must consume the validated static
-web-readiness bundle and may not bypass the same reliability and authority gates.
+The TUI is packaged in the hardened container boundary. The public web interface consumes the
+validated static web-readiness bundle and cannot bypass the same reliability and authority gates.

@@ -1,6 +1,7 @@
 # Statistical Recovery Verification and Automatic Reopening
 
-Phase 9 closes the incident lifecycle without giving the language model authority to declare success.
+Recovery verification closes the incident lifecycle without giving the language model authority
+to declare success.
 
 ## Authority boundary
 
@@ -29,7 +30,8 @@ Recovery reports are applied to a locked local lifecycle store. The store uses i
 - a severe guardrail breach occurs and immediate reopening is enabled; or
 - the configured number of consecutive non-recovered evaluations is reached.
 
-A reopened incident remains reopened until a new governed incident cycle handles it. Phase 9 does not silently retry remediation.
+A reopened incident remains reopened until a new governed incident cycle handles it. Recovery
+verification does not silently retry remediation.
 
 ## Artifact layout
 
@@ -80,7 +82,7 @@ the report, policy, transition, and previous event. Validation replays every
 transition against that stored policy. This is local-filesystem integrity, not
 distributed coordination or exactly-once delivery.
 
-The general one-day analytics smoke profile remains unchanged. Phase 9 uses a
+The general one-day analytics smoke profile remains unchanged. Recovery verification uses a
 separate lightweight 14-day recovery source profile, so every recovery baseline is
 genuinely derived from validated analytics windows. Its public CLI lifecycle proves
 `insufficient_data`, `recovering`, sustained `recovered`, duplicate/stale rejection,

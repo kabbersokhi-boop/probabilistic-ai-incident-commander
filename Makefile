@@ -1,4 +1,4 @@
-.PHONY: install locks-validate locks-freshness validate summary schemas schema-check deployment-validate web-bundle web-validate web-backup-restore deployment-rollback-smoke simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard analytics-showcase detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard detection-showcase impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate phase11-authoritative-soak test coverage lint format format-check typecheck check verify clean
+.PHONY: install locks-validate locks-freshness validate summary schemas schema-check deployment-validate web-bundle web-validate web-backup-restore deployment-rollback-smoke simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard analytics-showcase detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard detection-showcase impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate authoritative-soak test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -42,9 +42,9 @@ EVALUATION_STANDARD_DIR ?= .artifacts/evaluation-standard
 EVALUATION_ABLATION_DIR ?= .artifacts/evaluation-standard-no-lineage
 EVALUATION_COMPARISON_DIR ?= .artifacts/evaluation-comparison
 TUI_WORKSPACE ?= configs/tui/smoke.yaml
-PHASE11_SOAK_DIR ?= .artifacts/phase11-authoritative-soak
-PHASE11_SOAK_ITERATIONS ?= 25
-PHASE11_SOAK_DURATION_SECONDS ?= inf
+SOAK_DIR ?= .artifacts/authoritative-soak
+SOAK_ITERATIONS ?= 25
+SOAK_DURATION_SECONDS ?= inf
 
 install:
 	$(PYTHON) -m pip install --require-hashes -r requirements-dev.lock
@@ -311,7 +311,7 @@ evaluation-adversarial:
 
 tui-smoke: detection-smoke remediation-smoke recovery-smoke evaluation-smoke
 	$(PYTHON) -m paic tui validate --workspace $(TUI_WORKSPACE)
-	$(PYTHON) scripts/assert_phase11_smoke.py --workspace $(TUI_WORKSPACE)
+	$(PYTHON) scripts/assert_control_room_smoke.py --workspace $(TUI_WORKSPACE)
 
 tui-snapshot:
 	$(PYTHON) -m paic tui snapshot --workspace $(TUI_WORKSPACE) --format json
@@ -319,8 +319,8 @@ tui-snapshot:
 tui-validate:
 	$(PYTHON) -m paic tui validate --workspace $(TUI_WORKSPACE)
 
-phase11-authoritative-soak:
-	$(PYTHON) scripts/phase11_authoritative_soak.py --workspace $(TUI_WORKSPACE) --output-dir $(PHASE11_SOAK_DIR) --iterations $(PHASE11_SOAK_ITERATIONS) --duration-seconds $(PHASE11_SOAK_DURATION_SECONDS)
+authoritative-soak:
+	$(PYTHON) scripts/authoritative_soak.py --workspace $(TUI_WORKSPACE) --output-dir $(SOAK_DIR) --iterations $(SOAK_ITERATIONS) --duration-seconds $(SOAK_DURATION_SECONDS)
 
 test:
 	env $(PYTEST_ENV) $(PYTHON) -m pytest -q

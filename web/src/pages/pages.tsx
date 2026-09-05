@@ -1471,8 +1471,9 @@ export function System({
                 <p>
                     The credential-free bundle replays committed structured
                     provider responses through the same tool, probability,
-                    policy, and evaluation contracts. No external LLM generated
-                    this public result at build time.
+                    policy, and evaluation contracts. The public build consumes
+                    only validated, committed provider responses and does not
+                    call an external model.
                 </p>
             </Card>
             <Card

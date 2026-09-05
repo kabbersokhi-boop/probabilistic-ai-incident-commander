@@ -9,7 +9,8 @@ Contributions should keep the project reproducible, measurable, and safe.
 3. Add or update tests for every behavioural change.
 4. Run `make check` before requesting review.
 5. Record material architectural changes in `docs/DECISIONS.md`.
-6. Update `docs/CURRENT_STATUS.md` when public capabilities or limitations change.
+6. Update the README and the relevant design document when a public capability or limitation
+   changes.
 
 ## Quality expectations
 

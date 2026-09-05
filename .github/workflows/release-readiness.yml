@@ -1,4 +1,4 @@
-name: Phase 12 exact-head readiness
+name: Exact-head release readiness
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: phase12-readiness-${{ github.event.pull_request.number || github.ref }}
+  group: release-readiness-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -11,6 +11,8 @@ DIGEST = "sha256:" + "a" * 64
 ROOT = Path(__file__).parents[1]
 CA_CERTIFICATES_VERSION = "20250419~deb12u1"
 CA_CERTIFICATES_SHA256 = "62b08a77d985d4253894b1f69aebda5925034ca4e294add364167fad8cb64a44"
+LIBPCRE2_VERSION = "10.42-1+deb12u1"
+LIBPCRE2_SHA256 = "81c5502941118a24d47af69a17b8b0b9548d75cc6d72b3eb3fe01047b46fa10e"
 
 
 def _policy() -> dict[str, object]:
@@ -83,9 +85,13 @@ def test_runtime_security_update_is_exactly_version_and_hash_pinned() -> None:
     )
     assert f"ARG CA_CERTIFICATES_VERSION={CA_CERTIFICATES_VERSION}" in dockerfile
     assert f"ARG CA_CERTIFICATES_SHA256={CA_CERTIFICATES_SHA256}" in dockerfile
+    assert f"ARG LIBPCRE2_VERSION={LIBPCRE2_VERSION}" in dockerfile
+    assert f"ARG LIBPCRE2_SHA256={LIBPCRE2_SHA256}" in dockerfile
     assert 'apt-get download "ca-certificates=${CA_CERTIFICATES_VERSION}"' in dockerfile
+    assert 'apt-get download "libpcre2-8-0=${LIBPCRE2_VERSION}"' in dockerfile
     assert "sha256sum --check --strict" in dockerfile
-    assert 'dpkg --install "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb"' in dockerfile
+    assert '"ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb"' in dockerfile
+    assert '"libpcre2-8-0_${LIBPCRE2_VERSION}_amd64.deb"' in dockerfile
 
 
 def test_rejects_missing_or_incomplete_digest(tmp_path: Path) -> None:

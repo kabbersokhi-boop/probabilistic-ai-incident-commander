@@ -628,7 +628,7 @@ def test_tui_snapshot_json_returns_success_for_healthy_workspace(
     assert dispatch_tui(args) == 0
     assert (
         '"overall_status": "healthy"' in capsys.readouterr().out
-    )  # Phase 11 final hardening regressions
+    )  # Control-room hardening regressions
 
 
 def _assert_unbound_stage_is_warning(

@@ -198,7 +198,7 @@ def validate_contract_bundle(bundle: ContractBundle) -> list[ValidationIssue]:
                 "error",
                 "safety.risk3",
                 "safety.yaml:action_classes",
-                "Risk level 3 actions must be blocked in the portfolio project.",
+                "Risk level 3 actions must be blocked by the project policy.",
             )
         )
 

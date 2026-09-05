@@ -1,6 +1,6 @@
 # Expanded evaluation and adversarial testing
 
-Phase 10 introduces a deterministic benchmark boundary. Visible incident inputs
+The deterministic benchmark keeps visible incident inputs
 and hidden answer keys are separate artifacts; the investigation runtime receives
 only visible inputs, while scoring loads answer keys in the evaluator. The
 benchmark grader is ordinary Python code and does not ask a language model to

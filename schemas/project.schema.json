@@ -13,11 +13,6 @@
           "title": "One Sentence Definition",
           "type": "string"
         },
-        "portfolio_goal": {
-          "minLength": 1,
-          "title": "Portfolio Goal",
-          "type": "string"
-        },
         "primary_users": {
           "items": {
             "minLength": 1,
@@ -32,14 +27,10 @@
           "title": "Slug",
           "type": "string"
         },
-        "target_roles": {
-          "items": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "minItems": 1,
-          "title": "Target Roles",
-          "type": "array"
+        "system_goal": {
+          "minLength": 1,
+          "title": "System Goal",
+          "type": "string"
         },
         "version": {
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
@@ -52,8 +43,7 @@
         "slug",
         "version",
         "one_sentence_definition",
-        "portfolio_goal",
-        "target_roles",
+        "system_goal",
         "primary_users"
       ],
       "title": "ProjectIdentity",

@@ -1,4 +1,4 @@
-name: Phase 11 inspection and authoritative soak
+name: Authoritative inspection soak
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: phase11-authoritative-soak-${{ github.event.pull_request.number || github.ref }}
+  group: authoritative-soak-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       CERTIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}
       MIN_DURATION_SECONDS: ${{ github.event_name == 'workflow_dispatch' && '1800' || '0' }}
       EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-      SOAK_DIR: .artifacts/phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
+      SOAK_DIR: .artifacts/authoritative-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v6
@@ -56,14 +56,14 @@ jobs:
       - name: Verify threshold regressions
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q tests/test_phase11_authoritative_soak.py
+        run: python -m pytest -q tests/test_authoritative_soak.py
 
       - name: Build authoritative workspace
         run: make tui-smoke
 
       - name: Run authoritative soak
         run: >-
-          python scripts/phase11_authoritative_soak.py
+          python scripts/authoritative_soak.py
           --workspace configs/tui/smoke.yaml
           --output-dir "$SOAK_DIR"
           --iterations 25
@@ -78,7 +78,7 @@ jobs:
 
       - name: Validate certification evidence
         run: >-
-          python scripts/validate_phase11_evidence.py
+          python scripts/validate_soak_evidence.py
           --output-dir "$SOAK_DIR"
           --expected-commit "$EXPECTED_COMMIT"
           --mode "$CERTIFICATION_MODE"
@@ -92,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase11-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-python-${{ matrix.python-version }}
+          name: authoritative-${{ github.event_name == 'workflow_dispatch' && 'endurance' || 'inspection' }}-python-${{ matrix.python-version }}
           path: ${{ env.SOAK_DIR }}
           if-no-files-found: warn
           retention-days: 90

@@ -21,6 +21,7 @@ web/public/data/
 .idea/
 .vscode/
 *.log
+.*.lease
 schemas-generated/
 .artifacts/
 /data/generated/

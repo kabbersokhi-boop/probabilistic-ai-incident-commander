@@ -36,8 +36,7 @@ class ProjectIdentity(StrictModel):
     slug: Annotated[str, Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
     version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
     one_sentence_definition: NonEmptyText
-    portfolio_goal: NonEmptyText
-    target_roles: Annotated[list[NonEmptyText], Field(min_length=1)]
+    system_goal: NonEmptyText
     primary_users: Annotated[list[NonEmptyText], Field(min_length=1)]
 
 

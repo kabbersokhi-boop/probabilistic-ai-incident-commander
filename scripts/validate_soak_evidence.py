@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a Phase 11 evidence bundle independently of its producer."""
+"""Validate an authoritative-soak evidence bundle independently of its producer."""
 
 from __future__ import annotations
 
@@ -165,7 +165,7 @@ def main() -> int:
             max_rss_delta=args.max_rss_delta,
         )
     except EvidenceValidationError as exc:
-        print(f"phase11 evidence validation failed: {exc}")
+        print(f"soak evidence validation failed: {exc}")
         return 1
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

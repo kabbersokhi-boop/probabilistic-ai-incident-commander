@@ -2,7 +2,11 @@
 
 The machine-readable source is `specs/safety.yaml`.
 
-Public artifact boundary: `src/paic/web_readiness.py` exports only validated synthetic data into a closed-world static bundle. It excludes credentials, environment-like fields, evaluator answer keys, absolute/private paths, and mutable inputs. The future browser is a read-only presentation layer; it does not receive secrets, unrestricted SQL, filesystem paths, shell, cloud, deployment, approval, remediation, recovery, or evaluator authority.
+Public artifact boundary: `src/paic/web_readiness.py` exports only validated synthetic data into a
+closed-world static bundle. It excludes credentials, environment-like fields, evaluator answer
+keys, absolute or private paths, and mutable inputs. The browser is a read-only presentation layer;
+it does not receive secrets, unrestricted SQL, filesystem paths, shell, cloud, deployment,
+approval, remediation, recovery, or evaluator authority.
 
 ## Current boundary
 
@@ -31,7 +35,11 @@ Investigative SQL uses approved in-memory tables, AST-parsed read-only statement
 
 Every state transition, tool call, SQL decision, evidence record, approval decision, remediation attempt, and recovery decision must be traceable.
 
-The executable safety contract is already validated. SQL enforcement, tool authorization, approval tokens, and remediation controls are introduced with their corresponding runtime components and adversarial tests. Phase 10 evaluation treats answer keys as hidden evaluator input and deterministically flags unsupported claims, invalid evidence citations, prompt-injection markers, destructive SQL, traversal, and unsafe authority requests. These checks measure control behavior; they do not claim that a model never proposes unsafe content.
+The executable safety contract is validated by the corresponding runtime components and
+adversarial tests. Evaluation keeps answer keys as hidden evaluator input and deterministically
+flags unsupported claims, invalid evidence citations, prompt-injection markers, destructive SQL,
+traversal, and unsafe authority requests. These checks measure control behavior; they do not claim
+that a model never proposes unsafe content.
 
 ## Agentic investigation controls
 

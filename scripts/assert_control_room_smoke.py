@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless the configured Phase 11 smoke workspace is authoritative."""
+"""Fail closed unless the configured control-room workspace is authoritative."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def assert_authoritative_smoke(workspace: str | Path) -> None:
         or any(not stage.authoritative for stage in snapshot.stages)
     ):
         raise RuntimeError(
-            "Phase 11 smoke workspace is not nine-stage healthy and authoritative: "
+            "Control-room workspace is not nine-stage healthy and authoritative: "
             + snapshot.model_dump_json()
         )
 
@@ -44,7 +44,7 @@ def assert_authoritative_smoke(workspace: str | Path) -> None:
     missing = [name for name, value in required.items() if value is None]
     if missing:
         raise RuntimeError(
-            f"Phase 11 smoke workspace is missing required paths: {', '.join(missing)}"
+            f"Control-room workspace is missing required paths: {', '.join(missing)}"
         )
 
     execution_root = cast(Path, execution_dir)
@@ -69,7 +69,7 @@ def assert_authoritative_smoke(workspace: str | Path) -> None:
             or report.execution_manifest_sha256 != execution_manifest
             or report.observation_manifest_sha256 != observation_manifest
         ):
-            raise RuntimeError("Phase 11 smoke recovery artifacts are not bound to its execution")
+            raise RuntimeError("Control-room recovery artifacts are not bound to their execution")
 
 
 def main() -> int:
@@ -79,7 +79,7 @@ def main() -> int:
     try:
         assert_authoritative_smoke(args.workspace)
     except (OSError, RuntimeError, ValueError) as exc:
-        raise SystemExit(f"Phase 11 authoritative smoke assertion failed: {exc}") from exc
+        raise SystemExit(f"Authoritative control-room assertion failed: {exc}") from exc
     return 0
 
 

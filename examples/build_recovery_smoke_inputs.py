@@ -1,7 +1,7 @@
 """Create deterministic healthy and regression recovery observation sets.
 
 The execution receipt hash is supplied by the caller so generated inputs remain
-bound to a real Phase 8 execution artifact without embedding credentials or tokens.
+bound to a real remediation execution artifact without embedding credentials or tokens.
 """
 
 from __future__ import annotations

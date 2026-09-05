@@ -7,12 +7,21 @@ FROM docker.io/library/python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74
 # and verify its published checksum before installing it in both build stages.
 ARG CA_CERTIFICATES_VERSION=20250419~deb12u1
 ARG CA_CERTIFICATES_SHA256=62b08a77d985d4253894b1f69aebda5925034ca4e294add364167fad8cb64a44
+ARG LIBPCRE2_VERSION=10.42-1+deb12u1
+ARG LIBPCRE2_SHA256=81c5502941118a24d47af69a17b8b0b9548d75cc6d72b3eb3fe01047b46fa10e
 RUN apt-get update \
     && apt-get download "ca-certificates=${CA_CERTIFICATES_VERSION}" \
+    && apt-get download "libpcre2-8-0=${LIBPCRE2_VERSION}" \
     && echo "${CA_CERTIFICATES_SHA256}  ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb" \
         | sha256sum --check --strict \
-    && dpkg --install "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb" \
-    && rm -f "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb" \
+    && echo "${LIBPCRE2_SHA256}  libpcre2-8-0_${LIBPCRE2_VERSION}_amd64.deb" \
+        | sha256sum --check --strict \
+    && dpkg --install \
+        "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb" \
+        "libpcre2-8-0_${LIBPCRE2_VERSION}_amd64.deb" \
+    && rm -f \
+        "ca-certificates_${CA_CERTIFICATES_VERSION}_all.deb" \
+        "libpcre2-8-0_${LIBPCRE2_VERSION}_amd64.deb" \
     && rm -rf /var/lib/apt/lists/*
 
 FROM python-base AS builder

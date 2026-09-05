@@ -6,14 +6,8 @@ project:
   one_sentence_definition: An evidence-grounded agentic system that detects commerce anomalies, investigates them
     across business and operational data, ranks root causes probabilistically, recommends governed remediation,
     and verifies recovery.
-  portfolio_goal: Demonstrate advanced statistics, probability, data analysis, data engineering, agentic AI, evaluation,
-    security, and product engineering in one reproducible system.
-  target_roles:
-  - Agentic AI Engineer
-  - Applied AI Engineer
-  - Forward-Deployed AI Engineer
-  - AI Platform Engineer
-  - Data and AI Engineer
+  system_goal: Unify statistics, probability, data analysis, data engineering, agentic control, evaluation,
+    security, and product engineering in one reproducible incident-response system.
   primary_users:
   - Commerce operations manager
   - Incident commander
@@ -40,7 +34,7 @@ principles:
 - An incident is resolved only after statistical recovery verification and guardrail checks.
 - Every material claim in the final report must cite a stored evidence record.
 non_goals:
-- Operating a real production commerce environment during the portfolio build.
+- Operating against a live production commerce environment.
 - Building a multi-agent swarm before a single controlled agent is evaluated.
 - Adding infrastructure technologies that do not improve measured system quality.
 - Using vector retrieval for exact operational facts.

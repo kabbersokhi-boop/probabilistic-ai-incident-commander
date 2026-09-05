@@ -1,4 +1,4 @@
-.PHONY: install locks-validate locks-freshness validate summary schemas schema-check deployment-validate web-bundle web-validate web-backup-restore deployment-rollback-smoke simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard analytics-showcase detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard detection-showcase impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate authoritative-soak test coverage lint format format-check typecheck check verify clean
+.PHONY: install locks-validate locks-freshness validate summary schemas schema-check deployment-validate web-bundle web-validate web-backup-restore deployment-rollback-smoke simulate-smoke validate-smoke summarize-smoke simulate-standard validate-standard summarize-standard analytics-smoke validate-analytics-smoke summarize-analytics-smoke analytics-standard validate-analytics-standard summarize-analytics-standard analytics-reference detection-smoke validate-detection-smoke summarize-detection-smoke detection-standard validate-detection-standard summarize-detection-standard detection-reference impact-smoke validate-impact-smoke summarize-impact-smoke impact-standard validate-impact-standard summarize-impact-standard evidence-smoke validate-evidence-smoke summarize-evidence-smoke evidence-standard validate-evidence-standard summarize-evidence-standard tools-list tools-smoke tools-audit investigation-smoke validate-investigation-smoke replay-investigation-smoke remediation-smoke validate-remediation-smoke recovery-source-smoke recovery-smoke validate-recovery-smoke evaluation-smoke evaluation-validate-smoke evaluation-replay-smoke evaluation-standard evaluation-compare-smoke evaluation-adversarial tui-smoke tui-snapshot tui-validate authoritative-soak test coverage lint format format-check typecheck check verify clean
 
 PYTHON ?= python
 PYTEST_ENV ?= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -8,8 +8,8 @@ ANALYTICS_SMOKE_DIR ?= .artifacts/analytics-smoke
 ANALYTICS_STANDARD_DIR ?= .artifacts/analytics-standard
 DETECTION_SMOKE_DIR ?= .artifacts/detection-smoke
 DETECTION_STANDARD_DIR ?= .artifacts/detection-standard
-ANALYTICS_SHOWCASE_DIR ?= .artifacts/analytics-showcase
-DETECTION_SHOWCASE_DIR ?= .artifacts/detection-showcase
+ANALYTICS_REFERENCE_DIR ?= .artifacts/analytics-reference
+DETECTION_REFERENCE_DIR ?= .artifacts/detection-reference
 IMPACT_SOURCE_SMOKE_DIR ?= .artifacts/impact-source-smoke
 IMPACT_SOURCE_STANDARD_DIR ?= .artifacts/impact-source-standard
 IMPACT_SMOKE_DIR ?= .artifacts/impact-smoke
@@ -159,11 +159,11 @@ summarize-detection-smoke:
 detection-standard: analytics-standard
 	$(PYTHON) -m paic detection build --analytics-dir $(ANALYTICS_STANDARD_DIR) --config configs/detection/standard.yaml --output-dir $(DETECTION_STANDARD_DIR) --overwrite
 
-analytics-showcase: impact-smoke
-	$(PYTHON) -m paic analytics build --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --config configs/analytics/showcase.yaml --output-dir $(ANALYTICS_SHOWCASE_DIR) --overwrite
+analytics-reference: impact-smoke
+	$(PYTHON) -m paic analytics build --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --config configs/analytics/reference.yaml --output-dir $(ANALYTICS_REFERENCE_DIR) --overwrite
 
-detection-showcase: analytics-showcase
-	$(PYTHON) -m paic detection build --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --config configs/detection/showcase.yaml --output-dir $(DETECTION_SHOWCASE_DIR) --overwrite
+detection-reference: analytics-reference
+	$(PYTHON) -m paic detection build --analytics-dir $(ANALYTICS_REFERENCE_DIR) --config configs/detection/reference.yaml --output-dir $(DETECTION_REFERENCE_DIR) --overwrite
 
 validate-detection-standard:
 	$(PYTHON) -m paic detection validate --detection-dir $(DETECTION_STANDARD_DIR) --analytics-dir $(ANALYTICS_STANDARD_DIR)
@@ -191,11 +191,11 @@ validate-impact-standard:
 summarize-impact-standard:
 	$(PYTHON) -m paic impact summary --impact-dir $(IMPACT_STANDARD_DIR)
 
-evidence-smoke: impact-smoke detection-showcase
-	$(PYTHON) -m paic evidence build --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --config configs/evidence/smoke.yaml --output-dir $(EVIDENCE_SMOKE_DIR) --overwrite
+evidence-smoke: impact-smoke detection-reference
+	$(PYTHON) -m paic evidence build --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --config configs/evidence/smoke.yaml --output-dir $(EVIDENCE_SMOKE_DIR) --overwrite
 
 validate-evidence-smoke:
-	$(PYTHON) -m paic evidence validate --evidence-dir $(EVIDENCE_SMOKE_DIR) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR)
+	$(PYTHON) -m paic evidence validate --evidence-dir $(EVIDENCE_SMOKE_DIR) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR)
 
 summarize-evidence-smoke:
 	$(PYTHON) -m paic evidence summary --evidence-dir $(EVIDENCE_SMOKE_DIR)
@@ -220,29 +220,29 @@ tools-smoke: detection-smoke
 tools-audit:
 	$(PYTHON) -m paic tools audit validate --audit-dir $(TOOL_AUDIT_DIR)
 
-investigation-smoke: evidence-smoke detection-showcase
-	$(PYTHON) examples/build_scripted_investigation_inputs.py --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --config $(INVESTIGATION_CONFIG) --impact-dir $(IMPACT_SMOKE_DIR) --request $(INVESTIGATION_REQUEST) --script $(INVESTIGATION_SCRIPT) --audit-dir $(INVESTIGATION_AUDIT_DIR)
+investigation-smoke: evidence-smoke detection-reference
+	$(PYTHON) examples/build_scripted_investigation_inputs.py --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --config $(INVESTIGATION_CONFIG) --impact-dir $(IMPACT_SMOKE_DIR) --request $(INVESTIGATION_REQUEST) --script $(INVESTIGATION_SCRIPT) --audit-dir $(INVESTIGATION_AUDIT_DIR)
 	$(PYTHON) -m paic investigate run --request $(INVESTIGATION_REQUEST) --config $(INVESTIGATION_CONFIG) --provider-script $(INVESTIGATION_SCRIPT) --output-dir $(INVESTIGATION_SMOKE_DIR) --overwrite
 
 validate-investigation-smoke:
-	$(PYTHON) -m paic investigate validate --investigation-dir $(INVESTIGATION_SMOKE_DIR) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR)
+	$(PYTHON) -m paic investigate validate --investigation-dir $(INVESTIGATION_SMOKE_DIR) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR)
 	$(PYTHON) -m paic tools audit validate --audit-dir $(INVESTIGATION_AUDIT_DIR)
 
 replay-investigation-smoke:
-	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR) --config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR)
+	$(PYTHON) -m paic investigate replay --investigation-dir $(INVESTIGATION_SMOKE_DIR) --config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR)
 
 remediation-smoke: investigation-smoke
 	rm -rf $(REMEDIATION_STATE_DIR) $(REMEDIATION_PLAN_DIR) $(REMEDIATION_APPROVAL_DIR) $(REMEDIATION_EXECUTION_DIR) $(REMEDIATION_STATE_AFTER_DIR) $(REMEDIATION_STATE_STORE) .artifacts/remediation-approval.token
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --investigation-dir $(INVESTIGATION_SMOKE_DIR) --state-input .artifacts/remediation-state-input.json --proposal .artifacts/remediation-proposal.json
 	$(PYTHON) -m paic remediate state build --input .artifacts/remediation-state-input.json --output-dir $(REMEDIATION_STATE_DIR) --overwrite
-	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
+	$(PYTHON) -m paic remediate plan build --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR) --proposal .artifacts/remediation-proposal.json --config $(REMEDIATION_CONFIG) --output-dir $(REMEDIATION_PLAN_DIR) --overwrite
 	$(PYTHON) examples/build_remediation_smoke_inputs.py --plan-dir $(REMEDIATION_PLAN_DIR) --decision-one .artifacts/remediation-decision-one.json --decision-two .artifacts/remediation-decision-two.json --execution-request .artifacts/remediation-execution-request.json
 	@secret="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; primary="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; manager="$$($(PYTHON) -c 'import secrets; print(secrets.token_urlsafe(48))')"; export PAIC_APPROVAL_SECRET="$$secret" PAIC_APPROVER_ONCALL_PRIMARY_KEY="$$primary" PAIC_APPROVER_CHANGE_MANAGER_KEY="$$manager"; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-one.json; $(PYTHON) -m paic remediate approval record --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --decision .artifacts/remediation-decision-two.json; $(PYTHON) -m paic remediate token issue --plan-dir $(REMEDIATION_PLAN_DIR) --approval-dir $(REMEDIATION_APPROVAL_DIR) --at 2026-07-18T00:07:00+00:00 --output .artifacts/remediation-approval.token; $(PYTHON) -m paic remediate execute --plan-dir $(REMEDIATION_PLAN_DIR) --state-dir $(REMEDIATION_STATE_DIR) --state-store $(REMEDIATION_STATE_STORE) --approval-dir $(REMEDIATION_APPROVAL_DIR) --token-file .artifacts/remediation-approval.token --request .artifacts/remediation-execution-request.json --output-state-dir $(REMEDIATION_STATE_AFTER_DIR) --output-dir $(REMEDIATION_EXECUTION_DIR) --overwrite
 	rm -f .artifacts/remediation-approval.token
 
 validate-remediation-smoke:
 	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_DIR)
-	$(PYTHON) -m paic remediate plan validate --plan-dir $(REMEDIATION_PLAN_DIR) --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_SHOWCASE_DIR) --detection-dir $(DETECTION_SHOWCASE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR)
+	$(PYTHON) -m paic remediate plan validate --plan-dir $(REMEDIATION_PLAN_DIR) --investigation-dir $(INVESTIGATION_SMOKE_DIR) --investigation-config $(INVESTIGATION_CONFIG) --dataset-dir $(IMPACT_SOURCE_SMOKE_DIR) --analytics-dir $(ANALYTICS_REFERENCE_DIR) --detection-dir $(DETECTION_REFERENCE_DIR) --impact-dir $(IMPACT_SMOKE_DIR) --evidence-dir $(EVIDENCE_SMOKE_DIR) --state-dir $(REMEDIATION_STATE_DIR)
 	$(PYTHON) -m paic remediate state validate --state-dir $(REMEDIATION_STATE_AFTER_DIR)
 	$(PYTHON) -m paic remediate execution validate --execution-dir $(REMEDIATION_EXECUTION_DIR) --plan-dir $(REMEDIATION_PLAN_DIR) --before-state-dir $(REMEDIATION_STATE_DIR) --after-state-dir $(REMEDIATION_STATE_AFTER_DIR)
 

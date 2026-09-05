@@ -5,12 +5,12 @@ root_dir: ../..
 paths:
   metrics:
     dataset_dir: .artifacts/impact-source-smoke
-    analytics_dir: .artifacts/analytics-showcase
-    detection_dir: .artifacts/detection-showcase
+    analytics_dir: .artifacts/analytics-reference
+    detection_dir: .artifacts/detection-reference
   incident:
     dataset_dir: .artifacts/impact-source-smoke
-    analytics_dir: .artifacts/analytics-showcase
-    detection_dir: .artifacts/detection-showcase
+    analytics_dir: .artifacts/analytics-reference
+    detection_dir: .artifacts/detection-reference
     impact_dir: .artifacts/impact-smoke
     evidence_dir: .artifacts/evidence-smoke
     investigation_dir: .artifacts/investigation-smoke

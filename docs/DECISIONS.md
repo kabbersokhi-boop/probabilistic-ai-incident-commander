@@ -26,11 +26,11 @@
 
 ## ADR-0005: Repository contracts are authoritative
 
-**Decision:** Machine-readable specifications and versioned documentation are the source of truth across development tools.
-**Reason:** Tool sessions do not share perfect memory, while the repository is reviewable and reproducible.
+**Decision:** Machine-readable specifications and versioned documentation define the implementation and validation contracts.
+**Reason:** One versioned contract keeps code, tests, and deployment evidence consistent, reviewable, and reproducible.
 **Status:** Accepted.
 
-## ADR-0006: Deliver capability milestones through focused changes
+## ADR-0006: Evolve capabilities through focused changes
 
 **Decision:** Each substantial capability receives a focused branch, tests, documentation, and review; public releases group compatible capabilities.
 **Reason:** Smaller integration risk, clearer history, and easier regression diagnosis.

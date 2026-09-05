@@ -103,5 +103,5 @@ qualifying degraded evaluations count toward consecutive reopening.
 - Exactly-once lifecycle updates are scoped to one local filesystem store and its locking semantics.
 - TOST and robust trend checks are evidence for synthetic recovery evaluation, not proof of production causality.
 - Hosted services, production identity, distributed coordination, and alert delivery
-  remain later milestones. The existing hardened container does not change the
+  remain future work. The existing hardened container does not change the
   local-only recovery authority boundary.

@@ -402,7 +402,7 @@ export function Detection({ b }: { b: Bundle }) {
                 title="A controlled detector input—not a production observation"
             >
                 <p>
-                    The showcase deterministically applies a{" "}
+                    The reference scenario deterministically applies a{" "}
                     {percent(Math.abs(Number(scenario?.magnitude)))} level
                     decrease to the {region(leading?.region)} metric copy on{" "}
                     {date(scenario?.start_at)}. This gives the detector known

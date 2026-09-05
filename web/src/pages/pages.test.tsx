@@ -7,7 +7,7 @@ import { Detection } from "./pages";
 const bundle = {
     files: [
         {
-            path: "metrics.detection/detection-showcase/detection.config.resolved.json",
+            path: "metrics.detection/detection-reference/detection.config.resolved.json",
             content: {
                 benchmark_scenarios: [
                     {

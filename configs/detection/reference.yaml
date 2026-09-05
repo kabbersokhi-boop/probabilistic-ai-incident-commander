@@ -1,5 +1,5 @@
 schema_version: "1.0"
-detection_id: checkout-address-validation-showcase
+detection_id: checkout-address-validation-reference
 timezone: UTC
 selectors:
   - metric: checkout_conversion_rate

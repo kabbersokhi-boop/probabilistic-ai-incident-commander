@@ -37,7 +37,7 @@ export const recoveryConfig = (b: Bundle) =>
 export const recoveryObservations = (b: Bundle) =>
     file(b, "obs-recovered/observation-set.json");
 export const detectionConfig = (b: Bundle) =>
-    file(b, "detection-showcase/detection.config.resolved.json");
+    file(b, "detection-reference/detection.config.resolved.json");
 export const simulationConfig = (b: Bundle) =>
     file(b, "impact-source-smoke/config.resolved.json");
 export const evaluationMetrics = (b: Bundle) =>
